@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: bob-pr-monitor
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd backend && gunicorn --worker-class eventlet -w 1 api_server:app
+    envVars:
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:5000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bob-db
+          property: connectionString
+      - key: SESSION_TYPE
+        value: filesystem
+      - key: FLASK_ENV
+        value: production
+
+databases:
+  - name: bob-db
+    plan: free
