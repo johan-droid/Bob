@@ -64,6 +64,7 @@ socket.on('update', (data) => {
     updateStats(data.stats);
     collectRepos(data);
     renderAll();
+    renderRepos(data.repos || []);
 });
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -136,6 +137,37 @@ function renderList(containerId, items) {
                 </select>
             </div>
         </div>`).join('');
+}
+
+function renderRepos(repos) {
+    const el = document.getElementById('repo-list');
+    const badge = document.getElementById('repo-count-badge');
+    if (!el || !badge) return;
+    
+    const activeRepos = repos.filter(r => r.is_active);
+    badge.textContent = `${activeRepos.length} Active`;
+
+    if (!repos.length) {
+        el.innerHTML = '<div class="pr-empty">Not tracking any repositories yet.</div>';
+        return;
+    }
+
+    el.innerHTML = repos.map(r => `
+        <div class="pr-card" style="opacity: ${r.is_active ? '1' : '0.5'}">
+            <div class="pr-dot ${r.is_active ? 'resolved' : 'pending'}"></div>
+            <div class="pr-body">
+                <div class="pr-title">${escHtml(r.full_name)}</div>
+                <div class="pr-meta">
+                    <span>${r.is_active ? 'Scanning' : 'Ignored'}</span>
+                    <span>· ${r.issue_count} total issues</span>
+                    ${r.permission ? `<span>· ${r.permission}</span>` : ''}
+                </div>
+            </div>
+            <div class="pr-actions">
+                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="pr-link" style="padding: 6px 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">View ↗</a>
+            </div>
+        </div>
+    `).join('');
 }
 
 // ── Status update ─────────────────────────────────────────────────────────────

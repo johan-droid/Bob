@@ -228,7 +228,13 @@
     // Show error banner if OAuth redirect included ?error=
     const _errKey = new URLSearchParams(location.search).get('error');
     if (_errKey) {
-      const _msgs = {invalid_state:'Security check failed. Please try signing in again.',no_code:'GitHub did not return an auth code.',no_token:'Token exchange failed.',user_fetch_failed:'Could not fetch GitHub profile.'};
+      const _msgs = {
+          invalid_state:'Security check failed. Please try signing in again.',
+          no_code:'GitHub did not return an auth code.',
+          no_token:'Token exchange failed.',
+          user_fetch_failed:'Could not fetch GitHub profile.',
+          network_error:'Temporary network error. Please try signing in again.'
+      };
       const _b = document.createElement('div');
       _b.style.cssText='position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px 20px;font-family:sans-serif;font-size:14px;z-index:9999';
       _b.textContent = _msgs[_errKey] || ('Error: ' + _errKey);

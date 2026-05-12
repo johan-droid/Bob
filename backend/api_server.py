@@ -144,21 +144,30 @@ def github_callback():
     if not code:
         return redirect('/?error=no_code')
 
-    token_resp = http_req.post(
-        'https://github.com/login/oauth/access_token',
-        headers={'Accept': 'application/json'},
-        data={'client_id': GITHUB_CLIENT_ID, 'client_secret': GITHUB_CLIENT_SECRET, 'code': code},
-        timeout=10,
-    )
-    token_data   = token_resp.json()
+    try:
+        token_resp = http_req.post(
+            'https://github.com/login/oauth/access_token',
+            headers={'Accept': 'application/json'},
+            data={'client_id': GITHUB_CLIENT_ID, 'client_secret': GITHUB_CLIENT_SECRET, 'code': code},
+            timeout=10,
+        )
+        token_data   = token_resp.json()
+    except http_req.exceptions.RequestException as e:
+        logger.error(f"Network error during token exchange: {e}")
+        return redirect('/?error=network_error')
+
     access_token = token_data.get('access_token')
     if not access_token:
         logger.error(f"Token exchange failed: {token_data.get('error_description')}")
         return redirect('/?error=no_token')
 
-    user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
-    if user_resp.status_code != 200:
-        return redirect('/?error=user_fetch_failed')
+    try:
+        user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
+        if user_resp.status_code != 200:
+            return redirect('/?error=user_fetch_failed')
+    except http_req.exceptions.RequestException as e:
+        logger.error(f"Network error during user fetch: {e}")
+        return redirect('/?error=network_error')
 
     ud = user_resp.json()
     github_id = ud.get('id')
@@ -575,9 +584,25 @@ def _get_user_data(user_id):
     by_status = {'pending': [], 'in_progress': [], 'failed': [], 'resolved': []}
     for i in issues:
         by_status.get(i.status, by_status['pending']).append(i.to_dict())
+        
+    user_repos = UserRepo.query.filter_by(user_id=user_id).all()
+    settings = UserSettings.query.filter_by(user_id=user_id).first()
+    excluded = settings.get_excluded_list() if settings else []
+    
+    repos_list = []
+    for ur in user_repos:
+        repo_issues = [i for i in issues if i.repo == ur.full_name]
+        repos_list.append({
+            'full_name': ur.full_name,
+            'is_active': ur.full_name not in excluded,
+            'issue_count': len(repo_issues),
+            'permission': ur.permission
+        })
+
     return {
         **by_status,
         'stats': {k: len(v) for k, v in by_status.items()} | {'total': len(issues)},
+        'repos': repos_list,
     }
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────

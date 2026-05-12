@@ -79,6 +79,17 @@
 
     <!-- Main panel -->
     <div class="dash-panels">
+        <!-- Repositories panel -->
+        <section class="panel" id="panel-repos">
+            <div class="panel-header">
+                <h2 class="panel-title">📦 Active Repositories</h2>
+                <span id="repo-count-badge" class="repo-badge">0</span>
+            </div>
+            <div id="repo-list" class="pr-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 15px;">
+                <div class="pr-loading">Loading repositories…</div>
+            </div>
+        </section>
+
         <!-- Active issues panel -->
         <section class="panel" id="panel-active">
             <div class="panel-header">
