@@ -1,10 +1,17 @@
 /* sw.js — Bob Service Worker */
-const CACHE = 'bob-v1';
-const OFFLINE_URLS = ['/', '/dashboard', '/offline.html'];
+const CACHE = 'bob-v2';
+const OFFLINE_URLS = ['/', '/offline.html'];
 
 self.addEventListener('install', e => {
     self.skipWaiting();
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE_URLS).catch(() => {})));
+    e.waitUntil(
+        caches.open(CACHE).then(c => {
+            // Use individual add for resilience against single 404s
+            OFFLINE_URLS.forEach(url => {
+                c.add(url).catch(() => console.log('SW: Could not cache', url));
+            });
+        })
+    );
 });
 
 self.addEventListener('activate', e => {
@@ -16,16 +23,35 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-    if (e.request.method !== 'GET') return;
-    if (e.request.url.includes('/api/') || e.request.url.includes('socket.io')) return;
+    const url = new URL(e.request.url);
+    
+    // Only intercept GET requests for our own origin
+    if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+    
+    // Skip API, Socket.IO, and OAuth routes
+    if (url.pathname.startsWith('/api/') || 
+        url.pathname.startsWith('/socket.io/') ||
+        url.pathname.startsWith('/login/') ||
+        url.pathname.startsWith('/callback/')) {
+        return;
+    }
+
     e.respondWith(
         fetch(e.request)
-            .then(r => {
-                const clone = r.clone();
-                caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
-                return r;
+            .then(res => {
+                // If valid response, cache a clone and return
+                if (res.status === 200) {
+                    const clone = res.clone();
+                    caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+                }
+                return res;
             })
-            .catch(() => caches.match(e.request).then(r => r || caches.match('/dashboard')))
+            .catch(() => {
+                // Network failure: Try cache, fallback to offline.html
+                return caches.match(e.request).then(cached => {
+                    return cached || caches.match('/offline.html');
+                });
+            })
     );
 });
 

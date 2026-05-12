@@ -6,7 +6,7 @@ import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, jsonify, request, render_template, redirect, session, abort
+from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 from flask_session import Session
@@ -377,6 +377,27 @@ def _check_and_provision(full_repo, username, user_token, server_token):
         if r.status_code in (204, 422):
             return {**base, 'status': 'push', 'message': 'Write access confirmed'}
     return {**base, 'status': 'read', 'message': 'Read-only access'}
+
+# ── PWA & Static Assets ───────────────────────────────────────────────────────
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(app.static_folder, 'icons/icon-192.png')
+
+@app.route('/icons/<path:path>')
+def send_icons(path):
+    return send_from_directory(os.path.join(app.static_folder, 'icons'), path)
+
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory(app.static_folder, 'sw.js', mimetype='application/javascript')
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory(app.static_folder, 'manifest.json', mimetype='application/json')
+
+@app.route('/offline.html')
+def serve_offline():
+    return render_template('offline.html')
 
 # ── API: Scan ─────────────────────────────────────────────────────────────────
 @app.route('/api/scan', methods=['POST'])
