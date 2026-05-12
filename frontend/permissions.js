@@ -385,9 +385,16 @@ function escHtml(s) {
 }
 
 async function apiFetch(url, opts = {}) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    const headers = { 
+        'Content-Type': 'application/json', 
+        ...(opts.headers || {}) 
+    };
+    if (csrfToken) headers['X-CSRFToken'] = csrfToken;
+
     const resp = await fetch(url, {
         ...opts,
-        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        headers
     });
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
