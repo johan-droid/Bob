@@ -596,8 +596,8 @@ def _ingest_scan_results(results, user_id, scanner=None):
         repo = result['repo']
         for pr in result.get('conflicting_prs', []):
             key = f"{repo}#{pr['pr']}"
-            existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
-            if not existing:
+            issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not issue:
                 issue = PRIssue(
                     user_id=user_id, repo=repo, issue_key=key,
                     title=pr['title'], url=pr['url'],
@@ -605,12 +605,14 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     issue_type='merge_conflict', status='pending',
                 )
                 db.session.add(issue)
-                if scanner:
-                    _trigger_auto_comment(issue, scanner)
+            
+            if scanner and issue.status == 'pending':
+                _trigger_auto_comment(issue, scanner)
+        
         for f in result.get('workflow_failures', []):
             key = f"{repo}#run{f['id']}"
-            existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
-            if not existing:
+            issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not issue:
                 issue = PRIssue(
                     user_id=user_id, repo=repo, issue_key=key,
                     title=f"CI: {f['name']} failed on {f['branch']}",
@@ -618,13 +620,18 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     issue_type='ci_failure', status='pending',
                 )
                 db.session.add(issue)
-                # Workflow runs aren't PRs, so we don't comment on them here
-                # unless they are associated with a PR branch (future work)
+    
     db.session.commit()
 
 def _trigger_auto_comment(issue, scanner):
-    if issue.comment_sent or not issue.pr_number:
+    if not issue.pr_number:
         return
+
+    # Anti-spam cooldown: Only 1 comment per 12 hours per issue
+    if issue.last_commented_at:
+        delta = datetime.utcnow() - issue.last_commented_at
+        if delta.total_seconds() < 43200: # 12 hours in seconds
+            return
     
     # Check if Bob has write access to this specific repo
     ur = UserRepo.query.filter_by(user_id=issue.user_id, full_name=issue.repo).first()
@@ -636,13 +643,17 @@ def _trigger_auto_comment(issue, scanner):
         f"🤖 **Bob PR Health Alert**\n\n"
         f"Hey @{scanner.assignee}, I've detected a **{issue.issue_type.replace('_', ' ')}** on this PR.\n"
         f"You can track the resolution progress on the [Bob Dashboard](https://bob-7ae2.onrender.com).\n\n"
-        f"*Status: Flagged for attention*"
+        f"*Status: Flagged for attention (Reminder #{issue.comment_count + 1})*"
     )
     
-    logger.info(f"Auto-commenting on {issue.repo}#{issue.pr_number}")
+    logger.info(f"Auto-commenting on {issue.repo}#{issue.pr_number} (Count: {issue.comment_count})")
     resp = scanner.create_comment(issue.repo, issue.pr_number, msg)
+    
     if 'id' in resp or 'url' in resp:
         issue.comment_sent = True
+        issue.last_commented_at = datetime.utcnow()
+        issue.comment_count = (issue.comment_count or 0) + 1
+        db.session.commit() # Commit IMMEDIATELY to prevent race conditions
     else:
         logger.warning(f"Failed to auto-comment: {resp}")
 

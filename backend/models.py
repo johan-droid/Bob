@@ -51,7 +51,9 @@ class PRIssue(db.Model):
     run_id     = db.Column(db.String(100))
     issue_type = db.Column(db.String(50))   # merge_conflict | ci_failure
     status     = db.Column(db.String(50), default='pending')  # pending|in_progress|failed|resolved
-    comment_sent = db.Column(db.Boolean, default=False)
+    comment_sent = db.Column(db.Boolean, default=False) # Legacy (keeping for compat)
+    last_commented_at = db.Column(db.DateTime)
+    comment_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
