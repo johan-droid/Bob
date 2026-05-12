@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Bob - PR Health Monitor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="connection-status disconnected" id="connection-status">
+        <div class="connection-dot"></div>
+        <span>Connecting...</span>
+    </div>
+    
+    <div class="container">
+        <header>
+            <h1>🤖 Bob</h1>
+            <p class="subtitle">Multi-Repo PR Health Monitor</p>
+            <div class="stats-bar">
+                <div class="stat">
+                    <span class="stat-value" id="stat-pending">0</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-in-progress">0</span>
+                    <span class="stat-label">In Progress</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-failed">0</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-resolved">0</span>
+                    <span class="stat-label">Resolved</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Active PR Resolution Section -->
+            <section class="pr-section">
+                <h2>🔴 Active PR Resolution</h2>
+                <p class="section-desc">PRs assigned to jules-google-lab awaiting response</p>
+                <div id="active-prs" class="pr-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </section>
+
+            <!-- Work in Progress Section -->
+            <section class="pr-section">
+                <h2>🟢 Work in Progress</h2>
+                <p class="section-desc">PRs currently being resolved by jules-google-lab</p>
+                <div id="in-progress-prs" class="pr-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </section>
+
+            <!-- Failed Resolution Section -->
+            <section class="pr-section">
+                <h2>🔴 Failed Resolution</h2>
+                <p class="section-desc">PRs that jules-google-lab couldn't fix</p>
+                <div id="failed-prs" class="pr-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </section>
+
+            <!-- History Section -->
+            <section class="pr-section">
+                <h2>⚪ History</h2>
+                <p class="section-desc">Successfully resolved PRs</p>
+                <div id="history-prs" class="pr-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
