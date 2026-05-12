@@ -5,6 +5,12 @@
   "logo": "https://via.placeholder.com/200x200?text=🤖",
   "keywords": ["github", "pr", "monitoring", "websocket", "flask", "python"],
   "success_url": "/",
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
   "env": {
     "GITHUB_TOKEN": {
       "description": "GitHub Personal Access Token with repo, issues:write, pull_requests:write scopes",
@@ -37,11 +43,5 @@
       "quantity": 1,
       "size": "basic"
     }
-  },
-  "buildpacks": [
-    {
-      "url": "heroku/python"
-    }
-  ],
-  "stack": "heroku-24"
+  }
 }}
