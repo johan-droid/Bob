@@ -152,6 +152,9 @@ body {
     background: #f6f8fa;
     padding: 12px;
     border-bottom: 1px solid #d0d7de;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .preview-dots {
@@ -168,6 +171,46 @@ body {
 .dot.red { background: #ff5f56; }
 .dot.yellow { background: #ffbd2e; }
 .dot.green { background: #27c93f; }
+
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #57606a;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #8b949e;
+}
+
+.live-dot.connected {
+    background: #27c93f;
+    box-shadow: 0 0 8px #27c93f;
+    animation: pulse-live 2s infinite;
+}
+
+.live-dot.disconnected {
+    background: #ff5f56;
+}
+
+@keyframes pulse-live {
+    0%, 100% {
+        box-shadow: 0 0 8px #27c93f;
+    }
+    50% {
+        box-shadow: 0 0 15px #27c93f, 0 0 25px #27c93f;
+    }
+}
+
+.live-text {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
 .preview-content {
     padding: 30px;
