@@ -616,7 +616,7 @@ def _get_user_data(user_id):
             'full_name': ur.full_name,
             'is_active': ur.full_name not in excluded,
             'issue_count': len(repo_issues),
-            'permission': ur.permission
+            'permission': ur.permissions_level
         })
 
     return {
@@ -627,7 +627,7 @@ def _get_user_data(user_id):
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     if 'user' not in session:
         return False  # reject unauthenticated connections
     username = session['user']['username']
