@@ -31,9 +31,12 @@ socket.on('disconnect', () => {
     document.getElementById('preview-resolved').textContent = '-';
 });
 
-socket.on('connect_error', () => {
+socket.on('connect_error', (err) => {
+    console.warn('Socket connection error:', err);
     liveIndicator.className = 'live-dot disconnected';
-    liveText.textContent = 'Error';
+    liveText.textContent = 'Retrying...';
+    // Force a fresh connection attempt
+    setTimeout(() => socket.connect(), 5000);
 });
 
 // Receive real-time updates

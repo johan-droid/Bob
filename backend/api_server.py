@@ -150,64 +150,80 @@ def github_callback():
         return redirect('/?error=no_code')
 
     try:
-        token_resp = http_req.post(
-            'https://github.com/login/oauth/access_token',
-            headers={'Accept': 'application/json'},
-            data={'client_id': GITHUB_CLIENT_ID, 'client_secret': GITHUB_CLIENT_SECRET, 'code': code},
-            timeout=10,
-        )
-        token_data   = token_resp.json()
-    except http_req.exceptions.RequestException as e:
-        logger.error(f"Network error during token exchange: {e}")
-        return redirect('/?error=network_error')
+        # Add retries for transient Heroku DNS issues
+        token_resp = None
+        for attempt in range(3):
+            try:
+                token_resp = http_req.post(
+                    'https://github.com/login/oauth/access_token',
+                    headers={'Accept': 'application/json'},
+                    data={
+                        'client_id': GITHUB_CLIENT_ID,
+                        'client_secret': GITHUB_CLIENT_SECRET,
+                        'code': code,
+                        'state': returned_state
+                    },
+                    timeout=10
+                )
+                break
+            except (http_req.exceptions.RequestException, Exception) as e:
+                if attempt == 2: raise e
+                logger.warning(f"OAuth token attempt {attempt+1} failed: {e}. Retrying...")
+                time.sleep(1)
 
-    access_token = token_data.get('access_token')
-    if not access_token:
-        logger.error(f"Token exchange failed: {token_data.get('error_description')}")
-        return redirect('/?error=no_token')
+        token_data = token_resp.json()
+        access_token = token_data.get('access_token')
+        if not access_token:
+            logger.error(f"No access token in response: {token_data}")
+            return redirect(url_for('landing', error='no_token'))
 
-    try:
-        user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
-        if user_resp.status_code != 200:
-            return redirect('/?error=user_fetch_failed')
-    except http_req.exceptions.RequestException as e:
-        logger.error(f"Network error during user fetch: {e}")
-        return redirect('/?error=network_error')
+        # Fetch user profile with retries
+        user_resp = None
+        for attempt in range(3):
+            try:
+                user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
+                break
+            except Exception as e:
+                if attempt == 2: raise e
+                time.sleep(1)
 
-    ud = user_resp.json()
-    github_id = ud.get('id')
-    username  = ud.get('login')
+        ud = user_resp.json()
+        github_id = ud.get('id')
+        username  = ud.get('login')
 
-    # Upsert user in DB
-    user = User.query.filter_by(github_id=github_id).first()
-    if not user:
-        user = User(github_id=github_id, username=username)
-        db.session.add(user)
-    user.avatar     = ud.get('avatar_url')
-    user.name       = ud.get('name') or username
-    user.email      = ud.get('email')
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-
-    # Ensure user has settings row
-    if not user.settings:
-        db.session.add(UserSettings(user_id=user.id))
+        # Upsert user in DB
+        user = User.query.filter_by(github_id=github_id).first()
+        if not user:
+            user = User(github_id=github_id, username=username)
+            db.session.add(user)
+        user.avatar     = ud.get('avatar_url')
+        user.name       = ud.get('name') or username
+        user.email      = ud.get('email')
+        user.last_login = datetime.utcnow()
         db.session.commit()
 
-    # Store minimal data in session (NO token in session)
-    session['user'] = {
-        'id':       github_id,
-        'username': username,
-        'avatar':   ud.get('avatar_url'),
-        'name':     ud.get('name') or username,
-        'email':    ud.get('email'),
-        'db_id':    user.id,
-    }
-    # Store token server-side keyed by db user id (in-memory, replaced by Redis in prod)
-    app.config.setdefault('_user_tokens', {})[user.id] = access_token
+        # Ensure user has settings row
+        if not user.settings:
+            db.session.add(UserSettings(user_id=user.id))
+            db.session.commit()
 
-    logger.info(f"Auth OK: {username}")
-    return redirect('/permissions')
+        # Store minimal data in session (NO token in session)
+        session['user'] = {
+            'id':       github_id,
+            'username': username,
+            'avatar':   ud.get('avatar_url'),
+            'name':     ud.get('name') or username,
+            'email':    ud.get('email'),
+            'db_id':    user.id,
+        }
+        # Store token server-side keyed by db user id (in-memory, replaced by Redis in prod)
+        app.config.setdefault('_user_tokens', {})[user.id] = access_token
+
+        logger.info(f"Auth OK: {username}")
+        return redirect('/permissions')
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        return redirect('/?error=oauth_failed')
 
 def get_user_token(user_id: int) -> str | None:
     """Retrieve the stored OAuth token for a user (server-side only)."""
