@@ -74,10 +74,10 @@ def ensure_schema():
         try:
             from sqlalchemy import text
             # Add agent_permission to user_repo
-            db.session.execute(text("ALTER TABLE user_repo ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
+            db.session.execute(text("ALTER TABLE user_repos ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
             # Add anti-spam columns to pr_issue
-            db.session.execute(text("ALTER TABLE pr_issue ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
-            db.session.execute(text("ALTER TABLE pr_issue ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
+            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
+            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
             db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:
