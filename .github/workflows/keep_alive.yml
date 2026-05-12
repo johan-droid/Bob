@@ -1,0 +1,14 @@
+name: Bob Heartbeat (Keep-Alive)
+
+on:
+  schedule:
+    - cron: '*/14 * * * *' # Every 14 minutes
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Heartbeat to Render
+        run: |
+          curl -f https://bob-7ae2.onrender.com/api/health || echo "Bob is sleeping, waking him up..."
