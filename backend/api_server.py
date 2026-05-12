@@ -12,7 +12,10 @@ import requests
 
 load_dotenv()
 
-app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
+app = Flask(__name__, 
+            static_folder='../frontend', 
+            static_url_path='',
+            template_folder='../frontend')
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
