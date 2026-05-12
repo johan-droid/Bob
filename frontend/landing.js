@@ -3,7 +3,11 @@ const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = window.location.hostname === 'localhost' 
     ? 'http://localhost:5000' 
     : window.location.origin;
-const socket = io(wsUrl);
+const socket = io(wsUrl, {
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    withCredentials: true
+});
 
 const liveIndicator = document.getElementById('live-indicator');
 const liveText = document.querySelector('.live-text');

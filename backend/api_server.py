@@ -61,7 +61,12 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, manage_session=False)
+socketio = SocketIO(app, 
+                    cors_allowed_origins="*", 
+                    manage_session=False, 
+                    ping_timeout=60, 
+                    ping_interval=25, 
+                    async_mode='eventlet')
 init_db(app)
 
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}

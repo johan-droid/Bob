@@ -42,7 +42,11 @@ let activeFilters = { repo: '', type: '', search: '' };
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 const wsUrl  = window.location.hostname === 'localhost'
     ? 'http://localhost:5000' : window.location.origin;
-const socket = io(wsUrl, { withCredentials: true });
+const socket = io(wsUrl, { 
+    withCredentials: true,
+    transports: ['websocket', 'polling'],
+    upgrade: true
+});
 const wsEl   = document.getElementById('ws-status');
 const wsDot  = wsEl?.querySelector('.ws-dot');
 const wsLbl  = wsEl?.querySelector('.ws-label');
