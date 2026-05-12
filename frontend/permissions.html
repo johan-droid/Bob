@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting Up Your Access – Bob</title>
+    <meta name="description" content="Bob is automatically configuring your repository access and permissions. No manual steps required.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="permissions.css">
+</head>
+<body>
+    <!-- Animated background particles -->
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="page-wrapper">
+        <!-- Top nav -->
+        <nav class="topnav">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                </div>
+                <span class="brand-name">Bob</span>
+                <span class="brand-badge">PR Intelligence</span>
+            </div>
+            <div class="user-chip" id="user-chip">
+                <img id="user-avatar" src="" alt="" class="chip-avatar">
+                <span id="user-name" class="chip-name">Loading...</span>
+                <div class="chip-dot"></div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <!-- Progress breadcrumb -->
+            <div class="breadcrumb-track">
+                <div class="crumb crumb-done">
+                    <div class="crumb-circle done">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span>Authenticated</span>
+                </div>
+                <div class="crumb-line active"></div>
+                <div class="crumb crumb-active">
+                    <div class="crumb-circle active">
+                        <div class="crumb-dot-inner"></div>
+                    </div>
+                    <span>Configuring Access</span>
+                </div>
+                <div class="crumb-line" id="crumb-line-2"></div>
+                <div class="crumb" id="crumb-3">
+                    <div class="crumb-circle" id="crumb-circle-3">3</div>
+                    <span>Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Hero section -->
+            <div class="hero">
+                <div class="hero-icon-wrap" id="hero-icon-wrap">
+                    <div class="hero-icon-ring"></div>
+                    <div class="hero-icon-ring ring-2"></div>
+                    <div class="hero-icon-inner">
+                        <svg id="hero-icon-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                </div>
+                <h1 class="hero-title" id="hero-title">Configuring Your Access</h1>
+                <p class="hero-subtitle" id="hero-subtitle">
+                    Bob is automatically discovering all your repositories (personal + orgs) and
+                    verifying access. <strong>No manual configuration needed.</strong>
+                </p>
+            </div>
+
+            <!-- Permission cards grid -->
+            <div class="permissions-grid" id="permissions-list">
+
+                <!-- OAuth Scopes Section -->
+                <div class="section-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    OAuth Permissions
+                </div>
+
+                <div class="perm-card" id="perm-repo" data-scope="repo">
+                    <div class="perm-left">
+                        <div class="perm-icon-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>
+                        </div>
+                        <div class="perm-text">
+                            <div class="perm-name">Repository Access <span class="perm-badge">repo</span></div>
+                            <div class="perm-desc">Read & write to PRs, issues, code, and branches</div>
+                        </div>
+                    </div>
+                    <div class="perm-status-wrap">
+                        <div class="perm-status pending" id="status-repo">
+                            <div class="status-spinner"></div>
+                        </div>
+                        <span class="perm-status-text" id="status-text-repo">Checking…</span>
+                    </div>
+                </div>
+
+                <div class="perm-card" id="perm-read_org" data-scope="read:org">
+                    <div class="perm-left">
+                        <div class="perm-icon-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <div class="perm-text">
+                            <div class="perm-name">Organization Membership <span class="perm-badge">read:org</span></div>
+                            <div class="perm-desc">Read org membership for team assignment and tagging</div>
+                        </div>
+                    </div>
+                    <div class="perm-status-wrap">
+                        <div class="perm-status pending" id="status-read_org">
+                            <div class="status-spinner"></div>
+                        </div>
+                        <span class="perm-status-text" id="status-text-read_org">Checking…</span>
+                    </div>
+                </div>
+
+                <div class="perm-card" id="perm-write_discussion" data-scope="write:discussion">
+                    <div class="perm-left">
+                        <div class="perm-icon-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <div class="perm-text">
+                            <div class="perm-name">Discussions <span class="perm-badge">write:discussion</span></div>
+                            <div class="perm-desc">Post PR analysis and CI failure notifications</div>
+                        </div>
+                    </div>
+                    <div class="perm-status-wrap">
+                        <div class="perm-status pending" id="status-write_discussion">
+                            <div class="status-spinner"></div>
+                        </div>
+                        <span class="perm-status-text" id="status-text-write_discussion">Checking…</span>
+                    </div>
+                </div>
+
+                <div class="perm-card" id="perm-workflow" data-scope="workflow">
+                    <div class="perm-left">
+                        <div class="perm-icon-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="6" height="4" rx="1"/><rect x="16" y="3" width="6" height="4" rx="1"/><rect x="9" y="10" width="6" height="4" rx="1"/><rect x="2" y="17" width="6" height="4" rx="1"/><rect x="16" y="17" width="6" height="4" rx="1"/><path d="M5 7v3h14V7"/><path d="M12 14v3"/></svg>
+                        </div>
+                        <div class="perm-text">
+                            <div class="perm-name">GitHub Actions <span class="perm-badge">workflow</span></div>
+                            <div class="perm-desc">Monitor and update CI/CD workflow runs</div>
+                        </div>
+                    </div>
+                    <div class="perm-status-wrap">
+                        <div class="perm-status pending" id="status-workflow">
+                            <div class="status-spinner"></div>
+                        </div>
+                        <span class="perm-status-text" id="status-text-workflow">Checking…</span>
+                    </div>
+                </div>
+
+                <div class="perm-card" id="perm-user_email" data-scope="user:email">
+                    <div class="perm-left">
+                        <div class="perm-icon-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        </div>
+                        <div class="perm-text">
+                            <div class="perm-name">Email Address <span class="perm-badge">user:email</span></div>
+                            <div class="perm-desc">Access email for alert delivery and account identity</div>
+                        </div>
+                    </div>
+                    <div class="perm-status-wrap">
+                        <div class="perm-status pending" id="status-user_email">
+                            <div class="status-spinner"></div>
+                        </div>
+                        <span class="perm-status-text" id="status-text-user_email">Checking…</span>
+                    </div>
+                </div>
+
+                <div class="section-label" style="margin-top: 8px;" id="section-repo-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                    Discovering Repositories…
+                </div>
+
+                <div id="repos-container">
+                    <div class="repos-loading">
+                        <div class="repos-spinner"></div>
+                        <span>Discovering target repositories…</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Status banner -->
+            <div class="status-banner" id="status-banner" style="display:none;">
+                <div class="banner-icon" id="banner-icon"></div>
+                <div class="banner-text">
+                    <div class="banner-title" id="banner-title"></div>
+                    <div class="banner-sub" id="banner-sub"></div>
+                </div>
+                <div class="banner-action" id="banner-action"></div>
+            </div>
+
+            <!-- Overall progress bar -->
+            <div class="progress-track">
+                <div class="progress-labels">
+                    <span class="progress-label">Auto-provisioning progress</span>
+                    <span class="progress-pct" id="progress-pct">0%</span>
+                </div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="cta-row" id="cta-row" style="display:none;">
+                <a href="/dashboard" class="btn-primary" id="btn-dashboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Open Dashboard
+                </a>
+                <a href="/login/github" class="btn-outline" id="btn-retry" style="display:none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    Re-authorize
+                </a>
+            </div>
+
+            <!-- Security note -->
+            <div class="security-note">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Your credentials are never stored. All access tokens are scoped and revocable from your <a href="https://github.com/settings/applications" target="_blank">GitHub settings</a> at any time.</span>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Inject server-side user data
+        const USER_DATA = {
+            username: "{{ user.username }}",
+            avatar: "{{ user.avatar }}",
+            name: "{{ user.name }}"
+        };
+    </script>
+    <script src="permissions.js"></script>
+</body>
+</html>

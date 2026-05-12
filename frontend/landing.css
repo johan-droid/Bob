@@ -376,6 +376,101 @@ body {
     color: #667eea;
 }
 
+/* Permissions Info Section */
+.permissions-info {
+    padding: 100px 20px;
+    background: #0d1117;
+    text-align: center;
+}
+
+.permissions-info h2 {
+    font-size: 48px;
+    margin-bottom: 20px;
+    color: white;
+}
+
+.section-subtitle {
+    font-size: 20px;
+    color: #8b949e;
+    margin-bottom: 60px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto 60px;
+}
+
+.permission-info-card {
+    background: #161b22;
+    padding: 35px 25px;
+    border-radius: 12px;
+    border: 1px solid #30363d;
+    transition: all 0.3s ease;
+}
+
+.permission-info-card:hover {
+    transform: translateY(-5px);
+    border-color: #667eea;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+}
+
+.permission-info-icon {
+    font-size: 42px;
+    margin-bottom: 18px;
+}
+
+.permission-info-card h3 {
+    font-size: 22px;
+    margin-bottom: 12px;
+    color: white;
+}
+
+.permission-info-card p {
+    color: #8b949e;
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.security-badge {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 12px;
+}
+
+.badge-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+}
+
+.badge-text {
+    text-align: left;
+}
+
+.badge-text strong {
+    display: block;
+    font-size: 20px;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.badge-text p {
+    color: #8b949e;
+    line-height: 1.6;
+    margin: 0;
+}
+
 /* CTA Section */
 .cta-section {
     padding: 100px 20px;
@@ -476,11 +571,13 @@ body {
     
     .features h2,
     .status-flow h2,
+    .permissions-info h2,
     .cta-section h2 {
         font-size: 32px;
     }
     
-    .features-grid {
+    .features-grid,
+    .permissions-grid {
         grid-template-columns: 1fr;
     }
     
@@ -490,5 +587,14 @@ body {
     
     .flow-arrow {
         transform: rotate(90deg);
+    }
+    
+    .security-badge {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .badge-text {
+        text-align: center;
     }
 }
