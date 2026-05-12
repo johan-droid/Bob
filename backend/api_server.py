@@ -150,9 +150,9 @@ def github_callback():
         return redirect('/?error=no_code')
 
     try:
-        # Add retries for transient Heroku DNS issues
+        # Add retries for transient Heroku DNS issues (Aggressive for 30s H12 limit)
         token_resp = None
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 token_resp = http_req.post(
                     'https://github.com/login/oauth/access_token',
@@ -163,13 +163,13 @@ def github_callback():
                         'code': code,
                         'state': returned_state
                     },
-                    timeout=10
+                    timeout=4 # Fail fast to allow more retries
                 )
                 break
-            except (http_req.exceptions.RequestException, Exception) as e:
-                if attempt == 2: raise e
+            except Exception as e:
+                if attempt == 4: raise e
                 logger.warning(f"OAuth token attempt {attempt+1} failed: {e}. Retrying...")
-                time.sleep(1)
+                time.sleep(0.5)
 
         token_data = token_resp.json()
         access_token = token_data.get('access_token')
@@ -181,11 +181,11 @@ def github_callback():
         user_resp = None
         for attempt in range(3):
             try:
-                user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
+                user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=5)
                 break
             except Exception as e:
                 if attempt == 2: raise e
-                time.sleep(1)
+                time.sleep(0.5)
 
         ud = user_resp.json()
         github_id = ud.get('id')
