@@ -1,0 +1,46 @@
+{
+  "name": "Bob - Multi-Repo PR Health Monitor",
+  "description": "Production-grade GitHub PR health monitoring system with real-time WebSocket updates",
+  "repository": "https://github.com/johan-droid/Bob",
+  "logo": "https://via.placeholder.com/200x200?text=🤖",
+  "keywords": ["github", "pr", "monitoring", "websocket", "flask", "python"],
+  "success_url": "/",
+  "env": {
+    "GITHUB_TOKEN": {
+      "description": "GitHub Personal Access Token with repo, issues:write, pull_requests:write scopes",
+      "required": true
+    },
+    "TARGET_REPOS": {
+      "description": "Comma-separated list of repositories to monitor (e.g., owner/repo1,owner/repo2)",
+      "required": true
+    },
+    "GITHUB_CLIENT_ID": {
+      "description": "GitHub OAuth App Client ID (create at https://github.com/settings/developers)",
+      "required": true
+    },
+    "GITHUB_CLIENT_SECRET": {
+      "description": "GitHub OAuth App Client Secret",
+      "required": true
+    },
+    "SECRET_KEY": {
+      "description": "Flask secret key for session management",
+      "generator": "secret"
+    },
+    "SCAN_INTERVAL": {
+      "description": "Background scan interval in seconds",
+      "value": "300",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}

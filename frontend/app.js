@@ -1,5 +1,9 @@
-// WebSocket connection
-const socket = io('http://localhost:5000');
+// WebSocket connection - use dynamic URL for Heroku
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : window.location.origin;
+const socket = io(wsUrl);
 
 const connectionStatus = document.getElementById('connection-status');
 
