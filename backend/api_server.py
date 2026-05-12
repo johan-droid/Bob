@@ -68,6 +68,25 @@ socketio = SocketIO(app,
                     async_mode='eventlet')
 init_db(app)
 
+def ensure_schema():
+    """Manually add columns if they don't exist (since create_all doesn't migrate)."""
+    with app.app_context():
+        try:
+            from sqlalchemy import text
+            # Add agent_permission to user_repo
+            db.session.execute(text("ALTER TABLE user_repo ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
+            # Add anti-spam columns to pr_issue
+            db.session.execute(text("ALTER TABLE pr_issue ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
+            db.session.execute(text("ALTER TABLE pr_issue ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
+            db.session.commit()
+            logger.info("Database schema check: OK (Auto-repaired if needed)")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Schema auto-repair failed: {e}")
+
+ensure_schema()
+
+
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def gh(token): return {**GH_HEADERS, 'Authorization': f'token {token}'}
@@ -252,104 +271,108 @@ def verify_permissions():
     missing = [s for s in required if not satisfied(s)]
     return jsonify({'granted': granted, 'required': required, 'missing': missing, 'all_granted': not missing})
 
-# ── API: Discover Repos ───────────────────────────────────────────────────────
+# ── API: Discovery Helpers ───────────────────────────────────────────────────────
 @app.route('/api/discover-repos', methods=['POST'])
 @login_required
 def discover_repos():
-    user = current_user()
-    token = get_user_token(user.id)
-    if not token:
-        return jsonify({'error': 'Session expired'}), 401
+    try:
+        user = current_user()
+        token = get_user_token(user.id)
+        if not token:
+            return jsonify({'error': 'Session expired'}), 401
 
-    repos_map = {}
+        repos_map = {}
 
-    # Source 1: user/repos
-    page = 1
-    while True:
-        r = http_req.get('https://api.github.com/user/repos', headers=gh(token),
-                         params={'affiliation': 'owner,collaborator,organization_member',
-                                 'visibility': 'all', 'per_page': 100, 'page': page}, timeout=15)
-        _handle_rate_limit(r)
-        if r.status_code != 200: break
-        batch = r.json()
-        if not batch: break
-        for repo in batch:
-            repos_map[repo['full_name']] = _normalize_repo(repo, 'direct')
-        if len(batch) < 100: break
-        page += 1
-
-    # Source 2: org repos
-    orgs_r = http_req.get('https://api.github.com/user/orgs', headers=gh(token),
-                           params={'per_page': 100}, timeout=10)
-    orgs = orgs_r.json() if orgs_r.status_code == 200 else []
-    for org in orgs:
-        org_login = org.get('login')
-        if not org_login: continue
-        p = 1
+        # Source 1: user/repos
+        page = 1
         while True:
-            or_ = http_req.get(f'https://api.github.com/orgs/{org_login}/repos', headers=gh(token),
-                               params={'type': 'all', 'per_page': 100, 'page': p}, timeout=15)
-            _handle_rate_limit(or_)
-            if or_.status_code != 200: break
-            ob = or_.json()
-            if not ob: break
-            for repo in ob:
-                if repo['full_name'] not in repos_map:
-                    repos_map[repo['full_name']] = _normalize_repo(repo, 'org')
-            if len(ob) < 100: break
-            p += 1
- 
-    # Source 3: Bot's own permissions (for Tiered Logic)
-    agent_repos = {}
-    if GITHUB_TOKEN:
-        ap = 1
-        while True:
-            ar = http_req.get('https://api.github.com/user/repos', headers=gh(GITHUB_TOKEN),
-                              params={'per_page': 100, 'page': ap}, timeout=15)
-            if ar.status_code != 200: break
-            abatch = ar.json()
-            if not abatch: break
-            for r in abatch:
-                agent_repos[r['full_name']] = 'admin' if r['permissions'].get('admin') else 'write' if r['permissions'].get('push') else 'read'
-            if len(abatch) < 100: break
-            ap += 1
+            r = http_req.get('https://api.github.com/user/repos', headers=gh(token),
+                             params={'affiliation': 'owner,collaborator,organization_member',
+                                     'visibility': 'all', 'per_page': 100, 'page': page}, timeout=15)
+            _handle_rate_limit(r)
+            if r.status_code != 200: break
+            batch = r.json()
+            if not batch: break
+            for repo in batch:
+                repos_map[repo['full_name']] = _normalize_repo(repo, 'direct')
+            if len(batch) < 100: break
+            page += 1
 
-    if TARGET_REPOS_OVERRIDE:
-        repos_map = {k: v for k, v in repos_map.items() if k in TARGET_REPOS_OVERRIDE}
+        # Source 2: org repos
+        orgs_r = http_req.get('https://api.github.com/user/orgs', headers=gh(token),
+                               params={'per_page': 100}, timeout=10)
+        orgs = orgs_r.json() if orgs_r.status_code == 200 else []
+        for org in orgs:
+            org_login = org.get('login')
+            if not org_login: continue
+            p = 1
+            while True:
+                or_ = http_req.get(f'https://api.github.com/orgs/{org_login}/repos', headers=gh(token),
+                                   params={'type': 'all', 'per_page': 100, 'page': p}, timeout=15)
+                _handle_rate_limit(or_)
+                if or_.status_code != 200: break
+                ob = or_.json()
+                if not ob: break
+                for repo in ob:
+                    if repo['full_name'] not in repos_map:
+                        repos_map[repo['full_name']] = _normalize_repo(repo, 'org')
+                if len(ob) < 100: break
+                p += 1
+     
+        # Source 3: Bot's own permissions (for Tiered Logic)
+        agent_repos = {}
+        if GITHUB_TOKEN:
+            ap = 1
+            while True:
+                ar = http_req.get('https://api.github.com/user/repos', headers=gh(GITHUB_TOKEN),
+                                  params={'per_page': 100, 'page': ap}, timeout=15)
+                if ar.status_code != 200: break
+                abatch = ar.json()
+                if not abatch: break
+                for r in abatch:
+                    agent_repos[r['full_name']] = 'admin' if r['permissions'].get('admin') else 'write' if r['permissions'].get('push') else 'read'
+                if len(abatch) < 100: break
+                ap += 1
 
-    uname = session['user']['username']
-    accessible = [r for r in repos_map.values()
-                  if r['permissions'].get('push') or r['permissions'].get('admin')
-                  or r.get('owner_login', '').lower() == uname.lower()]
-    accessible.sort(key=lambda r: r.get('pushed_at', '') or '', reverse=True)
+        if TARGET_REPOS_OVERRIDE:
+            repos_map = {k: v for k, v in repos_map.items() if k in TARGET_REPOS_OVERRIDE}
 
-    # Sync to DB
-    existing = {ur.full_name for ur in user.repos}
-    for r in accessible:
-        if r['full_name'] not in existing:
-            db.session.add(UserRepo(
-                user_id=user.id, full_name=r['full_name'],
-                private=r['private'], url=r['url'],
-                language=r['language'],
-                permissions_level=('owner' if r.get('owner_login','').lower()==uname.lower()
-                                   else 'admin' if r['permissions'].get('admin')
-                                   else 'push'),
-                agent_permission=agent_repos.get(r['full_name'], 'none'),
-                archived=r['archived'], fork=r['fork'],
-            ))
-        else:
-            ur = UserRepo.query.filter_by(user_id=user.id, full_name=r['full_name']).first()
-            if ur:
-                ur.agent_permission = agent_repos.get(r['full_name'], 'none')
-                ur.last_synced = datetime.utcnow()
-    db.session.commit()
+        uname = session['user']['username']
+        accessible = [r for r in repos_map.values()
+                      if r['permissions'].get('push') or r['permissions'].get('admin')
+                      or r.get('owner_login', '').lower() == uname.lower()]
+        accessible.sort(key=lambda r: r.get('pushed_at', '') or '', reverse=True)
 
-    session['user']['repos'] = [r['full_name'] for r in accessible]
-    session.modified = True
+        # Sync to DB
+        existing = {ur.full_name for ur in user.repos}
+        for r in accessible:
+            if r['full_name'] not in existing:
+                db.session.add(UserRepo(
+                    user_id=user.id, full_name=r['full_name'],
+                    private=r['private'], url=r['url'],
+                    language=r['language'],
+                    permissions_level=('owner' if r.get('owner_login','').lower()==uname.lower()
+                                       else 'admin' if r['permissions'].get('admin')
+                                       else 'push'),
+                    agent_permission=agent_repos.get(r['full_name'], 'none'),
+                    archived=r['archived'], fork=r['fork'],
+                ))
+            else:
+                ur = UserRepo.query.filter_by(user_id=user.id, full_name=r['full_name']).first()
+                if ur:
+                    ur.agent_permission = agent_repos.get(r['full_name'], 'none')
+                    ur.last_synced = datetime.utcnow()
+        db.session.commit()
 
-    logger.info(f"Discover: {uname} → {len(accessible)} repos")
-    return jsonify({'repos': accessible, 'total': len(accessible),
-                    'whitelisted': bool(TARGET_REPOS_OVERRIDE)})
+        session['user']['repos'] = [r['full_name'] for r in accessible]
+        session.modified = True
+
+        logger.info(f"Discover: {uname} → {len(accessible)} repos")
+        return jsonify({'repos': accessible, 'total': len(accessible),
+                        'whitelisted': bool(TARGET_REPOS_OVERRIDE)})
+    except Exception as e:
+        logger.error(f"Discovery error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 def _normalize_repo(r, source):
     return {
