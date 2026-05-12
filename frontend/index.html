@@ -1,129 +1,266 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Bob — PR Health Dashboard</title>
-    <meta name="description" content="Real-time PR health monitoring across all your GitHub repositories.">
-    <meta property="og:title" content="Bob — PR Health Dashboard">
-    <meta property="og:description" content="Zero-config GitHub PR health monitoring with real-time alerts.">
-    <meta name="theme-color" content="#080c14">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Bob PR Health Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "tertiary-fixed": "#89fa9b",
+                "surface-bright": "#f6faff",
+                "tertiary-container": "#008939",
+                "inverse-primary": "#adc7ff",
+                "surface-container": "#eaeef4",
+                "tertiary": "#006d2c",
+                "on-primary-fixed": "#001a41",
+                "on-surface-variant": "#414754",
+                "surface-variant": "#dee3e8",
+                "primary-fixed": "#d8e2ff",
+                "primary": "#005bbf",
+                "surface-dim": "#d6dae0",
+                "primary-fixed-dim": "#adc7ff",
+                "inverse-surface": "#2c3135",
+                "on-secondary": "#ffffff",
+                "secondary-fixed": "#d8e2ff",
+                "surface": "#f6faff",
+                "on-secondary-fixed": "#001a41",
+                "primary-container": "#1a73e8",
+                "surface-tint": "#005bc0",
+                "on-tertiary-container": "#ffffff",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#6ddd81",
+                "inverse-on-surface": "#edf1f7",
+                "secondary-container": "#4d8efe",
+                "secondary": "#005ac1",
+                "error": "#ba1a1a",
+                "on-tertiary-fixed": "#002108",
+                "surface-container-highest": "#dee3e8",
+                "secondary-fixed-dim": "#adc6ff",
+                "on-error": "#ffffff",
+                "error-container": "#ffdad6",
+                "on-primary-fixed-variant": "#004493",
+                "on-secondary-fixed-variant": "#004494",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary-container": "#00285c",
+                "on-tertiary-fixed-variant": "#005320",
+                "background": "#f6faff",
+                "on-primary-container": "#ffffff",
+                "on-surface": "#171c20",
+                "outline-variant": "#c1c6d6",
+                "on-tertiary": "#ffffff",
+                "on-background": "#171c20",
+                "outline": "#727785",
+                "surface-container-high": "#e4e9ee",
+                "surface-container-low": "#f0f4fa",
+                "on-error-container": "#93000a"
+            },
+            "fontFamily": {
+                "sans": ["Inter", "sans-serif"]
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined[data-weight="fill"] { font-variation-settings: 'FILL' 1; }
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: white; border-left: 4px solid #1a73e8; padding: 16px; border-radius: 4px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 12px; }
+        .toast.error { border-left-color: #ba1a1a; }
+        .toast.success { border-left-color: #008939; }
+        .toast.warning { border-left-color: #f9ab00; }
+    </style>
 </head>
-<body>
+<body class="bg-background text-on-background font-sans h-screen w-full flex overflow-hidden">
 
-<!-- Toast container -->
 <div id="toast-container" class="toast-container"></div>
 
-<!-- Navbar -->
-<nav class="navbar">
-    <div class="nav-brand">
-        <span class="nav-logo">🤖</span>
-        <span class="nav-title">Bob</span>
-        <span class="nav-badge">PR Health</span>
-    </div>
-    <div class="nav-controls">
-        <div class="search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" id="search-input" placeholder="Search repos or PRs…" class="search-input">
-        </div>
-        <select id="repo-filter" class="repo-filter">
-            <option value="">All Repos</option>
-        </select>
-        <select id="type-filter" class="repo-filter">
-            <option value="">All Types</option>
-            <option value="merge_conflict">Merge Conflicts</option>
-            <option value="ci_failure">CI Failures</option>
-        </select>
-        <div id="ws-status" class="ws-status disconnected" title="WebSocket status">
-            <span class="ws-dot"></span>
-            <span class="ws-label">Connecting…</span>
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-6 px-4 w-64 z-50 border-r border-outline-variant bg-surface h-screen fixed left-0 top-0">
+    <div class="flex items-center gap-2 mb-8">
+        <img alt="{{ user.name }}" class="w-10 h-10 rounded-full" src="{{ user.avatar }}"/>
+        <div>
+            <h1 class="font-bold text-lg text-primary">Bob PR</h1>
+            <p class="text-xs text-on-surface-variant">{{ user.name }}</p>
         </div>
     </div>
-    <div class="nav-user">
-        <a href="/settings" class="nav-icon-btn" title="Settings">⚙️</a>
-        <img src="{{ user.avatar }}" alt="{{ user.name }}" class="nav-avatar" id="nav-avatar">
-        <span class="nav-username">{{ user.name }}</span>
-        <a href="/logout" class="nav-logout">Sign out</a>
+    
+    <button class="bg-primary-container text-on-primary-container rounded-lg font-medium text-sm py-2 px-4 mb-8 hover:bg-secondary-container transition-colors flex items-center justify-center gap-2 shadow-sm">
+        <span class="material-symbols-outlined">add</span> New Alert
+    </button>
+    
+    <div class="flex-1 flex flex-col gap-2">
+        <a class="flex items-center gap-3 px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-medium text-sm" href="/">
+            <span class="material-symbols-outlined" data-weight="fill">dashboard</span> Dashboard
+        </a>
+        <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm" href="/permissions">
+            <span class="material-symbols-outlined">sync</span> Sync Repos
+        </a>
+        <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm" href="/settings">
+            <span class="material-symbols-outlined">settings</span> Settings
+        </a>
+    </div>
+    
+    <div class="flex flex-col gap-2 mt-auto">
+        <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm" href="/logout">
+            <span class="material-symbols-outlined">logout</span> Logout
+        </a>
     </div>
 </nav>
 
-<div class="dash-container">
-    <!-- Stats row -->
-    <div class="stats-row">
-        <div class="stat-card stat-pending">
-            <div class="stat-num" id="stat-pending">0</div>
-            <div class="stat-lbl">🔴 Pending</div>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-0 md:ml-64 w-full h-full">
+    <!-- TopNavBar -->
+    <header class="flex justify-between items-center h-16 w-full px-6 z-40 bg-surface-bright shadow-sm sticky top-0">
+        <div class="flex items-center gap-4">
+            <h2 class="text-xl font-black text-primary md:hidden">Bob</h2>
+            <div id="ws-status" class="flex items-center gap-2 text-xs font-medium text-outline">
+                <span class="w-2 h-2 rounded-full bg-outline ws-dot"></span>
+                <span class="ws-label">Connecting…</span>
+            </div>
         </div>
-        <div class="stat-card stat-progress">
-            <div class="stat-num" id="stat-in-progress">0</div>
-            <div class="stat-lbl">🟡 In Progress</div>
+        
+        <div class="flex items-center gap-4">
+            <select id="repo-filter" class="hidden sm:block py-1.5 px-3 border border-outline-variant rounded-full bg-surface-container-lowest text-sm outline-none">
+                <option value="">All Repos</option>
+            </select>
+            <select id="type-filter" class="hidden sm:block py-1.5 px-3 border border-outline-variant rounded-full bg-surface-container-lowest text-sm outline-none">
+                <option value="">All Types</option>
+                <option value="merge_conflict">Merge Conflicts</option>
+                <option value="ci_failure">CI Failures</option>
+            </select>
+            <div class="relative hidden sm:block">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+                <input id="search-input" class="pl-9 pr-4 py-1.5 border border-outline-variant rounded-full bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm w-48" placeholder="Search..." type="text"/>
+            </div>
+            <img alt="{{ user.name }}" class="w-8 h-8 rounded-full md:hidden" src="{{ user.avatar }}"/>
         </div>
-        <div class="stat-card stat-failed">
-            <div class="stat-num" id="stat-failed">0</div>
-            <div class="stat-lbl">⛔ Failed</div>
+    </header>
+    
+    <!-- Canvas -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
+        <div class="max-w-[1400px] mx-auto flex flex-col gap-8">
+            
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant flex flex-col">
+                    <span class="text-2xl font-bold text-on-background" id="stat-pending">0</span>
+                    <span class="text-xs font-medium text-error flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span> Pending</span>
+                </div>
+                <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant flex flex-col">
+                    <span class="text-2xl font-bold text-on-background" id="stat-in-progress">0</span>
+                    <span class="text-xs font-medium text-warning flex items-center gap-1" style="color: #f9ab00;"><span class="material-symbols-outlined text-sm">pending_actions</span> In Progress</span>
+                </div>
+                <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant flex flex-col">
+                    <span class="text-2xl font-bold text-on-background" id="stat-failed">0</span>
+                    <span class="text-xs font-medium text-error flex items-center gap-1"><span class="material-symbols-outlined text-sm">cancel</span> Failed</span>
+                </div>
+                <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant flex flex-col">
+                    <span class="text-2xl font-bold text-on-background" id="stat-resolved">0</span>
+                    <span class="text-xs font-medium text-tertiary-container flex items-center gap-1"><span class="material-symbols-outlined text-sm">check_circle</span> Resolved</span>
+                </div>
+                <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant flex flex-col">
+                    <span class="text-2xl font-bold text-on-background" id="stat-total">0</span>
+                    <span class="text-xs font-medium text-primary flex items-center gap-1"><span class="material-symbols-outlined text-sm">bar_chart</span> Total</span>
+                </div>
+            </div>
+
+            <!-- Repositories Panel -->
+            <section>
+                <div class="flex items-center gap-2 mb-4">
+                    <h2 class="text-xl font-semibold text-on-background">Active Repositories</h2>
+                    <span id="repo-count-badge" class="bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full text-xs font-medium">0</span>
+                </div>
+                <div id="repo-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div class="text-sm text-on-surface-variant">Loading repositories…</div>
+                </div>
+            </section>
+
+            <!-- Issues Panels -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Active Issues -->
+                <section>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-error flex items-center gap-2"><span class="material-symbols-outlined">error</span> Active Issues</h2>
+                        <button onclick="requestUpdate()" class="text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined">refresh</span></button>
+                    </div>
+                    <div id="active-prs" class="flex flex-col gap-3">
+                        <div class="text-sm text-on-surface-variant">Loading…</div>
+                    </div>
+                </section>
+                
+                <!-- In Progress -->
+                <section>
+                    <div class="flex items-center mb-4">
+                        <h2 class="text-xl font-semibold flex items-center gap-2" style="color: #f9ab00;"><span class="material-symbols-outlined">pending_actions</span> In Progress</h2>
+                    </div>
+                    <div id="in-progress-prs" class="flex flex-col gap-3">
+                        <div class="text-sm text-on-surface-variant">Loading…</div>
+                    </div>
+                </section>
+
+                <!-- Failed -->
+                <section>
+                    <div class="flex items-center mb-4">
+                        <h2 class="text-xl font-semibold text-error flex items-center gap-2"><span class="material-symbols-outlined">cancel</span> Failed</h2>
+                    </div>
+                    <div id="failed-prs" class="flex flex-col gap-3">
+                        <div class="text-sm text-on-surface-variant">Loading…</div>
+                    </div>
+                </section>
+
+                <!-- Resolved -->
+                <section>
+                    <div class="flex items-center mb-4">
+                        <h2 class="text-xl font-semibold text-tertiary-container flex items-center gap-2"><span class="material-symbols-outlined">check_circle</span> Resolved</h2>
+                    </div>
+                    <div id="history-prs" class="flex flex-col gap-3">
+                        <div class="text-sm text-on-surface-variant">Loading…</div>
+                    </div>
+                </section>
+            </div>
+            
         </div>
-        <div class="stat-card stat-resolved">
-            <div class="stat-num" id="stat-resolved">0</div>
-            <div class="stat-lbl">✅ Resolved</div>
-        </div>
-        <div class="stat-card stat-total">
-            <div class="stat-num" id="stat-total">0</div>
-            <div class="stat-lbl">📊 Total</div>
-        </div>
-    </div>
-
-    <!-- Main panel -->
-    <div class="dash-panels">
-        <!-- Repositories panel -->
-        <section class="panel" id="panel-repos">
-            <div class="panel-header">
-                <h2 class="panel-title">📦 Active Repositories</h2>
-                <span id="repo-count-badge" class="repo-badge">0</span>
-            </div>
-            <div id="repo-list" class="pr-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 15px;">
-                <div class="pr-loading">Loading repositories…</div>
-            </div>
-        </section>
-
-        <!-- Active issues panel -->
-        <section class="panel" id="panel-active">
-            <div class="panel-header">
-                <h2 class="panel-title">🔴 Active Issues</h2>
-                <button class="panel-refresh-btn" onclick="requestUpdate()" title="Refresh">↻</button>
-            </div>
-            <div id="active-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
-        </section>
-
-        <section class="panel" id="panel-progress">
-            <div class="panel-header">
-                <h2 class="panel-title">🟡 In Progress</h2>
-            </div>
-            <div id="in-progress-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
-        </section>
-
-        <section class="panel" id="panel-failed">
-            <div class="panel-header">
-                <h2 class="panel-title">⛔ Failed</h2>
-            </div>
-            <div id="failed-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
-        </section>
-
-        <section class="panel" id="panel-resolved">
-            <div class="panel-header">
-                <h2 class="panel-title">✅ Resolved</h2>
-            </div>
-            <div id="history-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
-        </section>
-    </div>
+    </main>
 </div>
 
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+<!-- Mobile Bottom Navigation -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-surface-variant flex justify-around items-center py-2 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
+    <a href="/" class="flex flex-col items-center gap-1 p-2 text-primary">
+        <span class="material-symbols-outlined text-2xl" data-weight="fill">dashboard</span>
+        <span class="text-[10px] font-medium">Home</span>
+    </a>
+    <a href="/permissions" class="flex flex-col items-center gap-1 p-2 text-on-surface-variant hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-2xl">sync</span>
+        <span class="text-[10px] font-medium">Sync</span>
+    </a>
+    <a href="/settings" class="flex flex-col items-center gap-1 p-2 text-on-surface-variant hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-2xl">settings</span>
+        <span class="text-[10px] font-medium">Settings</span>
+    </a>
+    <a href="/logout" class="flex flex-col items-center gap-1 p-2 text-on-surface-variant hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-2xl">logout</span>
+        <span class="text-[10px] font-medium">Logout</span>
+    </a>
+</nav>
+<style>
+    /* Support safe area spacing on iOS devices */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    /* Give the main content some bottom padding on mobile so content isn't hidden behind the nav */
+    @media (max-width: 768px) {
+        main { padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+    }
+</style>
 </body>
 </html>

@@ -655,6 +655,11 @@ def _trigger_auto_comment(issue, scanner):
         delta = datetime.utcnow() - issue.last_commented_at
         if delta.total_seconds() < 43200: # 12 hours in seconds
             return
+
+    # Anti-spam Hard Cap: Maximum 3 comments per issue
+    if issue.comment_count and issue.comment_count >= 3:
+        logger.info(f"Skipping auto-comment on {issue.repo}#{issue.pr_number} (Hard cap of 3 reached)")
+        return
     
     # Check if Bob has write access to this specific repo
     ur = UserRepo.query.filter_by(user_id=issue.user_id, full_name=issue.repo).first()

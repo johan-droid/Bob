@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bob PR Health Monitor - Sync Repos</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed": "#89fa9b",
+                    "surface-bright": "#f6faff",
+                    "tertiary-container": "#008939",
+                    "inverse-primary": "#adc7ff",
+                    "surface-container": "#eaeef4",
+                    "tertiary": "#006d2c",
+                    "on-primary-fixed": "#001a41",
+                    "on-surface-variant": "#414754",
+                    "surface-variant": "#dee3e8",
+                    "primary-fixed": "#d8e2ff",
+                    "primary": "#005bbf",
+                    "surface-dim": "#d6dae0",
+                    "primary-fixed-dim": "#adc7ff",
+                    "inverse-surface": "#2c3135",
+                    "on-secondary": "#ffffff",
+                    "secondary-fixed": "#d8e2ff",
+                    "surface": "#f6faff",
+                    "on-secondary-fixed": "#001a41",
+                    "primary-container": "#1a73e8",
+                    "surface-tint": "#005bc0",
+                    "on-tertiary-container": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#6ddd81",
+                    "inverse-on-surface": "#edf1f7",
+                    "secondary-container": "#4d8efe",
+                    "secondary": "#005ac1",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed": "#002108",
+                    "surface-container-highest": "#dee3e8",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-error": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#004493",
+                    "on-secondary-fixed-variant": "#004494",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-container": "#00285c",
+                    "on-tertiary-fixed-variant": "#005320",
+                    "background": "#f6faff",
+                    "on-primary-container": "#ffffff",
+                    "on-surface": "#171c20",
+                    "outline-variant": "#c1c6d6",
+                    "on-tertiary": "#ffffff",
+                    "on-background": "#171c20",
+                    "outline": "#727785",
+                    "surface-container-high": "#e4e9ee",
+                    "surface-container-low": "#f0f4fa",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-margin": "24px",
+                    "base": "8px",
+                    "sm": "8px",
+                    "md": "16px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "gutter": "16px"
+            },
+            "fontFamily": {
+                    "title-md": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-sm": [
+                            "Inter"
+                    ],
+                    "display-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "title-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "title-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "letterSpacing": "0.15px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.25px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-sm": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "0px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "57px",
+                            {
+                                    "lineHeight": "64px",
+                                    "letterSpacing": "-0.25px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "letterSpacing": "0.5px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.1px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "label-md": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.5px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "title-lg": [
+                            "22px",
+                            {
+                                    "lineHeight": "28px",
+                                    "letterSpacing": "0px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "0px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-full flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-lg px-md w-64 z-50 border-r border-outline-variant bg-surface h-screen fixed left-0 top-0">
+<div class="flex items-center gap-sm mb-xl">
+<img alt="User Profile" class="w-10 h-10 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhURXt5OPMwXatyJyzBJEbOsrjxbg0nPh8i73oEQjj771Qe-SPpHFp7L9DtcZWTx0VkG5P5uzhUvuCM2BTPSU9ITBj0NwAO5AYnyq2GOPdUb3kM9SVZYQ0id9QEQmlIiiwHLSEX89oWmrZw4dD0HArpBMd2ztsQb5D4nrGXOK02gfduhYvjCa1MED6N32iVXZsgwrhpen2QWlDNxh01pK_Vk4muPsRcfqtS9rI3jIKHEE-x-1EywglcCeb8OGG05OlN9akiVlLBVs"/>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary">Bob PR Monitor</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</p>
+</div>
+</div>
+<button class="bg-primary-container text-on-primary-container rounded-lg font-label-lg text-label-lg py-sm px-md mb-xl hover:bg-secondary-container transition-colors flex items-center justify-center gap-sm shadow-sm">
+<span class="material-symbols-outlined">add</span> New PR Alert
+        </button>
+<div class="flex-1 flex flex-col gap-sm">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">monitor_heart</span> Health Monitor
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-bold font-title-md text-title-md scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-weight="fill">sync</span> Sync Repos
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">notifications</span> Alerts
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">settings</span> Settings
+            </a>
+</div>
+<div class="flex flex-col gap-sm mt-auto">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">help</span> Help Center
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors font-title-md text-title-md" href="#">
+<span class="material-symbols-outlined">logout</span> Logout
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-0 md:ml-64 w-full h-full">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center h-16 w-full px-lg z-40 bg-surface-bright shadow-sm sticky top-0">
+<div class="flex items-center gap-md">
+<h2 class="font-title-lg text-title-lg font-black text-primary md:hidden">Dashboard</h2>
+<div class="hidden md:flex gap-md font-label-lg text-label-lg">
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">Overview</a>
+<a class="text-primary border-b-2 border-primary pb-1 opacity-80" href="#">Analytics</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 border border-outline-variant rounded-full bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md" placeholder="Search repos..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">apps</span></button>
+<button class="bg-primary-container text-on-primary-container rounded-lg font-label-lg text-label-lg py-sm px-md hover:bg-secondary-container transition-colors hidden sm:block">Sync All</button>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full md:hidden" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-Y-USoOP7ZLeOzd5utMUG6sufa0xhHGP7gRrh-cgWVSp1I3-rhAqnvb1P36R2Ob5DSCIrC2Y_IGUxvDDSSaXZTRnNrOU-L17-KdF5GVBa7yESmlAUGct-k6o4b3ipNAdpgdyB4pPcB5RduPQo_P2aP-7jkrhrn4lFxjY6hwbWpuNL7jtKKv0jHATxiC97xV9oAV8uzn3sQtyDzkN5QH9u5lo_l_r_476rLsm9xXBe1v4bC-0oooLSs2F7wiX5noGjUJlkhBW9jrs"/>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-md md:p-container-margin bg-background">
+<div class="max-w-[1400px] mx-auto">
+<div class="flex justify-between items-end mb-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background">Synchronized Repositories</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-sm">Manage and monitor health across your connected codebases.</p>
+</div>
+</div>
+<!-- Repo Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-lg">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-surface-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-md">
+<div class="flex items-center gap-sm">
+<span class="w-3 h-3 rounded-full bg-tertiary-fixed shadow-sm"></span>
+<h3 class="font-title-md text-title-md text-on-surface">frontend-app</h3>
+</div>
+<span class="px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md">TypeScript</span>
+</div>
+<div class="flex flex-col gap-xs mb-md font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between"><span>Privacy:</span> <span class="bg-inverse-surface text-inverse-on-surface px-2 rounded-full text-xs">Private</span></div>
+<div class="flex justify-between"><span>Permissions:</span> <span>Agent/Jule</span></div>
+</div>
+<div class="pt-sm border-t border-surface-variant flex justify-between items-center text-on-surface-variant font-label-md text-label-md">
+<span>Synced 2h ago</span>
+<button class="text-primary hover:text-primary-container"><span class="material-symbols-outlined text-xl">sync</span></button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-surface-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-md">
+<div class="flex items-center gap-sm">
+<span class="w-3 h-3 rounded-full bg-tertiary-fixed shadow-sm"></span>
+<h3 class="font-title-md text-title-md text-on-surface">api-service</h3>
+</div>
+<span class="px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md">Go</span>
+</div>
+<div class="flex flex-col gap-xs mb-md font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between"><span>Privacy:</span> <span class="bg-surface-container-high text-on-surface px-2 rounded-full text-xs border border-outline-variant">Public</span></div>
+<div class="flex justify-between"><span>Permissions:</span> <span>Agent/Jule</span></div>
+</div>
+<div class="pt-sm border-t border-surface-variant flex justify-between items-center text-on-surface-variant font-label-md text-label-md">
+<span>Synced 1h ago</span>
+<button class="text-primary hover:text-primary-container"><span class="material-symbols-outlined text-xl">sync</span></button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-surface-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-md">
+<div class="flex items-center gap-sm">
+<span class="w-3 h-3 rounded-full bg-error shadow-sm"></span>
+<h3 class="font-title-md text-title-md text-on-surface">legacy-auth</h3>
+</div>
+<span class="px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md">Java</span>
+</div>
+<div class="flex flex-col gap-xs mb-md font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between"><span>Privacy:</span> <span class="bg-inverse-surface text-inverse-on-surface px-2 rounded-full text-xs">Private</span></div>
+<div class="flex justify-between"><span>Permissions:</span> <span>Admin</span></div>
+</div>
+<div class="pt-sm border-t border-surface-variant flex justify-between items-center text-on-surface-variant font-label-md text-label-md">
+<span class="text-error">Sync failed</span>
+<button class="text-primary hover:text-primary-container"><span class="material-symbols-outlined text-xl">sync</span></button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-surface-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-md">
+<div class="flex items-center gap-sm">
+<span class="w-3 h-3 rounded-full bg-secondary-container shadow-sm"></span>
+<h3 class="font-title-md text-title-md text-on-surface">docs-site</h3>
+</div>
+<span class="px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md">Markdown</span>
+</div>
+<div class="flex flex-col gap-xs mb-md font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between"><span>Privacy:</span> <span class="bg-surface-container-high text-on-surface px-2 rounded-full text-xs border border-outline-variant">Public</span></div>
+<div class="flex justify-between"><span>Permissions:</span> <span>Agent/Jule</span></div>
+</div>
+<div class="pt-sm border-t border-surface-variant flex justify-between items-center text-on-surface-variant font-label-md text-label-md">
+<span>Synced 5h ago</span>
+<button class="text-primary hover:text-primary-container"><span class="material-symbols-outlined text-xl">sync</span></button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

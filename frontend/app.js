@@ -142,24 +142,26 @@ function renderList(containerId, items) {
     const el = document.getElementById(containerId);
     if (!el) return;
     if (!items.length) {
-        el.innerHTML = '<div class="pr-empty">Nothing here 🎉</div>';
+        el.innerHTML = '<div class="text-sm text-on-surface-variant bg-surface-container-low rounded-lg p-6 text-center border border-surface-variant border-dashed">Nothing here 🎉</div>';
         return;
     }
     el.innerHTML = items.map(pr => `
-        <div class="pr-card" data-id="${pr.id}">
-            <div class="pr-dot ${pr.status}"></div>
-            <div class="pr-body">
-                <div class="pr-title">${escHtml(pr.title || 'Untitled')}</div>
-                <div class="pr-meta">
-                    <span class="pr-repo">${escHtml(pr.repo)}</span>
-                    ${pr.branch ? `<span>· ${escHtml(pr.branch)}</span>` : ''}
-                    ${pr.pr_number ? `<span>· PR #${pr.pr_number}</span>` : ''}
+        <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between md:items-center gap-4" data-id="${pr.id}">
+            <div class="flex items-start md:items-center gap-3">
+                <span class="w-3 h-3 rounded-full mt-1.5 md:mt-0 ${pr.status === 'failed' ? 'bg-error' : pr.status === 'resolved' ? 'bg-tertiary-container' : pr.status === 'in_progress' ? 'bg-[#f9ab00]' : 'bg-primary'} shadow-sm"></span>
+                <div class="flex flex-col">
+                    <div class="font-medium text-on-surface">${escHtml(pr.title || 'Untitled')}</div>
+                    <div class="text-xs text-on-surface-variant flex flex-wrap gap-2 mt-1">
+                        <span class="font-medium">${escHtml(pr.repo)}</span>
+                        ${pr.branch ? `<span>· ${escHtml(pr.branch)}</span>` : ''}
+                        ${pr.pr_number ? `<span>· PR #${pr.pr_number}</span>` : ''}
+                    </div>
                 </div>
-                <a href="${escHtml(pr.url || '#')}" target="_blank" class="pr-link">View on GitHub →</a>
             </div>
-            <div class="pr-actions">
-                <span class="pr-badge ${pr.type}">${pr.type === 'merge_conflict' ? '⚡ Conflict' : '🔧 CI'}</span>
-                <select class="pr-status-select" onchange="setStatus(${pr.id}, this.value)">
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="${escHtml(pr.url || '#')}" target="_blank" class="text-sm text-primary hover:text-primary-container font-medium flex items-center gap-1">View ↗</a>
+                <span class="px-2 py-1 rounded bg-surface-container text-on-surface-variant text-xs font-medium">${pr.type === 'merge_conflict' ? '⚡ Conflict' : '🔧 CI'}</span>
+                <select class="py-1 px-2 border border-outline-variant rounded bg-surface-container-lowest text-xs outline-none cursor-pointer" onchange="setStatus(${pr.id}, this.value)">
                     ${['pending','in_progress','failed','resolved'].map(s =>
                         `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`
                     ).join('')}
@@ -177,24 +179,26 @@ function renderRepos(repos) {
     badge.textContent = `${activeRepos.length} Active`;
 
     if (!repos.length) {
-        el.innerHTML = '<div class="pr-empty">Not tracking any repositories yet.</div>';
+        el.innerHTML = '<div class="text-sm text-on-surface-variant bg-surface-container-low rounded-lg p-6 text-center border border-surface-variant border-dashed md:col-span-2 lg:col-span-3 xl:col-span-4">Not tracking any repositories yet.</div>';
         return;
     }
 
     el.innerHTML = repos.map(r => `
-        <div class="pr-card" style="opacity: ${r.is_active ? '1' : '0.5'}">
-            <div class="pr-dot ${r.is_active ? 'resolved' : 'pending'}"></div>
-            <div class="pr-body">
-                <div class="pr-title">${escHtml(r.full_name)}</div>
-                <div class="pr-meta">
-                    <span>${r.is_active ? 'Scanning' : 'Ignored'}</span>
-                    <span>· ${r.issue_count} total issues</span>
-                    <span>· ${escHtml(r.permission || 'read')}</span>
-                    ${r.agent_permission ? `<span class="agent-badge ${r.agent_permission}">${r.agent_permission === 'write' || r.agent_permission === 'admin' ? '🟢 Active' : '🟡 Observer'}</span>` : ''}
+        <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant hover:shadow-md transition-shadow flex flex-col justify-between" style="opacity: ${r.is_active ? '1' : '0.5'}">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full ${r.is_active ? 'bg-tertiary-fixed' : 'bg-outline'} shadow-sm"></span>
+                    <h3 class="font-medium text-on-surface truncate pr-2" title="${escHtml(r.full_name)}">${escHtml(r.full_name)}</h3>
                 </div>
             </div>
-            <div class="pr-actions">
-                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="pr-link" style="padding: 6px 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">View ↗</a>
+            <div class="flex flex-col gap-1 mb-4 text-sm text-on-surface-variant">
+                <div class="flex justify-between"><span>Status:</span> <span class="bg-surface-container-high text-on-surface px-2 rounded-full text-xs border border-outline-variant">${r.is_active ? 'Scanning' : 'Ignored'}</span></div>
+                <div class="flex justify-between"><span>Issues:</span> <span>${r.issue_count} total</span></div>
+                <div class="flex justify-between"><span>Perms:</span> <span>${escHtml(r.permission || 'read')}</span></div>
+                ${r.agent_permission ? `<div class="flex justify-between"><span>Agent:</span> <span class="${r.agent_permission === 'write' || r.agent_permission === 'admin' ? 'text-tertiary-container' : 'text-[#f9ab00]'} font-medium">${r.agent_permission === 'write' || r.agent_permission === 'admin' ? 'Active' : 'Observer'}</span></div>` : ''}
+            </div>
+            <div class="pt-3 border-t border-surface-variant flex justify-end items-center">
+                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="text-sm text-primary hover:text-primary-container font-medium flex items-center gap-1">View ↗</a>
             </div>
         </div>
     `).join('');
