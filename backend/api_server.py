@@ -444,7 +444,7 @@ def trigger_scan():
 
     scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
     results = scanner.scan_all_repos()
-    _ingest_scan_results(results, user.id)
+    _ingest_scan_results(results, user.id, scanner=scanner)
     data = _get_user_data(user.id)
     socketio.emit('update', data, to=session['user']['username'])
     return jsonify({'success': True, 'results': results})
@@ -574,30 +574,54 @@ def _emit_to_repo_owners(repo_full_name):
         socketio.emit('update', _get_user_data(ur.user_id), to=ur.user.username)
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
-def _ingest_scan_results(results, user_id):
+def _ingest_scan_results(results, user_id, scanner=None):
     for result in results:
         repo = result['repo']
         for pr in result.get('conflicting_prs', []):
             key = f"{repo}#{pr['pr']}"
             existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
             if not existing:
-                db.session.add(PRIssue(
+                issue = PRIssue(
                     user_id=user_id, repo=repo, issue_key=key,
                     title=pr['title'], url=pr['url'],
                     pr_number=pr['pr'], branch=pr.get('head_branch'),
                     issue_type='merge_conflict', status='pending',
-                ))
+                )
+                db.session.add(issue)
+                if scanner:
+                    _trigger_auto_comment(issue, scanner)
         for f in result.get('workflow_failures', []):
             key = f"{repo}#run{f['id']}"
             existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
             if not existing:
-                db.session.add(PRIssue(
+                issue = PRIssue(
                     user_id=user_id, repo=repo, issue_key=key,
                     title=f"CI: {f['name']} failed on {f['branch']}",
                     url=f['html_url'], run_id=str(f['id']), branch=f['branch'],
                     issue_type='ci_failure', status='pending',
-                ))
+                )
+                db.session.add(issue)
+                # Workflow runs aren't PRs, so we don't comment on them here
+                # unless they are associated with a PR branch (future work)
     db.session.commit()
+
+def _trigger_auto_comment(issue, scanner):
+    if issue.comment_sent or not issue.pr_number:
+        return
+    
+    msg = (
+        f"🤖 **Bob PR Health Alert**\n\n"
+        f"Hey @{scanner.assignee}, I've detected a **{issue.issue_type.replace('_', ' ')}** on this PR.\n"
+        f"You can track the resolution progress on the [Bob Dashboard](https://bob-7ae2.onrender.com).\n\n"
+        f"*Status: Flagged for attention*"
+    )
+    
+    logger.info(f"Auto-commenting on {issue.repo}#{issue.pr_number}")
+    resp = scanner.create_comment(issue.repo, issue.pr_number, msg)
+    if 'id' in resp or 'url' in resp:
+        issue.comment_sent = True
+    else:
+        logger.warning(f"Failed to auto-comment: {resp}")
 
 def _get_user_data(user_id):
     issues = PRIssue.query.filter_by(user_id=user_id).all()
