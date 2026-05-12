@@ -22,6 +22,23 @@ async function apiFetch(url, opts = {}) {
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    // Initial fetch to avoid waiting for WebSocket
+    requestUpdate();
+});
+
+function requestUpdate() {
+    apiFetch('/api/dashboard-data')
+        .then(data => {
+            allData = data;
+            updateStats(data.stats);
+            collectRepos(data);
+            renderAll();
+            renderRepos(data.repos || []);
+        })
+        .catch(err => console.warn('[Initial fetch] Failed:', err.message));
+}
+
 function showToast(msg, type = 'info', duration = 4000) {
     const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
     const el = document.createElement('div');
@@ -205,7 +222,7 @@ document.getElementById('search-input')?.addEventListener('input', e => {
     activeFilters.search = e.target.value.toLowerCase(); renderAll();
 });
 
-function requestUpdate() { socket.emit('request_update'); }
+
 
 // ── PWA push notifications ────────────────────────────────────────────────────
 async function requestNotificationPermission() {

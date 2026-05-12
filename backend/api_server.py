@@ -624,6 +624,11 @@ def _get_user_data(user_id):
         'stats': {k: len(v) for k, v in by_status.items()} | {'total': len(issues)},
         'repos': repos_list,
     }
+ 
+@app.route('/api/dashboard-data')
+@login_required
+def get_dashboard_data():
+    return jsonify(_get_user_data(session['user']['db_id']))
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 @socketio.on('connect')
