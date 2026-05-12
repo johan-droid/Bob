@@ -1,0 +1,19 @@
+{
+  "name": "Bob PR Monitor",
+  "short_name": "Bob",
+  "description": "Zero-config GitHub PR health monitoring with real-time alerts.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["developer", "productivity"],
+  "shortcuts": [
+    { "name": "Dashboard", "url": "/dashboard", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Settings",  "url": "/settings",  "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

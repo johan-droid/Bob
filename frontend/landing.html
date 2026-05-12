@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Bob - Multi-Repo PR Health Monitor</title>
+    <title>Bob — Multi-Repo PR Health Monitor</title>
+    <meta name="description" content="Zero-config GitHub PR health monitoring with real-time alerts across all your repos.">
+    <meta property="og:title" content="Bob — PR Health Monitor">
+    <meta property="og:description" content="Zero-config GitHub PR health monitoring with real-time alerts.">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#080c14">
+    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
 </head>
 <body>
@@ -216,6 +222,20 @@
         </footer>
     </div>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='landing.js') }}"></script>
+    <script src="{{ url_for('static', filename='landing.js') }}">
+    </script>
+    <script>
+    // Show error banner if OAuth redirect included ?error=
+    const _errKey = new URLSearchParams(location.search).get('error');
+    if (_errKey) {
+      const _msgs = {invalid_state:'Security check failed. Please try signing in again.',no_code:'GitHub did not return an auth code.',no_token:'Token exchange failed.',user_fetch_failed:'Could not fetch GitHub profile.'};
+      const _b = document.createElement('div');
+      _b.style.cssText='position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px 20px;font-family:sans-serif;font-size:14px;z-index:9999';
+      _b.textContent = _msgs[_errKey] || ('Error: ' + _errKey);
+      document.body.prepend(_b);
+      setTimeout(()=>_b.remove(), 6000);
+    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    </script>
 </body>
 </html>

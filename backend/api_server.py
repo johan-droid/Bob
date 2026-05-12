@@ -1,331 +1,311 @@
 """
-api_server.py — Bob PR Health Scanner
-────────────────────────────────────────────────────────────────────────────
-Zero-config repo discovery: TARGET_REPOS is optional.
-On login, the system automatically discovers EVERY repo the user has access
-to (personal + all orgs) using their OAuth token, stores them in the session,
-and uses them for live PR health scanning.
-
-Flow:
-  1. GitHub OAuth login → /callback/github
-  2. /permissions page loads → JS calls:
-       GET  /api/verify-permissions   – check OAuth scopes
-       POST /api/discover-repos       – auto-discover all accessible repos
-       POST /api/auto-provision       – verify & report access level per repo
-  3. PR scanning uses the discovered repos (session-stored)
-  4. Background thread continuously scans all known repos across all sessions
-────────────────────────────────────────────────────────────────────────────
+api_server.py — Bob PR Health Scanner (SaaS-grade)
+Security: server-side sessions, OAuth state, CSRF, CORS lockdown, WS auth, DB persistence.
 """
-
-from flask import Flask, jsonify, request, render_template, redirect, session
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit
-import os
-from dotenv import load_dotenv
-from pr_health_scanner import PRHealthScanner
+import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
-import threading
-import time
-import requests
+from functools import wraps
+
+from flask import Flask, jsonify, request, render_template, redirect, session, abort
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room
+from flask_session import Session
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from dotenv import load_dotenv
+import requests as http_req
+
+from database import init_db
+from models import db, User, UserRepo, PRIssue, UserSettings
+from logger import get_logger
+from pr_health_scanner import PRHealthScanner
 
 load_dotenv()
+logger = get_logger(__name__)
 
-app = Flask(__name__,
-            static_folder='../frontend',
-            static_url_path='',
-            template_folder='../frontend')
-app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# ── Required env vars ─────────────────────────────────────────────────────────
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is required. Run: python -c \"import secrets; print(secrets.token_hex(32))\"")
 
-GITHUB_TOKEN      = os.getenv("GITHUB_TOKEN")          # Server PAT (optional, used as fallback)
-GITHUB_CLIENT_ID  = os.getenv("GITHUB_CLIENT_ID")
-GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-# TARGET_REPOS is now OPTIONAL — used only as an explicit whitelist/override.
-# If empty or unset, all repos the user has access to are discovered automatically.
-TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv("TARGET_REPOS", "").split(",") if r.strip()]
+GITHUB_CLIENT_ID      = os.getenv('GITHUB_CLIENT_ID')
+GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
+GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
+WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
+ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
+SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
+TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
+ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')]
 
-# ── In-memory stores ──────────────────────────────────────────────────────────
-pr_status_db: dict   = {}              # { "owner/repo#NNN": { ...pr data } }
-authorized_users: set = set()
-# Per-user repo registry: { username: ["owner/repo", ...] }
-# Populated on login, updated on re-scan.
-user_repo_registry: dict = {}
+SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))
+os.makedirs(SESSION_DIR, exist_ok=True)
 
-GITHUB_HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-}
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(os.path.dirname(__file__), "bob.db")}')
+DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
+# ── App setup ─────────────────────────────────────────────────────────────────
+app = Flask(__name__, static_folder='../frontend', static_url_path='', template_folder='../frontend')
+app.secret_key = SECRET_KEY
+app.config.update(
+    SESSION_TYPE='filesystem',
+    SESSION_FILE_DIR=SESSION_DIR,
+    SESSION_PERMANENT=False,
+    SESSION_USE_SIGNER=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=(os.getenv('FLASK_ENV') == 'production'),
+    WTF_CSRF_TIME_LIMIT=None,
+    SQLALCHEMY_DATABASE_URI=DATABASE_URL,
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+)
 
-def gh_headers(token: str) -> dict:
-    return {**GITHUB_HEADERS, "Authorization": f"token {token}"}
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
+Session(app)
+csrf = CSRFProtect(app)
+socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, manage_session=False)
+init_db(app)
 
+GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pages
-# ─────────────────────────────────────────────────────────────────────────────
+def gh(token): return {**GH_HEADERS, 'Authorization': f'token {token}'}
 
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Not authenticated'}), 401
+            return redirect('/')
+        return f(*args, **kwargs)
+    return decorated
+
+def current_user():
+    if 'user' not in session:
+        return None
+    return User.query.filter_by(github_id=session['user']['id']).first()
+
+# ── Pages ─────────────────────────────────────────────────────────────────────
 @app.route('/')
 def landing():
     if 'user' in session:
         return redirect('/dashboard')
     return render_template('landing.html')
 
-
 @app.route('/permissions')
+@login_required
 def permissions_page():
-    if 'user' not in session:
-        return redirect('/')
     return render_template('permissions.html', user=session['user'])
 
-
 @app.route('/dashboard')
+@login_required
 def dashboard():
-    if 'user' not in session:
-        return redirect('/')
     return render_template('index.html', user=session['user'])
 
+@app.route('/settings')
+@login_required
+def settings_page():
+    return render_template('settings.html', user=session['user'])
+
+@app.route('/error')
+def error_page():
+    return render_template('error.html')
 
 @app.route('/logout')
+@login_required
 def logout():
-    username = session.get('user', {}).get('username')
-    if username:
-        user_repo_registry.pop(username, None)
-    session.pop('user', None)
+    logger.info(f"Logout: {session['user'].get('username')}")
+    session.clear()
     return redirect('/')
 
+# ── CSRF token endpoint ───────────────────────────────────────────────────────
+@app.route('/api/csrf-token')
+def get_csrf_token():
+    return jsonify({'csrf_token': generate_csrf()})
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GitHub OAuth
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── GitHub OAuth ──────────────────────────────────────────────────────────────
 @app.route('/login/github')
 def github_login():
-    """Send user to GitHub OAuth with all required scopes (auto-requested)."""
-    scopes = ['repo', 'read:org', 'write:discussion', 'workflow', 'user:email']
-    params = (
-        f"client_id={GITHUB_CLIENT_ID}"
-        f"&scope={' '.join(scopes)}"
-        f"&allow_signup=true"
-    )
-    return redirect(f"https://github.com/login/oauth/authorize?{params}")
-
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    scopes = 'repo read:org write:discussion workflow user:email'
+    url = (f'https://github.com/login/oauth/authorize'
+           f'?client_id={GITHUB_CLIENT_ID}&scope={scopes}&state={state}&allow_signup=true')
+    return redirect(url)
 
 @app.route('/callback/github')
 def github_callback():
-    """Exchange OAuth code → token, store in session, redirect to /permissions."""
+    returned_state = request.args.get('state')
+    stored_state   = session.pop('oauth_state', None)
+    if not returned_state or returned_state != stored_state:
+        logger.warning('OAuth state mismatch — possible CSRF')
+        return redirect('/?error=invalid_state')
+
     code = request.args.get('code')
     if not code:
         return redirect('/?error=no_code')
 
-    token_resp = requests.post(
+    token_resp = http_req.post(
         'https://github.com/login/oauth/access_token',
-        headers={"Accept": "application/json"},
-        data={"client_id": GITHUB_CLIENT_ID,
-              "client_secret": GITHUB_CLIENT_SECRET,
-              "code": code},
+        headers={'Accept': 'application/json'},
+        data={'client_id': GITHUB_CLIENT_ID, 'client_secret': GITHUB_CLIENT_SECRET, 'code': code},
         timeout=10,
     )
     token_data   = token_resp.json()
     access_token = token_data.get('access_token')
     if not access_token:
-        print(f"[OAuth] Token exchange failed: {token_data.get('error_description')}")
+        logger.error(f"Token exchange failed: {token_data.get('error_description')}")
         return redirect('/?error=no_token')
 
-    user_resp = requests.get(
-        'https://api.github.com/user',
-        headers=gh_headers(access_token),
-        timeout=10,
-    )
+    user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=10)
     if user_resp.status_code != 200:
         return redirect('/?error=user_fetch_failed')
 
-    user_data = user_resp.json()
-    username  = user_data.get('login')
+    ud = user_resp.json()
+    github_id = ud.get('id')
+    username  = ud.get('login')
 
+    # Upsert user in DB
+    user = User.query.filter_by(github_id=github_id).first()
+    if not user:
+        user = User(github_id=github_id, username=username)
+        db.session.add(user)
+    user.avatar     = ud.get('avatar_url')
+    user.name       = ud.get('name') or username
+    user.email      = ud.get('email')
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+
+    # Ensure user has settings row
+    if not user.settings:
+        db.session.add(UserSettings(user_id=user.id))
+        db.session.commit()
+
+    # Store minimal data in session (NO token in session)
     session['user'] = {
-        'username':     username,
-        'avatar':       user_data.get('avatar_url'),
-        'name':         user_data.get('name') or username,
-        'access_token': access_token,
-        'id':           user_data.get('id'),
-        'email':        user_data.get('email'),
-        'repos':        [],   # will be filled by /api/discover-repos
+        'id':       github_id,
+        'username': username,
+        'avatar':   ud.get('avatar_url'),
+        'name':     ud.get('name') or username,
+        'email':    ud.get('email'),
+        'db_id':    user.id,
     }
-    authorized_users.add(username)
-    print(f"[OAuth] ✓ {username} authenticated.")
+    # Store token server-side keyed by db user id (in-memory, replaced by Redis in prod)
+    app.config.setdefault('_user_tokens', {})[user.id] = access_token
+
+    logger.info(f"Auth OK: {username}")
     return redirect('/permissions')
 
+def get_user_token(user_id: int) -> str | None:
+    """Retrieve the stored OAuth token for a user (server-side only)."""
+    return app.config.get('_user_tokens', {}).get(user_id)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# API — Verify OAuth Scopes
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.route('/api/verify-permissions', methods=['GET'])
+# ── API: Verify Scopes ────────────────────────────────────────────────────────
+@app.route('/api/verify-permissions')
+@login_required
 def verify_permissions():
-    """Check which OAuth scopes were actually granted by the user."""
-    if 'user' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    token = session['user'].get('access_token')
+    token = get_user_token(session['user']['db_id'])
     if not token:
-        return jsonify({'error': 'No access token'}), 401
+        return jsonify({'error': 'Session expired, please re-login'}), 401
 
-    resp = requests.get(
-        'https://api.github.com/user',
-        headers=gh_headers(token),
-        timeout=10,
-    )
+    resp = http_req.get('https://api.github.com/user', headers=gh(token), timeout=10)
     if resp.status_code != 200:
         return jsonify({'error': 'Token validation failed'}), 401
 
-    raw = resp.headers.get('X-OAuth-Scopes', '')
-    granted  = [s.strip() for s in raw.split(',') if s.strip()]
+    raw     = resp.headers.get('X-OAuth-Scopes', '')
+    granted = [s.strip() for s in raw.split(',') if s.strip()]
     required = ['repo', 'read:org', 'write:discussion', 'workflow', 'user:email']
 
     def satisfied(needed):
-        if needed in granted:
-            return True
-        # parent-scope check: admin:org satisfies read:org etc.
+        if needed in granted: return True
         parent = needed.split(':')[0]
-        return any(g == parent or g.startswith(f"{parent}:") for g in granted)
+        return any(g == parent or g.startswith(f'{parent}:') for g in granted)
 
     missing = [s for s in required if not satisfied(s)]
-    return jsonify({
-        'granted':     granted,
-        'required':    required,
-        'missing':     missing,
-        'all_granted': len(missing) == 0,
-    })
+    return jsonify({'granted': granted, 'required': required, 'missing': missing, 'all_granted': not missing})
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# API — Auto-Discover All Repos  ◄── ZERO CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── API: Discover Repos ───────────────────────────────────────────────────────
 @app.route('/api/discover-repos', methods=['POST'])
+@login_required
 def discover_repos():
-    """
-    Automatically discover every GitHub repository the logged-in user has
-    access to — no TARGET_REPOS config required.
-
-    Discovery sources (merged, deduplicated):
-      1. /user/repos?affiliation=owner,collaborator,organization_member
-         → All repos the user owns or is a collaborator on
-      2. /user/orgs  → then /orgs/{org}/repos  for each org
-         → All repos in orgs the user belongs to
-
-    If TARGET_REPOS_OVERRIDE is set in .env, the result is FILTERED to only
-    those repos (acts as a whitelist for orgs that want to restrict scope).
-
-    Returns:
-      { "repos": [ { full_name, private, url, permissions, description,
-                      language, open_issues, stars, org, source } ] }
-    """
-    if 'user' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-
-    token    = session['user'].get('access_token')
-    username = session['user'].get('username')
+    user = current_user()
+    token = get_user_token(user.id)
     if not token:
-        return jsonify({'error': 'No access token'}), 401
+        return jsonify({'error': 'Session expired'}), 401
 
-    repos_map: dict = {}  # full_name → repo dict
+    repos_map = {}
 
-    # ── Source 1: user/repos (owner + collaborator + org_member) ─────────────
+    # Source 1: user/repos
     page = 1
     while True:
-        resp = requests.get(
-            'https://api.github.com/user/repos',
-            headers=gh_headers(token),
-            params={
-                'affiliation': 'owner,collaborator,organization_member',
-                'visibility':  'all',
-                'per_page':    100,
-                'sort':        'pushed',
-                'page':        page,
-            },
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            break
-        batch = resp.json()
-        if not batch:
-            break
-        for r in batch:
-            repos_map[r['full_name']] = _normalize_repo(r, source='direct')
-        if len(batch) < 100:
-            break
+        r = http_req.get('https://api.github.com/user/repos', headers=gh(token),
+                         params={'affiliation': 'owner,collaborator,organization_member',
+                                 'visibility': 'all', 'per_page': 100, 'page': page}, timeout=15)
+        _handle_rate_limit(r)
+        if r.status_code != 200: break
+        batch = r.json()
+        if not batch: break
+        for repo in batch:
+            repos_map[repo['full_name']] = _normalize_repo(repo, 'direct')
+        if len(batch) < 100: break
         page += 1
 
-    # ── Source 2: org repos (catches repos the above might miss) ─────────────
-    orgs_resp = requests.get(
-        'https://api.github.com/user/orgs',
-        headers=gh_headers(token),
-        params={'per_page': 100},
-        timeout=10,
-    )
-    if orgs_resp.status_code == 200:
-        for org in orgs_resp.json():
-            org_login = org.get('login')
-            if not org_login:
-                continue
-            op = 1
-            while True:
-                oresp = requests.get(
-                    f'https://api.github.com/orgs/{org_login}/repos',
-                    headers=gh_headers(token),
-                    params={'type': 'all', 'per_page': 100, 'page': op},
-                    timeout=15,
-                )
-                if oresp.status_code != 200:
-                    break
-                obatch = oresp.json()
-                if not obatch:
-                    break
-                for r in obatch:
-                    if r['full_name'] not in repos_map:
-                        repos_map[r['full_name']] = _normalize_repo(r, source='org')
-                if len(obatch) < 100:
-                    break
-                op += 1
+    # Source 2: org repos
+    orgs_r = http_req.get('https://api.github.com/user/orgs', headers=gh(token),
+                           params={'per_page': 100}, timeout=10)
+    orgs = orgs_r.json() if orgs_r.status_code == 200 else []
+    for org in orgs:
+        org_login = org.get('login')
+        if not org_login: continue
+        p = 1
+        while True:
+            or_ = http_req.get(f'https://api.github.com/orgs/{org_login}/repos', headers=gh(token),
+                               params={'type': 'all', 'per_page': 100, 'page': p}, timeout=15)
+            _handle_rate_limit(or_)
+            if or_.status_code != 200: break
+            ob = or_.json()
+            if not ob: break
+            for repo in ob:
+                if repo['full_name'] not in repos_map:
+                    repos_map[repo['full_name']] = _normalize_repo(repo, 'org')
+            if len(ob) < 100: break
+            p += 1
 
-    # ── Apply whitelist override ──────────────────────────────────────────────
     if TARGET_REPOS_OVERRIDE:
         repos_map = {k: v for k, v in repos_map.items() if k in TARGET_REPOS_OVERRIDE}
 
-    # ── Filter: only repos where user has at least push (write) access ────────
+    uname = session['user']['username']
     accessible = [r for r in repos_map.values()
-                  if r['permissions'].get('push') or
-                     r['permissions'].get('admin') or
-                     r.get('owner_login', '').lower() == username.lower()]
-
-    # Sort: own repos first, then by pushed_at
-    accessible.sort(key=lambda r: (
-        0 if r.get('owner_login', '').lower() == username.lower() else 1,
-        r.get('pushed_at', '') or '',
-    ), reverse=False)
+                  if r['permissions'].get('push') or r['permissions'].get('admin')
+                  or r.get('owner_login', '').lower() == uname.lower()]
     accessible.sort(key=lambda r: r.get('pushed_at', '') or '', reverse=True)
 
-    # Store in session & global registry for scanner
-    repo_names = [r['full_name'] for r in accessible]
-    session['user']['repos'] = repo_names
+    # Sync to DB
+    existing = {ur.full_name for ur in user.repos}
+    for r in accessible:
+        if r['full_name'] not in existing:
+            db.session.add(UserRepo(
+                user_id=user.id, full_name=r['full_name'],
+                private=r['private'], url=r['url'],
+                language=r['language'],
+                permissions_level=('owner' if r.get('owner_login','').lower()==uname.lower()
+                                   else 'admin' if r['permissions'].get('admin')
+                                   else 'push'),
+                archived=r['archived'], fork=r['fork'],
+            ))
+        else:
+            ur = UserRepo.query.filter_by(user_id=user.id, full_name=r['full_name']).first()
+            if ur:
+                ur.last_synced = datetime.utcnow()
+    db.session.commit()
+
+    session['user']['repos'] = [r['full_name'] for r in accessible]
     session.modified = True
-    user_repo_registry[username] = repo_names
 
-    print(f"[Discover] {username}: discovered {len(accessible)} repos "
-          f"({'whitelist active' if TARGET_REPOS_OVERRIDE else 'all accessible'})")
+    logger.info(f"Discover: {uname} → {len(accessible)} repos")
+    return jsonify({'repos': accessible, 'total': len(accessible),
+                    'whitelisted': bool(TARGET_REPOS_OVERRIDE)})
 
-    return jsonify({
-        'repos':       accessible,
-        'total':       len(accessible),
-        'orgs_scanned': len(orgs_resp.json()) if orgs_resp.status_code == 200 else 0,
-        'whitelisted': bool(TARGET_REPOS_OVERRIDE),
-    })
-
-
-def _normalize_repo(r: dict, source: str = 'direct') -> dict:
-    """Normalize a GitHub repo API object into our standard shape."""
+def _normalize_repo(r, source):
     return {
         'full_name':   r.get('full_name', ''),
         'name':        r.get('name', ''),
@@ -338,295 +318,294 @@ def _normalize_repo(r: dict, source: str = 'direct') -> dict:
         'pushed_at':   r.get('pushed_at', ''),
         'permissions': r.get('permissions') or {},
         'owner_login': r.get('owner', {}).get('login', ''),
-        'org':         r.get('organization', {}).get('login', '') if r.get('organization') else '',
-        'source':      source,
         'fork':        r.get('fork', False),
         'archived':    r.get('archived', False),
+        'source':      source,
     }
 
+def _handle_rate_limit(resp):
+    remaining = int(resp.headers.get('X-RateLimit-Remaining', 999))
+    if remaining < 5:
+        reset_at = int(resp.headers.get('X-RateLimit-Reset', time.time() + 60))
+        wait = max(0, reset_at - time.time()) + 2
+        logger.warning(f"Rate limit low ({remaining} remaining), sleeping {wait:.0f}s")
+        time.sleep(wait)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# API — Auto-Provision (access verification & reporting)
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── API: Auto Provision ───────────────────────────────────────────────────────
 @app.route('/api/auto-provision', methods=['POST'])
+@login_required
 def auto_provision():
-    """
-    For every repo discovered by /api/discover-repos, verify the user's
-    actual GitHub permission level using the API and report it.
-
-    For repos where the user only has read access and the server PAT has
-    admin rights, we attempt to upgrade them to push/collaborator access.
-
-    Returns per-repo status: owner | admin | push | read | invited | error
-    """
-    if 'user' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-
-    username = session['user'].get('username')
-    token    = session['user'].get('access_token')
-    repos    = session['user'].get('repos', [])
-
+    user  = current_user()
+    token = get_user_token(user.id)
+    repos = session['user'].get('repos', [])
     if not repos:
-        return jsonify({
-            'all_provisioned': True,
-            'results': [],
-            'message': 'No repos discovered yet — call /api/discover-repos first.',
-        })
+        return jsonify({'all_provisioned': True, 'results': []})
 
-    results   = []
-    all_ok    = True
-    server_tk = GITHUB_TOKEN   # server PAT for granting access where needed
-
+    results = []
     for full_repo in repos:
-        result = _check_and_provision(full_repo, username, token, server_tk)
+        result = _check_and_provision(full_repo, session['user']['username'], token, GITHUB_TOKEN)
         results.append(result)
-        if result['status'] == 'error':
-            all_ok = False
 
-    print(f"[Provision] {username}: {len(results)} repos, all_ok={all_ok}")
+    all_ok = all(r['status'] != 'error' for r in results)
     return jsonify({'all_provisioned': all_ok, 'results': results})
 
-
-def _check_and_provision(full_repo: str, username: str,
-                          user_token: str, server_token: str) -> dict:
-    """Check permission level for one repo; upgrade via server token if needed."""
-    base = {'repo': full_repo, 'private': False,
-            'url': f'https://github.com/{full_repo}'}
-
-    hdrs = gh_headers(user_token)
-
-    # Fetch the repo as the user to get their permission level
-    resp = requests.get(
-        f'https://api.github.com/repos/{full_repo}',
-        headers=hdrs, timeout=10,
-    )
+def _check_and_provision(full_repo, username, user_token, server_token):
+    base = {'repo': full_repo, 'url': f'https://github.com/{full_repo}'}
+    resp = http_req.get(f'https://api.github.com/repos/{full_repo}', headers=gh(user_token), timeout=10)
     if resp.status_code == 404:
-        return {**base, 'status': 'error', 'message': 'Repo not found or no access'}
+        return {**base, 'status': 'error', 'message': 'Not found or no access'}
     if resp.status_code != 200:
-        return {**base, 'status': 'error',
-                'message': f'GitHub API error (HTTP {resp.status_code})'}
+        return {**base, 'status': 'error', 'message': f'HTTP {resp.status_code}'}
 
-    repo_data = resp.json()
-    base['private'] = repo_data.get('private', False)
-    base['url']     = repo_data.get('html_url', base['url'])
-
-    perms  = repo_data.get('permissions', {})
-    owner  = repo_data.get('owner', {}).get('login', '')
+    rd    = resp.json()
+    perms = rd.get('permissions', {})
+    owner = rd.get('owner', {}).get('login', '')
 
     if owner.lower() == username.lower():
         return {**base, 'status': 'owner', 'message': 'You own this repository'}
-
     if perms.get('admin'):
         return {**base, 'status': 'admin', 'message': 'Admin access confirmed'}
-
     if perms.get('push'):
         return {**base, 'status': 'push', 'message': 'Write access confirmed'}
+    if perms.get('pull') and server_token:
+        owner_name, repo_name = full_repo.split('/', 1)
+        r = http_req.put(
+            f'https://api.github.com/repos/{owner_name}/{repo_name}/collaborators/{username}',
+            headers=gh(server_token), json={'permission': 'push'}, timeout=10)
+        if r.status_code == 201:
+            return {**base, 'status': 'invited', 'message': 'Invitation sent ✓'}
+        if r.status_code in (204, 422):
+            return {**base, 'status': 'push', 'message': 'Write access confirmed'}
+    return {**base, 'status': 'read', 'message': 'Read-only access'}
 
-    if perms.get('pull'):
-        # User only has read — try to grant push via server token
-        if server_token:
-            grant = _grant_collaborator(full_repo, username, server_token)
-            if grant:
-                return {**base, **grant}
-        return {**base, 'status': 'read',
-                'message': 'Read-only access (no server token to upgrade)'}
-
-    return {**base, 'status': 'error', 'message': 'Permission level unknown'}
-
-
-def _grant_collaborator(full_repo: str, username: str, server_token: str) -> dict | None:
-    """Use server PAT to grant push/collaborator access."""
-    owner, repo_name = full_repo.split('/', 1)
-    hdrs = gh_headers(server_token)
-
-    r = requests.put(
-        f'https://api.github.com/repos/{owner}/{repo_name}/collaborators/{username}',
-        headers=hdrs,
-        json={'permission': 'push'},
-        timeout=10,
-    )
-    if r.status_code == 201:
-        return {'status': 'invited', 'message': 'Collaborator invitation sent ✓'}
-    if r.status_code == 204:
-        return {'status': 'push', 'message': 'Write access confirmed'}
-    if r.status_code == 422:
-        return {'status': 'push', 'message': 'Already a member'}
-    return None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# API — PR Health Scan (uses session repos — zero config)
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── API: Scan ─────────────────────────────────────────────────────────────────
 @app.route('/api/scan', methods=['POST'])
+@login_required
 def trigger_scan():
-    """Trigger a full PR health scan across all repos discovered for this user."""
-    if 'user' not in session:
-        # fall back to server token + TARGET_REPOS_OVERRIDE for unauthenticated calls
-        scan_token = GITHUB_TOKEN
-        repos      = TARGET_REPOS_OVERRIDE
-    else:
-        # Use the logged-in user's token — they already have repo access
-        scan_token = session['user'].get('access_token', GITHUB_TOKEN)
-        repos      = session['user'].get('repos', TARGET_REPOS_OVERRIDE)
-
+    user  = current_user()
+    token = get_user_token(user.id) or GITHUB_TOKEN
+    repos = session['user'].get('repos', TARGET_REPOS_OVERRIDE)
     if not repos:
         return jsonify({'success': False, 'error': 'No repos discovered yet.'}), 400
 
-    scanner = PRHealthScanner(scan_token, repos)
+    settings = user.settings
+    excluded = settings.get_excluded_list() if settings else []
+    repos    = [r for r in repos if r not in excluded]
+
+    scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
     results = scanner.scan_all_repos()
-    _ingest_scan_results(results)
-    socketio.emit('scan_complete', {'results': results})
+    _ingest_scan_results(results, user.id)
+    data = _get_user_data(user.id)
+    socketio.emit('update', data, to=session['user']['username'])
     return jsonify({'success': True, 'results': results})
 
-
-@app.route('/api/repos', methods=['GET'])
+@app.route('/api/repos')
+@login_required
 def list_repos():
-    """Return the repos currently stored for this user session."""
-    if 'user' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    repos = session['user'].get('repos', [])
+    user  = current_user()
+    repos = [{'full_name': ur.full_name, 'private': ur.private,
+               'language': ur.language, 'permissions_level': ur.permissions_level}
+             for ur in user.repos]
     return jsonify({'repos': repos, 'total': len(repos)})
 
-
-@app.route('/api/health', methods=['GET'])
+@app.route('/api/health')
 def health_check():
-    username = session.get('user', {}).get('username', 'anonymous')
-    repos    = session.get('user', {}).get('repos', TARGET_REPOS_OVERRIDE)
-    return jsonify({
-        'status':    'ok',
-        'service':   'Bob PR Health Scanner',
-        'user':      username,
-        'repos':     repos,
-        'timestamp': datetime.now().isoformat(),
-    })
+    return jsonify({'status': 'ok', 'service': 'Bob PR Health Scanner',
+                    'timestamp': datetime.utcnow().isoformat()})
 
+@app.route('/api/issues')
+@login_required
+def get_issues():
+    user = current_user()
+    repo_filter = request.args.get('repo')
+    q = PRIssue.query.filter_by(user_id=user.id)
+    if repo_filter:
+        q = q.filter_by(repo=repo_filter)
+    issues = q.order_by(PRIssue.updated_at.desc()).all()
+    return jsonify({'issues': [i.to_dict() for i in issues]})
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PR Status Helpers
-# ─────────────────────────────────────────────────────────────────────────────
+# ── API: Settings ─────────────────────────────────────────────────────────────
+@app.route('/api/settings', methods=['GET', 'POST'])
+@login_required
+def user_settings():
+    user = current_user()
+    if not user.settings:
+        s = UserSettings(user_id=user.id)
+        db.session.add(s)
+        db.session.commit()
 
-def _ingest_scan_results(results: list):
+    if request.method == 'GET':
+        s = user.settings
+        return jsonify({
+            'scan_interval':  s.scan_interval,
+            'excluded_repos': s.get_excluded_list(),
+            'notify_in_app':  s.notify_in_app,
+        })
+
+    data = request.get_json() or {}
+    s = user.settings
+    if 'scan_interval'  in data: s.scan_interval     = int(data['scan_interval'])
+    if 'excluded_repos' in data: s.excluded_repos     = ','.join(data['excluded_repos'])
+    if 'notify_in_app'  in data: s.notify_in_app      = bool(data['notify_in_app'])
+    if 'push_subscription' in data: s.push_subscription = data['push_subscription']
+    s.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'saved': True})
+
+# ── API: Update Issue Status ──────────────────────────────────────────────────
+@app.route('/api/issues/<int:issue_id>/status', methods=['POST'])
+@login_required
+def update_issue_status(issue_id):
+    user   = current_user()
+    issue  = PRIssue.query.filter_by(id=issue_id, user_id=user.id).first_or_404()
+    data   = request.get_json() or {}
+    status = data.get('status')
+    if status not in ('pending', 'in_progress', 'failed', 'resolved'):
+        return jsonify({'error': 'Invalid status'}), 400
+    issue.status     = status
+    issue.updated_at = datetime.utcnow()
+    db.session.commit()
+    socketio.emit('update', _get_user_data(user.id), to=session['user']['username'])
+    return jsonify({'saved': True, 'issue': issue.to_dict()})
+
+# ── API: GitHub Webhook ───────────────────────────────────────────────────────
+@csrf.exempt
+@app.route('/api/webhooks/github', methods=['POST'])
+def github_webhook():
+    if WEBHOOK_SECRET:
+        sig = request.headers.get('X-Hub-Signature-256', '')
+        expected = 'sha256=' + hmac.new(
+            WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            logger.warning('Webhook signature mismatch')
+            abort(403)
+
+    event   = request.headers.get('X-GitHub-Event', '')
+    payload = request.get_json(silent=True) or {}
+    repo_name = payload.get('repository', {}).get('full_name', '')
+
+    logger.info(f"Webhook: {event} → {repo_name}")
+
+    if event == 'pull_request':
+        action = payload.get('action')
+        pr     = payload.get('pull_request', {})
+        if action == 'closed' and pr.get('merged'):
+            # Mark as resolved for any user tracking this repo
+            _webhook_resolve_pr(repo_name, pr.get('number'))
+        elif action == 'opened':
+            _webhook_check_pr_conflict(repo_name, pr)
+
+    elif event == 'check_suite':
+        cs = payload.get('check_suite', {})
+        if cs.get('conclusion') == 'failure':
+            _webhook_ci_failure(repo_name, cs)
+
+    return jsonify({'ok': True}), 200
+
+def _webhook_resolve_pr(repo, pr_number):
+    key   = f'{repo}#{pr_number}'
+    issue = PRIssue.query.filter_by(repo=repo, issue_key=key).first()
+    if issue:
+        issue.status     = 'resolved'
+        issue.updated_at = datetime.utcnow()
+        db.session.commit()
+        _emit_to_repo_owners(repo)
+
+def _webhook_check_pr_conflict(repo, pr):
+    pass  # Conflict status is async on GitHub side; handled by scanner
+
+def _webhook_ci_failure(repo, check_suite):
+    _emit_to_repo_owners(repo)
+
+def _emit_to_repo_owners(repo_full_name):
+    """Emit real-time update to all users who track this repo."""
+    user_repos = UserRepo.query.filter_by(full_name=repo_full_name).all()
+    for ur in user_repos:
+        socketio.emit('update', _get_user_data(ur.user_id), to=ur.user.username)
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+def _ingest_scan_results(results, user_id):
     for result in results:
         repo = result['repo']
         for pr in result.get('conflicting_prs', []):
-            pr_id = f"{repo}#{pr['pr']}"
-            pr_status_db[pr_id] = {
-                'repo': repo, 'pr_number': pr['pr'],
-                'title': pr['title'], 'url': pr['url'],
-                'status': 'pending', 'type': 'merge_conflict',
-                'timestamp': datetime.now().isoformat(),
-            }
-        for failure in result.get('workflow_failures', []):
-            fid = f"{repo}#{failure['id']}"
-            pr_status_db[fid] = {
-                'repo': repo, 'workflow_name': failure['name'],
-                'branch': failure['branch'], 'url': failure['html_url'],
-                'status': 'pending', 'type': 'ci_failure',
-                'timestamp': datetime.now().isoformat(),
-            }
+            key = f"{repo}#{pr['pr']}"
+            existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not existing:
+                db.session.add(PRIssue(
+                    user_id=user_id, repo=repo, issue_key=key,
+                    title=pr['title'], url=pr['url'],
+                    pr_number=pr['pr'], branch=pr.get('head_branch'),
+                    issue_type='merge_conflict', status='pending',
+                ))
+        for f in result.get('workflow_failures', []):
+            key = f"{repo}#run{f['id']}"
+            existing = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not existing:
+                db.session.add(PRIssue(
+                    user_id=user_id, repo=repo, issue_key=key,
+                    title=f"CI: {f['name']} failed on {f['branch']}",
+                    url=f['html_url'], run_id=str(f['id']), branch=f['branch'],
+                    issue_type='ci_failure', status='pending',
+                ))
+    db.session.commit()
 
-
-def get_all_data():
-    active      = [p for p in pr_status_db.values() if p['status'] == 'pending']
-    in_progress = [p for p in pr_status_db.values() if p['status'] == 'in_progress']
-    failed      = [p for p in pr_status_db.values() if p['status'] == 'failed']
-    resolved    = [p for p in pr_status_db.values() if p['status'] == 'resolved']
+def _get_user_data(user_id):
+    issues = PRIssue.query.filter_by(user_id=user_id).all()
+    by_status = {'pending': [], 'in_progress': [], 'failed': [], 'resolved': []}
+    for i in issues:
+        by_status.get(i.status, by_status['pending']).append(i.to_dict())
     return {
-        'active': active, 'in_progress': in_progress,
-        'failed': failed, 'resolved': resolved,
-        'stats': {
-            'total': len(pr_status_db), 'pending': len(active),
-            'in_progress': len(in_progress), 'failed': len(failed),
-            'resolved': len(resolved),
-        }
+        **by_status,
+        'stats': {k: len(v) for k, v in by_status.items()} | {'total': len(issues)},
     }
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# WebSocket Events
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── WebSocket ─────────────────────────────────────────────────────────────────
 @socketio.on('connect')
 def handle_connect():
-    print('WS: client connected')
-    emit('update', get_all_data())
-
+    if 'user' not in session:
+        return False  # reject unauthenticated connections
+    username = session['user']['username']
+    join_room(username)
+    logger.info(f"WS connect: {username}")
+    emit('update', _get_user_data(session['user']['db_id']))
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('WS: client disconnected')
-
+    logger.info(f"WS disconnect: {session.get('user', {}).get('username')}")
 
 @socketio.on('request_update')
 def handle_request_update():
-    emit('update', get_all_data())
+    if 'user' not in session:
+        return
+    emit('update', _get_user_data(session['user']['db_id']))
 
-
-@socketio.on('update_status')
-def handle_update_status(data):
-    pr_id      = data.get('pr_id')
-    new_status = data.get('status')
-    if new_status in ('pending', 'in_progress', 'failed', 'resolved') and pr_id in pr_status_db:
-        pr_status_db[pr_id]['status']     = new_status
-        pr_status_db[pr_id]['updated_at'] = datetime.now().isoformat()
-        socketio.emit('update', get_all_data())
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Background Scanning Thread — scans all registered user repos continuously
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── Background Scanner ────────────────────────────────────────────────────────
 def background_scan():
-    """
-    Every SCAN_INTERVAL seconds, scan all repos in user_repo_registry.
-    Uses GITHUB_TOKEN as the scan token (server PAT must have repo read access).
-    New repos discovered from logins are automatically picked up.
-    """
-    interval = int(os.getenv('SCAN_INTERVAL', 300))
     while True:
-        time.sleep(interval)
-        if not user_repo_registry:
-            continue
+        time.sleep(SCAN_INTERVAL)
+        with app.app_context():
+            try:
+                users = User.query.all()
+                for user in users:
+                    token = get_user_token(user.id) or GITHUB_TOKEN
+                    if not token:
+                        continue
+                    settings = user.settings
+                    excluded = settings.get_excluded_list() if settings else []
+                    repos    = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
+                    if not repos:
+                        continue
+                    logger.info(f"BG scan: {user.username} → {len(repos)} repos")
+                    scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
+                    results = scanner.scan_all_repos()
+                    _ingest_scan_results(results, user.id)
+                    socketio.emit('update', _get_user_data(user.id), to=user.username)
+            except Exception as e:
+                logger.error(f"BG scan error: {e}")
 
-        # Collect unique repos across all registered users
-        all_repos: set = set()
-        for repos in user_repo_registry.values():
-            all_repos.update(repos)
-
-        if not all_repos or not GITHUB_TOKEN:
-            continue
-
-        print(f"[BG Scan] Scanning {len(all_repos)} repos across all users…")
-        try:
-            scanner = PRHealthScanner(GITHUB_TOKEN, list(all_repos))
-            results = scanner.scan_all_repos()
-            _ingest_scan_results(results)
-            socketio.emit('update', get_all_data())
-            print(f"[BG Scan] ✓ Complete. {len(pr_status_db)} total issues tracked.")
-        except Exception as e:
-            print(f"[BG Scan] Error: {e}")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry Point
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    print("─" * 64)
-    print("  Bob PR Health Scanner")
-    if TARGET_REPOS_OVERRIDE:
-        print(f"  Whitelist mode: {len(TARGET_REPOS_OVERRIDE)} repos")
-        for r in TARGET_REPOS_OVERRIDE:
-            print(f"    • {r}")
-    else:
-        print("  Auto-discovery mode: repos fetched from each user on login")
-    print("  WebSocket: enabled")
-    print("─" * 64)
-
-    scan_thread = threading.Thread(target=background_scan, daemon=True)
-    scan_thread.start()
-
+    logger.info("Bob PR Health Scanner starting up")
+    threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)

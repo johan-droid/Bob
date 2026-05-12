@@ -2,82 +2,116 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Bob - PR Health Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Bob — PR Health Dashboard</title>
+    <meta name="description" content="Real-time PR health monitoring across all your GitHub repositories.">
+    <meta property="og:title" content="Bob — PR Health Dashboard">
+    <meta property="og:description" content="Zero-config GitHub PR health monitoring with real-time alerts.">
+    <meta name="theme-color" content="#080c14">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <div class="connection-status disconnected" id="connection-status">
-        <div class="connection-dot"></div>
-        <span>Connecting...</span>
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="nav-brand">
+        <span class="nav-logo">🤖</span>
+        <span class="nav-title">Bob</span>
+        <span class="nav-badge">PR Health</span>
     </div>
-    
-    <div class="container">
-        <header>
-            <h1>🤖 Bob</h1>
-            <p class="subtitle">Multi-Repo PR Health Monitor</p>
-            <div class="stats-bar">
-                <div class="stat">
-                    <span class="stat-value" id="stat-pending">0</span>
-                    <span class="stat-label">Pending</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="stat-in-progress">0</span>
-                    <span class="stat-label">In Progress</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="stat-failed">0</span>
-                    <span class="stat-label">Failed</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="stat-resolved">0</span>
-                    <span class="stat-label">Resolved</span>
-                </div>
+    <div class="nav-controls">
+        <div class="search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="search-input" placeholder="Search repos or PRs…" class="search-input">
+        </div>
+        <select id="repo-filter" class="repo-filter">
+            <option value="">All Repos</option>
+        </select>
+        <select id="type-filter" class="repo-filter">
+            <option value="">All Types</option>
+            <option value="merge_conflict">Merge Conflicts</option>
+            <option value="ci_failure">CI Failures</option>
+        </select>
+        <div id="ws-status" class="ws-status disconnected" title="WebSocket status">
+            <span class="ws-dot"></span>
+            <span class="ws-label">Connecting…</span>
+        </div>
+    </div>
+    <div class="nav-user">
+        <a href="/settings" class="nav-icon-btn" title="Settings">⚙️</a>
+        <img src="{{ user.avatar }}" alt="{{ user.name }}" class="nav-avatar" id="nav-avatar">
+        <span class="nav-username">{{ user.name }}</span>
+        <a href="/logout" class="nav-logout">Sign out</a>
+    </div>
+</nav>
+
+<div class="dash-container">
+    <!-- Stats row -->
+    <div class="stats-row">
+        <div class="stat-card stat-pending">
+            <div class="stat-num" id="stat-pending">0</div>
+            <div class="stat-lbl">🔴 Pending</div>
+        </div>
+        <div class="stat-card stat-progress">
+            <div class="stat-num" id="stat-in-progress">0</div>
+            <div class="stat-lbl">🟡 In Progress</div>
+        </div>
+        <div class="stat-card stat-failed">
+            <div class="stat-num" id="stat-failed">0</div>
+            <div class="stat-lbl">⛔ Failed</div>
+        </div>
+        <div class="stat-card stat-resolved">
+            <div class="stat-num" id="stat-resolved">0</div>
+            <div class="stat-lbl">✅ Resolved</div>
+        </div>
+        <div class="stat-card stat-total">
+            <div class="stat-num" id="stat-total">0</div>
+            <div class="stat-lbl">📊 Total</div>
+        </div>
+    </div>
+
+    <!-- Main panel -->
+    <div class="dash-panels">
+        <!-- Active issues panel -->
+        <section class="panel" id="panel-active">
+            <div class="panel-header">
+                <h2 class="panel-title">🔴 Active Issues</h2>
+                <button class="panel-refresh-btn" onclick="requestUpdate()" title="Refresh">↻</button>
             </div>
-        </header>
+            <div id="active-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
+        </section>
 
-        <main>
-            <!-- Active PR Resolution Section -->
-            <section class="pr-section">
-                <h2>🔴 Active PR Resolution</h2>
-                <p class="section-desc">PRs assigned to jules-google-lab awaiting response</p>
-                <div id="active-prs" class="pr-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </section>
+        <section class="panel" id="panel-progress">
+            <div class="panel-header">
+                <h2 class="panel-title">🟡 In Progress</h2>
+            </div>
+            <div id="in-progress-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
+        </section>
 
-            <!-- Work in Progress Section -->
-            <section class="pr-section">
-                <h2>🟢 Work in Progress</h2>
-                <p class="section-desc">PRs currently being resolved by jules-google-lab</p>
-                <div id="in-progress-prs" class="pr-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </section>
+        <section class="panel" id="panel-failed">
+            <div class="panel-header">
+                <h2 class="panel-title">⛔ Failed</h2>
+            </div>
+            <div id="failed-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
+        </section>
 
-            <!-- Failed Resolution Section -->
-            <section class="pr-section">
-                <h2>🔴 Failed Resolution</h2>
-                <p class="section-desc">PRs that jules-google-lab couldn't fix</p>
-                <div id="failed-prs" class="pr-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </section>
-
-            <!-- History Section -->
-            <section class="pr-section">
-                <h2>⚪ History</h2>
-                <p class="section-desc">Successfully resolved PRs</p>
-                <div id="history-prs" class="pr-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </section>
-        </main>
+        <section class="panel" id="panel-resolved">
+            <div class="panel-header">
+                <h2 class="panel-title">✅ Resolved</h2>
+            </div>
+            <div id="history-prs" class="pr-list"><div class="pr-loading">Loading…</div></div>
+        </section>
     </div>
+</div>
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

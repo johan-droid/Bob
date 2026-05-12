@@ -1,95 +1,216 @@
-// WebSocket connection - use dynamic URL for Heroku
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000' 
-    : window.location.origin;
-const socket = io(wsUrl);
+/* ── Dashboard app.js — Bob PR Health Scanner ─────────────────────────────── */
 
-const connectionStatus = document.getElementById('connection-status');
+// ── CSRF token ────────────────────────────────────────────────────────────────
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
-// Connection status handlers
+async function apiFetch(url, opts = {}) {
+    const resp = await fetch(url, {
+        ...opts,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN,
+            ...(opts.headers || {}),
+        },
+        credentials: 'same-origin',
+    });
+    if (!resp.ok) {
+        if (resp.status === 401) { window.location.href = '/'; return; }
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    return resp.json();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'info', duration = 4000) {
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-msg">${escHtml(msg)}</span>
+        <span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+    document.getElementById('toast-container').prepend(el);
+    setTimeout(() => el.remove(), duration);
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allData   = { pending: [], in_progress: [], failed: [], resolved: [], stats: {} };
+let allRepos  = new Set();
+let activeFilters = { repo: '', type: '', search: '' };
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+const wsUrl  = window.location.hostname === 'localhost'
+    ? 'http://localhost:5000' : window.location.origin;
+const socket = io(wsUrl, { withCredentials: true });
+const wsEl   = document.getElementById('ws-status');
+const wsDot  = wsEl?.querySelector('.ws-dot');
+const wsLbl  = wsEl?.querySelector('.ws-label');
+
 socket.on('connect', () => {
-    console.log('Connected to Bob server');
-    connectionStatus.className = 'connection-status connected';
-    connectionStatus.querySelector('span').textContent = 'Connected';
+    wsEl?.classList.replace('disconnected', 'connected');
+    if (wsLbl) wsLbl.textContent = 'Live';
     socket.emit('request_update');
 });
 
 socket.on('disconnect', () => {
-    console.log('Disconnected from Bob server');
-    connectionStatus.className = 'connection-status disconnected';
-    connectionStatus.querySelector('span').textContent = 'Disconnected';
+    wsEl?.classList.replace('connected', 'disconnected');
+    if (wsLbl) wsLbl.textContent = 'Offline';
+    showToast('Lost connection — retrying…', 'warning');
 });
 
-// Receive real-time updates
 socket.on('update', (data) => {
-    console.log('Received update:', data);
-    updateUI(data);
+    allData = data;
+    updateStats(data.stats);
+    collectRepos(data);
+    renderAll();
 });
 
-// Update UI with data
-function updateUI(data) {
-    // Update stats
-    if (data.stats) {
-        document.getElementById('stat-pending').textContent = data.stats.pending;
-        document.getElementById('stat-in-progress').textContent = data.stats.in_progress;
-        document.getElementById('stat-failed').textContent = data.stats.failed;
-        document.getElementById('stat-resolved').textContent = data.stats.resolved;
-    }
-    
-    // Update active PRs
-    renderPRList('active-prs', data.active, 'red', 'No active PRs awaiting resolution');
-    
-    // Update in-progress PRs
-    renderPRList('in-progress-prs', data.in_progress, 'green', 'No PRs currently in progress');
-    
-    // Update failed PRs
-    renderPRList('failed-prs', data.failed, 'red', 'No failed resolutions');
-    
-    // Update history
-    renderPRList('history-prs', data.resolved, 'grey', 'No resolved PRs yet');
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats(stats = {}) {
+    ['pending', 'in_progress', 'failed', 'resolved', 'total'].forEach(k => {
+        const el = document.getElementById(`stat-${k}`);
+        if (el) el.textContent = stats[k] ?? 0;
+    });
 }
 
-// Render PR list
-function renderPRList(containerId, prs, dotColor, emptyMessage) {
-    const container = document.getElementById(containerId);
-    
-    if (!prs || prs.length === 0) {
-        container.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+// ── Repo filter population ────────────────────────────────────────────────────
+function collectRepos(data) {
+    const all = [...(data.pending||[]), ...(data.in_progress||[]),
+                 ...(data.failed||[]), ...(data.resolved||[])];
+    const sel = document.getElementById('repo-filter');
+    if (!sel) return;
+    all.forEach(i => allRepos.add(i.repo));
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Repos</option>';
+    [...allRepos].sort().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = r;
+        if (r === current) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAll() {
+    renderList('active-prs',      filter(allData.pending     || []));
+    renderList('in-progress-prs', filter(allData.in_progress || []));
+    renderList('failed-prs',      filter(allData.failed      || []));
+    renderList('history-prs',     filter(allData.resolved    || []));
+}
+
+function filter(items) {
+    const { repo, type, search } = activeFilters;
+    return items.filter(i =>
+        (!repo   || i.repo === repo) &&
+        (!type   || i.type === type) &&
+        (!search || i.title?.toLowerCase().includes(search) ||
+                    i.repo?.toLowerCase().includes(search)));
+}
+
+function renderList(containerId, items) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!items.length) {
+        el.innerHTML = '<div class="pr-empty">Nothing here 🎉</div>';
         return;
     }
-    
-    container.innerHTML = prs.map(pr => `
-        <div class="pr-card">
-            <div class="status-dot ${dotColor}"></div>
-            <div class="pr-content">
-                <div class="pr-title">${escapeHtml(pr.title || pr.workflow_name || 'Untitled')}</div>
+    el.innerHTML = items.map(pr => `
+        <div class="pr-card" data-id="${pr.id}">
+            <div class="pr-dot ${pr.status}"></div>
+            <div class="pr-body">
+                <div class="pr-title">${escHtml(pr.title || 'Untitled')}</div>
                 <div class="pr-meta">
-                    ${escapeHtml(pr.repo)} • ${pr.type === 'merge_conflict' ? 'PR #' + pr.pr_number : escapeHtml(pr.branch)}
-                    ${pr.assigned_to ? '• ' + escapeHtml(pr.assigned_to) : ''}
+                    <span class="pr-repo">${escHtml(pr.repo)}</span>
+                    ${pr.branch ? `<span>· ${escHtml(pr.branch)}</span>` : ''}
+                    ${pr.pr_number ? `<span>· PR #${pr.pr_number}</span>` : ''}
                 </div>
-                <a href="${escapeHtml(pr.url)}" target="_blank" class="pr-link">View on GitHub →</a>
+                <a href="${escHtml(pr.url || '#')}" target="_blank" class="pr-link">View on GitHub →</a>
             </div>
-            <span class="pr-badge ${pr.type === 'merge_conflict' ? 'conflict' : 'ci-failure'}">
-                ${pr.type === 'merge_conflict' ? 'Merge Conflict' : 'CI Failure'}
-            </span>
-        </div>
-    `).join('');
+            <div class="pr-actions">
+                <span class="pr-badge ${pr.type}">${pr.type === 'merge_conflict' ? '⚡ Conflict' : '🔧 CI'}</span>
+                <select class="pr-status-select" onchange="setStatus(${pr.id}, this.value)">
+                    ${['pending','in_progress','failed','resolved'].map(s =>
+                        `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`
+                    ).join('')}
+                </select>
+            </div>
+        </div>`).join('');
 }
 
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// ── Status update ─────────────────────────────────────────────────────────────
+async function setStatus(issueId, status) {
+    try {
+        await apiFetch(`/api/issues/${issueId}/status`, {
+            method: 'POST',
+            body: JSON.stringify({ status }),
+        });
+    } catch (e) {
+        showToast(`Failed to update status: ${e.message}`, 'error');
+    }
 }
 
-// Request manual update
-function requestUpdate() {
-    socket.emit('request_update');
+// ── Filter controls ───────────────────────────────────────────────────────────
+document.getElementById('repo-filter')?.addEventListener('change', e => {
+    activeFilters.repo = e.target.value; renderAll();
+});
+document.getElementById('type-filter')?.addEventListener('change', e => {
+    activeFilters.type = e.target.value; renderAll();
+});
+document.getElementById('search-input')?.addEventListener('input', e => {
+    activeFilters.search = e.target.value.toLowerCase(); renderAll();
+});
+
+function requestUpdate() { socket.emit('request_update'); }
+
+// ── PWA push notifications ────────────────────────────────────────────────────
+async function requestNotificationPermission() {
+    if (!('Notification' in window)) return;
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') showToast('Notifications enabled!', 'success');
 }
 
-// Update PR status
-function updatePRStatus(prId, status) {
-    socket.emit('update_status', { pr_id: prId, status: status });
+// Ask once on first visit
+if (localStorage.getItem('notif_asked') !== '1') {
+    setTimeout(() => {
+        requestNotificationPermission();
+        localStorage.setItem('notif_asked', '1');
+    }, 3000);
 }
+
+// Show notification on new issues
+socket.on('update', (data) => {
+    const newPending = (data.pending || []).length;
+    const oldPending = (allData.pending || []).length;
+    if (newPending > oldPending && Notification.permission === 'granted') {
+        new Notification('Bob — New PR Issue', {
+            body: `${newPending - oldPending} new issue(s) detected`,
+            icon: '/icons/icon-192.png',
+        });
+    }
+});
+
+// ── Service Worker registration ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(console.warn);
+}
+
+// ── Error query param handling ────────────────────────────────────────────────
+const urlErr = new URLSearchParams(window.location.search).get('error');
+if (urlErr) {
+    const msgs = {
+        invalid_state:    'Login failed: security check failed. Please try again.',
+        no_code:          'GitHub did not return an auth code.',
+        no_token:         'Token exchange failed. Check your OAuth app config.',
+        user_fetch_failed:'Could not fetch your GitHub profile.',
+    };
+    showToast(msgs[urlErr] || `Auth error: ${urlErr}`, 'error', 8000);
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s || '');
+    return d.innerHTML;
+}
+function capitalize(s) { return s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }

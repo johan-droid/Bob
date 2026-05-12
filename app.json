@@ -1,47 +1,57 @@
 {
   "name": "Bob - Multi-Repo PR Health Monitor",
-  "description": "Production-grade GitHub PR health monitoring system with real-time WebSocket updates",
+  "description": "Production-grade GitHub PR health monitoring with real-time WebSocket updates and zero-config repo discovery.",
   "repository": "https://github.com/johan-droid/Bob",
-  "logo": "https://via.placeholder.com/200x200?text=🤖",
   "keywords": ["github", "pr", "monitoring", "websocket", "flask", "python"],
   "success_url": "/",
   "stack": "heroku-24",
-  "buildpacks": [
-    {
-      "url": "heroku/python"
-    }
-  ],
+  "buildpacks": [{ "url": "heroku/python" }],
   "env": {
-    "GITHUB_TOKEN": {
-      "description": "GitHub Personal Access Token with repo, issues:write, pull_requests:write scopes",
+    "SECRET_KEY": {
+      "description": "Flask secret key for sessions. Generate: python -c \"import secrets; print(secrets.token_hex(32))\"",
+      "generator": "secret",
       "required": true
     },
-    "TARGET_REPOS": {
-      "description": "Comma-separated list of repositories to monitor (e.g., owner/repo1,owner/repo2)",
+    "GITHUB_TOKEN": {
+      "description": "Server PAT with repo + admin:org scopes (used for auto-provisioning and background scan).",
       "required": true
     },
     "GITHUB_CLIENT_ID": {
-      "description": "GitHub OAuth App Client ID (create at https://github.com/settings/developers)",
+      "description": "GitHub OAuth App Client ID (create at https://github.com/settings/developers).",
       "required": true
     },
     "GITHUB_CLIENT_SECRET": {
-      "description": "GitHub OAuth App Client Secret",
+      "description": "GitHub OAuth App Client Secret.",
       "required": true
     },
-    "SECRET_KEY": {
-      "description": "Flask secret key for session management",
-      "generator": "secret"
+    "ALLOWED_ORIGINS": {
+      "description": "Comma-separated list of allowed origins for CORS. Example: https://your-app.heroku.com",
+      "required": true
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (Heroku provides this automatically with Postgres add-on).",
+      "required": false
+    },
+    "WEBHOOK_SECRET": {
+      "description": "Secret for GitHub Webhook HMAC-SHA256 verification. Set this in your GitHub Webhook config.",
+      "required": false
+    },
+    "ASSIGNEE_USERNAME": {
+      "description": "GitHub username to @mention in auto-created issues (e.g. jules).",
+      "value": "jules",
+      "required": false
+    },
+    "TARGET_REPOS": {
+      "description": "OPTIONAL whitelist. Leave empty to auto-discover all repos the user has access to. Format: owner/repo,owner/repo",
+      "value": "",
+      "required": false
     },
     "SCAN_INTERVAL": {
-      "description": "Background scan interval in seconds",
+      "description": "Background scan interval in seconds.",
       "value": "300",
       "required": false
     }
   },
-  "formation": {
-    "web": {
-      "quantity": 1,
-      "size": "basic"
-    }
-  }
-}}
+  "formation": { "web": { "quantity": 1, "size": "basic" } },
+  "addons": [{ "plan": "heroku-postgresql:essential-0" }]
+}
