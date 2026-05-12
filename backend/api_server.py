@@ -1,7 +1,6 @@
-"""
-api_server.py — Bob PR Health Scanner (SaaS-grade)
-Security: server-side sessions, OAuth state, CSRF, CORS lockdown, WS auth, DB persistence.
-"""
+import eventlet
+eventlet.monkey_patch()
+
 import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
