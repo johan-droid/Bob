@@ -42,5 +42,6 @@
     {
       "url": "heroku/python"
     }
-  ]
-}
+  ],
+  "stack": "heroku-24"
+}}
