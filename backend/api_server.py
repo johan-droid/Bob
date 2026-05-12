@@ -298,6 +298,21 @@ def discover_repos():
                     repos_map[repo['full_name']] = _normalize_repo(repo, 'org')
             if len(ob) < 100: break
             p += 1
+ 
+    # Source 3: Bot's own permissions (for Tiered Logic)
+    agent_repos = {}
+    if GITHUB_TOKEN:
+        ap = 1
+        while True:
+            ar = http_req.get('https://api.github.com/user/repos', headers=gh(GITHUB_TOKEN),
+                              params={'per_page': 100, 'page': ap}, timeout=15)
+            if ar.status_code != 200: break
+            abatch = ar.json()
+            if not abatch: break
+            for r in abatch:
+                agent_repos[r['full_name']] = 'admin' if r['permissions'].get('admin') else 'write' if r['permissions'].get('push') else 'read'
+            if len(abatch) < 100: break
+            ap += 1
 
     if TARGET_REPOS_OVERRIDE:
         repos_map = {k: v for k, v in repos_map.items() if k in TARGET_REPOS_OVERRIDE}
@@ -319,11 +334,13 @@ def discover_repos():
                 permissions_level=('owner' if r.get('owner_login','').lower()==uname.lower()
                                    else 'admin' if r['permissions'].get('admin')
                                    else 'push'),
+                agent_permission=agent_repos.get(r['full_name'], 'none'),
                 archived=r['archived'], fork=r['fork'],
             ))
         else:
             ur = UserRepo.query.filter_by(user_id=user.id, full_name=r['full_name']).first()
             if ur:
+                ur.agent_permission = agent_repos.get(r['full_name'], 'none')
                 ur.last_synced = datetime.utcnow()
     db.session.commit()
 
@@ -609,6 +626,12 @@ def _trigger_auto_comment(issue, scanner):
     if issue.comment_sent or not issue.pr_number:
         return
     
+    # Check if Bob has write access to this specific repo
+    ur = UserRepo.query.filter_by(user_id=issue.user_id, full_name=issue.repo).first()
+    if not ur or ur.agent_permission not in ('write', 'admin'):
+        logger.info(f"Skipping auto-comment on {issue.repo}#{issue.pr_number} (Read-only or No Access)")
+        return
+    
     msg = (
         f"🤖 **Bob PR Health Alert**\n\n"
         f"Hey @{scanner.assignee}, I've detected a **{issue.issue_type.replace('_', ' ')}** on this PR.\n"
@@ -640,7 +663,9 @@ def _get_user_data(user_id):
             'full_name': ur.full_name,
             'is_active': ur.full_name not in excluded,
             'issue_count': len(repo_issues),
-            'permission': ur.permissions_level
+            'permission': ur.permissions_level,
+            'agent_permission': ur.agent_permission,
+            'language': ur.language,
         })
 
     return {

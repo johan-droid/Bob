@@ -189,7 +189,8 @@ function renderRepos(repos) {
                 <div class="pr-meta">
                     <span>${r.is_active ? 'Scanning' : 'Ignored'}</span>
                     <span>· ${r.issue_count} total issues</span>
-                    ${r.permission ? `<span>· ${r.permission}</span>` : ''}
+                    <span>· ${escHtml(r.permission || 'read')}</span>
+                    ${r.agent_permission ? `<span class="agent-badge ${r.agent_permission}">${r.agent_permission === 'write' || r.agent_permission === 'admin' ? '🟢 Active' : '🟡 Observer'}</span>` : ''}
                 </div>
             </div>
             <div class="pr-actions">

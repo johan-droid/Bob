@@ -124,6 +124,22 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.agent-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.agent-badge.write, .agent-badge.admin {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+}
+.agent-badge.read, .agent-badge.none {
+    background: rgba(241, 196, 15, 0.2);
+    color: #f1c40f;
+}
+
 @media(max-width: 768px) { .dash-panels { grid-template-columns: 1fr; } }
 
 .panel {

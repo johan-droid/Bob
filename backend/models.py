@@ -30,6 +30,7 @@ class UserRepo(db.Model):
     url               = db.Column(db.String(500))
     language          = db.Column(db.String(100), default='Unknown')
     permissions_level = db.Column(db.String(50),  default='read')
+    agent_permission  = db.Column(db.String(50),  default='none') # none|read|write|admin
     archived          = db.Column(db.Boolean, default=False)
     fork              = db.Column(db.Boolean, default=False)
     last_synced       = db.Column(db.DateTime, default=datetime.utcnow)
