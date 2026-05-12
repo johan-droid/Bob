@@ -61,6 +61,14 @@ socket.on('disconnect', () => {
     wsEl?.classList.replace('connected', 'disconnected');
     if (wsLbl) wsLbl.textContent = 'Offline';
     showToast('Lost connection — retrying…', 'warning');
+    setTimeout(() => socket.connect(), 5000);
+});
+
+socket.on('connect_error', (err) => {
+    console.warn('[WS] Connection error:', err.message);
+    wsEl?.classList.replace('connected', 'disconnected');
+    if (wsLbl) wsLbl.textContent = 'Reconnecting...';
+    setTimeout(() => socket.connect(), 5000);
 });
 
 socket.on('update', (data) => {

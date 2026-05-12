@@ -63,8 +63,8 @@ csrf = CSRFProtect(app)
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
                     manage_session=False, 
-                    ping_timeout=60, 
-                    ping_interval=25, 
+                    ping_timeout=30, 
+                    ping_interval=10, 
                     async_mode='eventlet')
 init_db(app)
 
