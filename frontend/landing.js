@@ -1,62 +1,35 @@
-// WebSocket connection for landing page
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000' 
-    : window.location.origin;
-const socket = io(wsUrl, {
-    transports: ['websocket', 'polling'],
-    upgrade: true,
-    withCredentials: true
-});
+document.addEventListener('DOMContentLoaded', () => {
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const closeDrawerBtn = document.getElementById('close-drawer');
+    const mobileDrawer = document.getElementById('mobile-drawer');
+    const drawerOverlay = document.getElementById('drawer-overlay');
 
-const liveIndicator = document.getElementById('live-indicator');
-const liveText = document.querySelector('.live-text');
+    const toggleDrawer = (isOpen) => {
+        if (!mobileDrawer || !drawerOverlay) {
+            return;
+        }
 
-// Connection status handlers
-socket.on('connect', () => {
-    console.log('Connected to Bob server');
-    liveIndicator.className = 'live-dot connected';
-    liveText.textContent = 'Live';
-    socket.emit('request_update');
-});
+        if (isOpen) {
+            mobileDrawer.classList.add('open');
+            drawerOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            return;
+        }
 
-socket.on('disconnect', () => {
-    console.log('Disconnected from Bob server');
-    liveIndicator.className = 'live-dot disconnected';
-    liveText.textContent = 'Offline';
-    
-    // Reset values to dash
-    document.getElementById('preview-pending').textContent = '-';
-    document.getElementById('preview-in-progress').textContent = '-';
-    document.getElementById('preview-resolved').textContent = '-';
-});
+        mobileDrawer.classList.remove('open');
+        drawerOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    };
 
-socket.on('connect_error', (err) => {
-    console.warn('Socket connection error:', err);
-    liveIndicator.className = 'live-dot disconnected';
-    liveText.textContent = 'Retrying...';
-    // Force a fresh connection attempt
-    setTimeout(() => socket.connect(), 5000);
-});
-
-// Receive real-time updates
-socket.on('update', (data) => {
-    console.log('Received update:', data);
-    updatePreview(data);
-});
-
-// Update preview with live data
-function updatePreview(data) {
-    if (data.stats) {
-        document.getElementById('preview-pending').textContent = data.stats.pending || 0;
-        document.getElementById('preview-in-progress').textContent = data.stats.in_progress || 0;
-        document.getElementById('preview-resolved').textContent = data.stats.resolved || 0;
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', () => toggleDrawer(true));
     }
-}
 
-// Request update every 30 seconds
-setInterval(() => {
-    if (socket.connected) {
-        socket.emit('request_update');
+    if (closeDrawerBtn) {
+        closeDrawerBtn.addEventListener('click', () => toggleDrawer(false));
     }
-}, 30000);
+
+    if (drawerOverlay) {
+        drawerOverlay.addEventListener('click', () => toggleDrawer(false));
+    }
+});

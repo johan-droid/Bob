@@ -14,6 +14,6 @@
   "categories": ["developer", "productivity"],
   "shortcuts": [
     { "name": "Dashboard", "url": "/dashboard", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Settings",  "url": "/settings",  "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Org Settings",  "url": "/org/settings",  "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

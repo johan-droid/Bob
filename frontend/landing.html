@@ -2,247 +2,107 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Bob — Multi-Repo PR Health Monitor</title>
-    <meta name="description" content="Zero-config GitHub PR health monitoring with real-time alerts across all your repos.">
-    <meta property="og:title" content="Bob — PR Health Monitor">
-    <meta property="og:description" content="Zero-config GitHub PR health monitoring with real-time alerts.">
-    <meta property="og:type" content="website">
-    <meta name="theme-color" content="#080c14">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bob helps teams monitor PR health with real-time visibility, proactive alerting, and zero-config onboarding.">
+    <title>Bob | PR Health Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="landing.css">
 </head>
 <body>
-    <div class="landing-container">
-        <!-- Hero Section -->
-        <header class="hero">
-            <div class="hero-content">
-                <div class="logo">
-                    <span class="robot-emoji">🤖</span>
-                    <h1>Bob</h1>
-                </div>
-                <p class="tagline">Multi-Repo PR Health Monitor</p>
-                <p class="description">
-                    Production-grade GitHub PR health monitoring system with real-time WebSocket updates
-                </p>
-                
-                <div class="cta-buttons">
-                    <a href="/login/github" class="btn btn-primary">
-                        <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                        </svg>
-                        Sign in with GitHub
-                    </a>
-                    <a href="#features" class="btn btn-secondary">Learn More</a>
-                </div>
-            </div>
-            
-            <div class="hero-visual">
-                <div class="dashboard-preview">
-                    <div class="preview-header">
-                        <div class="preview-dots">
-                            <span class="dot red"></span>
-                            <span class="dot yellow"></span>
-                            <span class="dot green"></span>
-                        </div>
-                        <div class="live-indicator">
-                            <span class="live-dot" id="live-indicator"></span>
-                            <span class="live-text">Connecting...</span>
-                        </div>
-                    </div>
-                    <div class="preview-content">
-                        <div class="preview-stat">
-                            <div class="stat-icon">🔴</div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="preview-pending">-</div>
-                                <div class="stat-label">Active PRs</div>
-                            </div>
-                        </div>
-                        <div class="preview-stat">
-                            <div class="stat-icon">🟢</div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="preview-in-progress">-</div>
-                                <div class="stat-label">In Progress</div>
-                            </div>
-                        </div>
-                        <div class="preview-stat">
-                            <div class="stat-icon">⚪</div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="preview-resolved">-</div>
-                                <div class="stat-label">Resolved</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
+    <nav class="md3-navbar">
+        <div class="logo">
+            <span class="material-icons-outlined">merge_type</span>
+            <span class="brand-name">Bob</span>
+        </div>
 
-        <!-- Features Section -->
-        <section id="features" class="features">
-            <div class="features-container">
-                <h2>Why Bob?</h2>
-                <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Real-time Updates</h3>
-                    <p>WebSocket-powered instant updates without polling. See PR status changes as they happen.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📱</div>
-                    <h3>Mobile Optimized</h3>
-                    <p>Fully responsive design that works perfectly on phones, tablets, and desktops.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3>Conflict Detection</h3>
-                    <p>Automatic merge conflict detection with retry logic and smart notifications.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🚀</div>
-                    <h3>CI Monitoring</h3>
-                    <p>Track workflow run failures across all your repositories in one place.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🔄</div>
-                    <h3>Auto-scanning</h3>
-                    <p>Background scanning every 5 minutes keeps your dashboard always up-to-date.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
-                    <h3>Team Tagging</h3>
-                    <p>Automatically tag your team when issues are detected for quick resolution.</p>
+        <div class="nav-controls">
+            <div class="desktop-controls">
+                <div class="auth-buttons">
+                    <a href="/user/login.html" class="md3-btn md3-btn-text">Developer Login</a>
+                    <a href="/org/login.html" class="md3-btn md3-btn-filled">Organization Portal</a>
                 </div>
             </div>
-        </section>
 
-        <!-- Status Flow Section -->
-        <section class="status-flow">
-            <h2>PR Status Flow</h2>
-            <div class="flow-diagram">
-                <div class="flow-step">
-                    <div class="flow-icon red-glow">🔴</div>
-                    <h4>Pending</h4>
-                    <p>PRs awaiting response</p>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon green-glow">🟢</div>
-                    <h4>In Progress</h4>
-                    <p>Being resolved</p>
-                </div>
-                <div class="flow-arrow">→</div>
-                <div class="flow-step">
-                    <div class="flow-icon grey-glow">⚪</div>
-                    <h4>Resolved</h4>
-                    <p>Successfully fixed</p>
-                </div>
-            </div>
-        </section>
+            <button id="mobile-menu-toggle" class="icon-btn mobile-only" aria-label="Open menu">
+                <span class="material-icons-outlined">menu</span>
+            </button>
+        </div>
+    </nav>
 
-        <!-- Permissions Section -->
-        <section class="permissions-info">
-            <h2>🔐 Secure & Automated Permissions</h2>
-            <p class="section-subtitle">Bob automatically requests all necessary permissions during login - no manual setup required!</p>
-            
-            <div class="permissions-grid">
-                <div class="permission-info-card">
-                    <div class="permission-info-icon">📦</div>
-                    <h3>Repository Access</h3>
-                    <p>Monitor PRs, detect conflicts, and track CI failures across all your repositories</p>
-                </div>
-                
-                <div class="permission-info-card">
-                    <div class="permission-info-icon">👥</div>
-                    <h3>Organization Access</h3>
-                    <p>Tag team members automatically when issues are detected for faster resolution</p>
-                </div>
-                
-                <div class="permission-info-card">
-                    <div class="permission-info-icon">⚙️</div>
-                    <h3>Workflow Monitoring</h3>
-                    <p>Track GitHub Actions and CI/CD pipeline failures in real-time</p>
-                </div>
-                
-                <div class="permission-info-card">
-                    <div class="permission-info-icon">💬</div>
-                    <h3>Smart Notifications</h3>
-                    <p>Create discussions and comments to keep your team informed</p>
-                </div>
-            </div>
-            
-            <div class="security-badge">
-                <span class="badge-icon">🔒</span>
-                <div class="badge-text">
-                    <strong>Enterprise-grade Security</strong>
-                    <p>Your credentials are never stored. Bob uses OAuth tokens that you can revoke anytime from GitHub settings.</p>
-                </div>
-            </div>
-        </section>
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <aside id="mobile-drawer" class="mobile-drawer">
+        <div class="drawer-header">
+            <span class="brand-name">Bob</span>
+            <button id="close-drawer" class="icon-btn" aria-label="Close menu">
+                <span class="material-icons-outlined">close</span>
+            </button>
+        </div>
+        <div class="drawer-content">
+            <a href="/user/login.html" class="md3-btn md3-btn-outlined drawer-btn">Developer Login</a>
+            <a href="/org/login.html" class="md3-btn md3-btn-filled drawer-btn">Organization Portal</a>
+        </div>
+    </aside>
 
-        <!-- CTA Section -->
-        <section class="cta-section">
-            <h2>Ready to Monitor Your PRs?</h2>
-            <p>One-click setup with automatic permission configuration</p>
-            <a href="/login/github" class="btn btn-primary btn-large">
-                <svg height="24" width="24" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                </svg>
-                Sign in with GitHub
-            </a>
-        </section>
+    <header class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">Ship Faster with Multi-Repository PR Health Monitoring.</h1>
+            <p class="hero-subtitle">Gain real-time visibility into your engineering pipelines. Bob automatically detects CI workflow failures and merge conflicts across your entire organization, keeping your main branch pristine.</p>
+            <div class="hero-actions">
+                <a href="/org/signup.html" class="md3-btn md3-btn-filled md3-btn-large">Get Started for Free</a>
+                <a href="#features" class="md3-btn md3-btn-outlined md3-btn-large">Explore Features</a>
+            </div>
+        </div>
+    </header>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>🤖 Bob</h4>
-                    <p>Multi-Repo PR Health Monitor</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Resources</h4>
-                    <a href="https://github.com/johan-droid/Bob">GitHub</a>
-                    <a href="https://github.com/johan-droid/Bob/blob/main/README.md">Documentation</a>
-                    <a href="https://github.com/johan-droid/Bob/blob/main/CONTRIBUTING.md">Contributing</a>
-                </div>
-                <div class="footer-section">
-                    <h4>Support</h4>
-                    <a href="https://github.com/johan-droid/Bob/issues">Issues</a>
-                    <a href="https://github.com/johan-droid/Bob/discussions">Discussions</a>
-                </div>
+    <section id="features" class="features-section">
+        <div class="section-header">
+            <h2>Enterprise-Grade Tools, Open-Source Flexibility</h2>
+        </div>
+
+        <div class="md3-card-grid">
+            <div class="md3-card">
+                <span class="material-icons-outlined card-icon">bolt</span>
+                <h3>Real-Time Visibility</h3>
+                <p>Powered by WebSockets, track PR statuses, CI workflow runs, and pipeline blockers instantly across multiple repositories without refreshing.</p>
             </div>
-            <div class="footer-bottom">
-                <p>Made with ❤️ by the Bob team • MIT License</p>
+
+            <div class="md3-card">
+                <span class="material-icons-outlined card-icon">warning_amber</span>
+                <h3>Proactive Alerting</h3>
+                <p>Automated detection of merge conflicts and failing checks. Automatically labels and tags the responsible developers to resolve blockers faster.</p>
             </div>
-        </footer>
-    </div>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='landing.js') }}">
-    </script>
-    <script>
-    // Show error banner if OAuth redirect included ?error=
-    const _errKey = new URLSearchParams(location.search).get('error');
-    if (_errKey) {
-      const _msgs = {
-          invalid_state:'Security check failed. Please try signing in again.',
-          no_code:'GitHub did not return an auth code.',
-          no_token:'Token exchange failed.',
-          user_fetch_failed:'Could not fetch GitHub profile.',
-          network_error:'Temporary network error. Please try signing in again.'
-      };
-      const _b = document.createElement('div');
-      _b.style.cssText='position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px 20px;font-family:sans-serif;font-size:14px;z-index:9999';
-      _b.textContent = _msgs[_errKey] || ('Error: ' + _errKey);
-      document.body.prepend(_b);
-      setTimeout(()=>_b.remove(), 6000);
-    }
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
-    </script>
+
+            <div class="md3-card">
+                <span class="material-icons-outlined card-icon">dashboard_customize</span>
+                <h3>Executive Dashboard</h3>
+                <p>A fully mobile-optimized view for engineering managers to track team velocity, active blockers, and deployment readiness on the go.</p>
+            </div>
+
+            <div class="md3-card">
+                <span class="material-icons-outlined card-icon">admin_panel_settings</span>
+                <h3>Zero-Config Onboarding</h3>
+                <p>Connect your GitHub organization once. Bob auto-provisions collaborator access and starts monitoring immediately with zero manual configuration.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="md3-footer">
+        <div class="footer-content">
+            <div class="brand-footer">
+                <span class="material-icons-outlined">merge_type</span>
+                <span class="brand-name">Bob</span>
+            </div>
+            <div class="footer-links">
+                <a href="/docs">Documentation</a>
+                <a href="https://github.com/johan-droid/bob">GitHub</a>
+                <a href="/privacy">Privacy</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="landing.js"></script>
 </body>
 </html>

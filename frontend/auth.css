@@ -1,0 +1,130 @@
+:root {
+    --md-sys-color-primary: #0b57d0;
+    --md-sys-color-surface: #fdfbff;
+    --md-sys-color-surface-container: #f3f4f9;
+    --md-sys-color-surface-variant: #e1e2e8;
+    --md-sys-color-on-surface: #1a1b1f;
+    --md-sys-color-on-surface-variant: #44474e;
+    --md-sys-color-outline: #74777f;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    min-height: 100%;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 24px;
+}
+
+.md3-card {
+    background-color: var(--md-sys-color-surface);
+    border-radius: 24px;
+    padding: 40px 32px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--md-sys-color-surface-variant);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.brand-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    font-size: 48px;
+    color: var(--md-sys-color-primary);
+    background-color: #d3e3fd;
+    padding: 16px;
+    border-radius: 50%;
+}
+
+.auth-title {
+    font-size: 1.5rem;
+    font-weight: 400;
+}
+
+.auth-subtitle {
+    font-size: 0.95rem;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.5;
+}
+
+.oauth-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #ffffff;
+    background-color: #24292f;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.oauth-btn:hover {
+    background-color: #000000;
+}
+
+.github-icon {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.auth-footer {
+    font-size: 0.875rem;
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+.auth-footer a {
+    color: var(--md-sys-color-primary);
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 24px;
+    color: var(--md-sys-color-on-surface-variant);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.back-link:hover {
+    color: var(--md-sys-color-primary);
+}

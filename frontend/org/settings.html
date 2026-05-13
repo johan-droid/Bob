@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bob | Organization Settings</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="settings.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <aside id="nav-drawer" class="md3-drawer">
+            <div class="drawer-header">
+                <span class="material-icons-outlined logo-icon">merge_type</span>
+                <span class="brand-name">Bob Org</span>
+            </div>
+            <nav class="drawer-nav">
+                <a href="/org/dashboard" class="nav-item">
+                    <span class="material-icons-outlined">dashboard</span>
+                    Pipeline Health
+                </a>
+                <a href="/org/settings" class="nav-item active" aria-current="page">
+                    <span class="material-icons-outlined">settings_applications</span>
+                    Org Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="md3-top-app-bar">
+                <div class="app-bar-left">
+                    <button id="menu-toggle" class="icon-btn" aria-label="Toggle Menu" type="button">
+                        <span class="material-icons-outlined">menu</span>
+                    </button>
+                    <h1 class="page-title">Organization Settings</h1>
+                </div>
+                <div class="app-bar-right">
+                    <button id="global-save-btn" class="md3-btn md3-btn-filled" type="button" disabled>Save Changes</button>
+                    <div class="avatar-circle">M</div>
+                </div>
+            </header>
+
+            <div class="settings-content">
+                <section class="settings-section md3-card">
+                    <div class="section-header">
+                        <h2>Monitored Repositories</h2>
+                        <p class="section-desc">Manage which GitHub repositories Bob tracks for CI failures and merge conflicts.</p>
+                    </div>
+
+                    <div class="sync-panel">
+                        <div class="sync-info">
+                            <span class="material-icons-outlined">sync_problem</span>
+                            <div class="sync-text">
+                                <strong>Not Synchronized</strong>
+                                <span>Awaiting GitHub App installation token payload.</span>
+                            </div>
+                        </div>
+                        <button class="md3-btn md3-btn-outlined" id="force-sync-btn" type="button">Force Sync</button>
+                    </div>
+                </section>
+
+                <section class="settings-section md3-card">
+                    <div class="section-header">
+                        <h2>Notification Channels</h2>
+                        <p class="section-desc">Configure where Bob routes high-priority pipeline blockers.</p>
+                    </div>
+
+                    <form class="settings-form" id="notifications-form">
+                        <div class="form-group">
+                            <label for="slack-webhook" class="md3-label">Slack Webhook URL</label>
+                            <input type="url" id="slack-webhook" class="md3-input" placeholder="https://hooks.slack.com/services/...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="discord-webhook" class="md3-label">Discord Webhook URL</label>
+                            <input type="url" id="discord-webhook" class="md3-input" placeholder="https://discord.com/api/webhooks/...">
+                        </div>
+                    </form>
+                </section>
+
+                <section class="settings-section md3-card">
+                    <div class="section-header">
+                        <h2>Auto-Triage Rules</h2>
+                        <p class="section-desc">Set up automated labeling and developer tagging for broken pipelines.</p>
+                    </div>
+
+                    <div class="toggle-list">
+                        <div class="toggle-item">
+                            <div class="toggle-text">
+                                <strong>Auto-label Merge Conflicts</strong>
+                                <span>Apply 'conflict-detected' label immediately upon detection.</span>
+                            </div>
+                            <label class="md3-switch">
+                                <input type="checkbox" id="rule-label-conflict" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="toggle-item">
+                            <div class="toggle-text">
+                                <strong>Tag PR Author on CI Failure</strong>
+                                <span>Automatically mention the author in a PR comment if checks fail.</span>
+                            </div>
+                            <label class="md3-switch">
+                                <input type="checkbox" id="rule-tag-author">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>

@@ -1,5 +1,8 @@
-import eventlet
-eventlet.monkey_patch()
+import sys as _sys
+_USE_EVENTLET = _sys.platform != 'win32'
+if _USE_EVENTLET:
+    import eventlet
+    eventlet.monkey_patch()
 
 import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
@@ -60,12 +63,13 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, 
-                    cors_allowed_origins="*", 
-                    manage_session=False, 
-                    ping_timeout=30, 
-                    ping_interval=10, 
-                    async_mode='eventlet')
+_ASYNC_MODE = 'eventlet' if _USE_EVENTLET else 'threading'
+socketio = SocketIO(app,
+                    cors_allowed_origins="*",
+                    manage_session=False,
+                    ping_timeout=30,
+                    ping_interval=10,
+                    async_mode=_ASYNC_MODE)
 init_db(app)
 
 def ensure_schema():
@@ -111,13 +115,27 @@ def current_user():
 @app.route('/')
 def landing():
     if 'user' in session:
-        return redirect('/dashboard')
+        portal = session.get('oauth_portal', 'org')
+        return redirect('/user/dashboard' if portal == 'user' else '/org/dashboard')
     return render_template('landing.html')
 
 @app.route('/permissions')
 @login_required
 def permissions_page():
-    return render_template('permissions.html', user=session['user'])
+    portal = session.get('oauth_portal', 'org')
+    dashboard_url = '/user/dashboard' if portal == 'user' else '/org/dashboard'
+    auth_url = '/api/auth/github/login?scope=user' if portal == 'user' else '/api/auth/github/install'
+    return render_template('permissions.html', user=session['user'], portal=portal, dashboard_url=dashboard_url, auth_url=auth_url)
+
+@app.route('/org/dashboard')
+@login_required
+def org_dashboard():
+    return render_template('org/dashboard.html', user=session['user'])
+
+@app.route('/user/dashboard')
+@login_required
+def user_dashboard():
+    return render_template('user/dashboard.html', user=session['user'])
 
 @app.route('/dashboard')
 @login_required
@@ -127,11 +145,24 @@ def dashboard():
 @app.route('/settings')
 @login_required
 def settings_page():
-    return render_template('settings.html', user=session['user'])
+    return redirect(url_for('org_settings_page'))
+
+@app.route('/org/settings')
+@login_required
+def org_settings_page():
+    return render_template('org/settings.html', user=session['user'])
 
 @app.route('/error')
 def error_page():
     return render_template('error.html')
+
+@app.route('/docs')
+def docs_page():
+    return render_template('docs.html')
+
+@app.route('/privacy')
+def privacy_page():
+    return render_template('privacy.html')
 
 @app.route('/logout')
 @login_required
@@ -150,10 +181,20 @@ def get_csrf_token():
 def github_login():
     state = secrets.token_urlsafe(32)
     session['oauth_state'] = state
+    session['oauth_portal'] = 'user' if request.args.get('portal') == 'user' else 'org'
     scopes = 'repo read:org write:discussion workflow user:email'
     url = (f'https://github.com/login/oauth/authorize'
            f'?client_id={GITHUB_CLIENT_ID}&scope={scopes}&state={state}&allow_signup=true')
     return redirect(url)
+
+@app.route('/api/auth/github/login')
+def api_auth_github_login():
+    portal = 'user' if request.args.get('scope') == 'user' else 'org'
+    return redirect(url_for('github_login', portal=portal))
+
+@app.route('/api/auth/github/install')
+def api_auth_github_install():
+    return redirect(url_for('github_login', portal='org'))
 
 @app.route('/callback/github')
 def github_callback():
@@ -767,4 +808,6 @@ if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
     threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    _local_dev = not _USE_EVENTLET  # True on Windows
+    socketio.run(app, host='0.0.0.0', port=port, debug=False,
+                 allow_unsafe_werkzeug=_local_dev)
