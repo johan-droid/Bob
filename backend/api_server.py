@@ -650,10 +650,10 @@ def _trigger_auto_comment(issue, scanner):
     if not issue.pr_number:
         return
 
-    # Anti-spam cooldown: Only 1 comment per 12 hours per issue
+    # Anti-spam cooldown: Only 1 comment per 1 hour per issue
     if issue.last_commented_at:
         delta = datetime.utcnow() - issue.last_commented_at
-        if delta.total_seconds() < 43200: # 12 hours in seconds
+        if delta.total_seconds() < 3600: # 1 hour in seconds
             return
 
     # Anti-spam Hard Cap: Maximum 3 comments per issue
