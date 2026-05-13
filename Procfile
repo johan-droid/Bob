@@ -1,1 +1,1 @@
-web: cd backend && gunicorn --worker-class eventlet -w 1 api_server:app
+web: cd backend && gunicorn --worker-class gevent -w 1 api_server:app
