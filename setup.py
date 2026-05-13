@@ -18,7 +18,7 @@ setup(
         'Flask-Session==0.8.0',
         'Flask-WTF==1.2.1',
         'WTForms==3.1.2',
-        'Flask-SQLAlchemy==3.2.0',
+        'Flask-SQLAlchemy==3.1.1',
         'SQLAlchemy==2.1.0',
         'psycopg2-binary==2.9.10',
     ],

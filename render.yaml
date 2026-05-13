@@ -1,7 +1,7 @@
 services:
   - type: web
     name: bob-pr-monitor
-    env: python
+    runtime: python-3.11
     buildCommand: pip install -r requirements.txt
     startCommand: cd backend && gunicorn --worker-class eventlet -w 1 api_server:app
     envVars:
