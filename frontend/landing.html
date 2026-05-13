@@ -2,107 +2,113 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Bob helps teams monitor PR health with real-time visibility, proactive alerting, and zero-config onboarding.">
-    <title>Bob | PR Health Monitoring</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Bob is a high-fidelity PR health monitor that keeps your engineering pipelines pristine with real-time analysis and proactive conflict detection.">
+    <title>Bob | Galaxy PR Intelligence</title>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="landing.css">
 </head>
 <body>
-    <nav class="md3-navbar">
-        <div class="logo">
-            <span class="material-icons-outlined">merge_type</span>
-            <span class="brand-name">Bob</span>
-        </div>
 
-        <div class="nav-controls">
-            <div class="desktop-controls">
-                <div class="auth-buttons">
-                    <a href="/user/login.html" class="md3-btn md3-btn-text">Developer Login</a>
-                    <a href="/org/login.html" class="md3-btn md3-btn-filled">Organization Portal</a>
-                </div>
-            </div>
-
-            <button id="mobile-menu-toggle" class="icon-btn mobile-only" aria-label="Open menu">
-                <span class="material-icons-outlined">menu</span>
-            </button>
-        </div>
-    </nav>
-
-    <div id="drawer-overlay" class="drawer-overlay"></div>
-    <aside id="mobile-drawer" class="mobile-drawer">
-        <div class="drawer-header">
-            <span class="brand-name">Bob</span>
-            <button id="close-drawer" class="icon-btn" aria-label="Close menu">
-                <span class="material-icons-outlined">close</span>
-            </button>
-        </div>
-        <div class="drawer-content">
-            <a href="/user/login.html" class="md3-btn md3-btn-outlined drawer-btn">Developer Login</a>
-            <a href="/org/login.html" class="md3-btn md3-btn-filled drawer-btn">Organization Portal</a>
-        </div>
-    </aside>
-
-    <header class="hero-section">
-        <div class="hero-content">
-            <h1 class="hero-title">Ship Faster with Multi-Repository PR Health Monitoring.</h1>
-            <p class="hero-subtitle">Gain real-time visibility into your engineering pipelines. Bob automatically detects CI workflow failures and merge conflicts across your entire organization, keeping your main branch pristine.</p>
-            <div class="hero-actions">
-                <a href="/org/signup.html" class="md3-btn md3-btn-filled md3-btn-large">Get Started for Free</a>
-                <a href="#features" class="md3-btn md3-btn-outlined md3-btn-large">Explore Features</a>
+    <header class="nav-container" id="navbar">
+        <div class="nav-content">
+            <a href="/" class="logo">
+                <span class="material-symbols-outlined">rocket_launch</span>
+                <span>BOB</span>
+            </a>
+            <div class="nav-actions">
+                <a href="/user/login.html" class="btn btn-glass" style="margin-right: 12px;">LOGIN</a>
+                <a href="/org/signup.html" class="btn btn-primary">GET STARTED</a>
             </div>
         </div>
     </header>
 
-    <section id="features" class="features-section">
-        <div class="section-header">
-            <h2>Enterprise-Grade Tools, Open-Source Flexibility</h2>
-        </div>
-
-        <div class="md3-card-grid">
-            <div class="md3-card">
-                <span class="material-icons-outlined card-icon">bolt</span>
-                <h3>Real-Time Visibility</h3>
-                <p>Powered by WebSockets, track PR statuses, CI workflow runs, and pipeline blockers instantly across multiple repositories without refreshing.</p>
+    <main>
+        <section class="hero">
+            <div class="hero-tag">
+                <span class="material-symbols-outlined" style="font-size: 16px;">verified</span>
+                Next-Gen Pipeline Intelligence
+            </div>
+            <h1 class="hero-title">Engineering Health,<br>at Galaxy Scale.</h1>
+            <p class="hero-subtitle">Gain real-time visibility into your engineering pipelines. Bob automatically detects CI workflow failures and merge conflicts across your entire organization.</p>
+            
+            <div class="hero-actions">
+                <a href="/org/signup.html" class="btn btn-primary" style="padding: 18px 36px; font-size: 17px;">
+                    <span class="material-symbols-outlined">bolt</span>
+                    INITIALIZE MISSION
+                </a>
+                <a href="#features" class="btn btn-glass" style="padding: 18px 36px; font-size: 17px;">
+                    EXPLORE SECTORS
+                </a>
             </div>
 
-            <div class="md3-card">
-                <span class="material-icons-outlined card-icon">warning_amber</span>
-                <h3>Proactive Alerting</h3>
-                <p>Automated detection of merge conflicts and failing checks. Automatically labels and tags the responsible developers to resolve blockers faster.</p>
+            <div class="hero-preview">
+                <img src="bob_dashboard_mockup_1778659836772.png" alt="Bob Dashboard Preview">
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="section-title">
+                <div class="hero-tag" style="margin-bottom: 16px;">Core Modules</div>
+                <h2>Autonomous Monitoring</h2>
             </div>
 
-            <div class="md3-card">
-                <span class="material-icons-outlined card-icon">dashboard_customize</span>
-                <h3>Executive Dashboard</h3>
-                <p>A fully mobile-optimized view for engineering managers to track team velocity, active blockers, and deployment readiness on the go.</p>
-            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-symbols-outlined" style="font-size: 32px;">radar</span>
+                    </div>
+                    <h3>Proactive Detection</h3>
+                    <p>Bob scans your repositories in real-time to catch merge conflicts and CI failures before they block your team.</p>
+                </div>
 
-            <div class="md3-card">
-                <span class="material-icons-outlined card-icon">admin_panel_settings</span>
-                <h3>Zero-Config Onboarding</h3>
-                <p>Connect your GitHub organization once. Bob auto-provisions collaborator access and starts monitoring immediately with zero manual configuration.</p>
-            </div>
-        </div>
-    </section>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-symbols-outlined" style="font-size: 32px;">auto_awesome</span>
+                    </div>
+                    <h3>Intelligent Tagging</h3>
+                    <p>Automatically identify and notify the right developers when a PR needs attention. No more manual follow-ups.</p>
+                </div>
 
-    <footer class="md3-footer">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <span class="material-symbols-outlined" style="font-size: 32px;">dashboard</span>
+                    </div>
+                    <h3>Executive Control</h3>
+                    <p>A high-fidelity dashboard designed for engineering leads to track velocity and system health at a glance.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
         <div class="footer-content">
-            <div class="brand-footer">
-                <span class="material-icons-outlined">merge_type</span>
-                <span class="brand-name">Bob</span>
+            <div class="logo">
+                <span class="material-symbols-outlined">rocket_launch</span>
+                <span style="font-size: 20px;">BOB</span>
             </div>
             <div class="footer-links">
-                <a href="/docs">Documentation</a>
-                <a href="https://github.com/johan-droid/bob">GitHub</a>
-                <a href="/privacy">Privacy</a>
+                <a href="https://github.com/johan-droid/bob">SOURCE</a>
+                <a href="/docs">DOCS</a>
+                <a href="/privacy">PRIVACY</a>
             </div>
+            <p style="color: var(--text-dim); font-size: 12px; font-weight: 500;">© 2026 ANTIGRAVITY SYSTEMS. ALL SECTORS MONITORED.</p>
         </div>
     </footer>
 
-    <script src="landing.js"></script>
+    <script>
+        window.onscroll = function() {
+            const nav = document.getElementById('navbar');
+            if (window.pageYOffset > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        };
+    </script>
 </body>
 </html>
