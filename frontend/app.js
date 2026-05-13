@@ -23,7 +23,6 @@ async function apiFetch(url, opts = {}) {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial fetch to avoid waiting for WebSocket
     requestUpdate();
 });
 
@@ -40,15 +39,28 @@ function requestUpdate() {
 }
 
 function showToast(msg, type = 'info', duration = 4000) {
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const icons = { success: 'check_circle', error: 'error', info: 'info', warning: 'warning' };
     const el = document.createElement('div');
-    el.className = `toast ${type}`;
+    el.className = `card ${type}`;
+    el.style.cssText = `
+        background: white;
+        border-radius: 16px;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 280px;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+        border-left: 6px solid var(--md-sys-color-${type === 'info' ? 'primary' : type === 'success' ? 'tertiary' : type});
+        margin-bottom: 8px;
+        pointer-events: auto;
+    `;
     el.innerHTML = `
-        <span class="toast-icon">${icons[type] || icons.info}</span>
-        <span class="toast-msg">${escHtml(msg)}</span>
-        <span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+        <span class="material-symbols-outlined" style="color: var(--md-sys-color-${type === 'info' ? 'primary' : type === 'success' ? 'tertiary' : type});">${icons[type]}</span>
+        <span class="text-body-md" style="flex: 1; font-weight: 500;">${escHtml(msg)}</span>
+        <span class="material-symbols-outlined" style="cursor: pointer; font-size: 18px;" onclick="this.parentElement.remove()">close</span>`;
     document.getElementById('toast-container').prepend(el);
-    setTimeout(() => el.remove(), duration);
+    setTimeout(() => { if(el.parentElement) el.remove(); }, duration);
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -61,31 +73,25 @@ const wsUrl  = window.location.hostname === 'localhost'
     ? 'http://localhost:5000' : window.location.origin;
 const socket = io(wsUrl, { 
     withCredentials: true,
-    transports: ['websocket', 'polling'],
-    upgrade: true
+    transports: ['websocket', 'polling']
 });
 const wsEl   = document.getElementById('ws-status');
-const wsDot  = wsEl?.querySelector('.ws-dot');
-const wsLbl  = wsEl?.querySelector('.ws-label');
+const wsLbl  = wsEl?.querySelector('.text-label');
+const wsDot  = wsEl?.querySelector('.status-dot');
 
 socket.on('connect', () => {
     wsEl?.classList.replace('disconnected', 'connected');
-    if (wsLbl) wsLbl.textContent = 'Live';
+    wsDot?.classList.replace('disconnected', 'connected');
+    wsDot.style.background = 'var(--md-sys-color-tertiary)';
+    if (wsLbl) wsLbl.textContent = 'Live Sync';
     socket.emit('request_update');
 });
 
 socket.on('disconnect', () => {
     wsEl?.classList.replace('connected', 'disconnected');
+    wsDot?.classList.replace('connected', 'disconnected');
+    wsDot.style.background = 'var(--md-sys-color-outline)';
     if (wsLbl) wsLbl.textContent = 'Offline';
-    showToast('Lost connection — retrying…', 'warning');
-    setTimeout(() => socket.connect(), 5000);
-});
-
-socket.on('connect_error', (err) => {
-    console.warn('[WS] Connection error:', err.message);
-    wsEl?.classList.replace('connected', 'disconnected');
-    if (wsLbl) wsLbl.textContent = 'Reconnecting...';
-    setTimeout(() => socket.connect(), 5000);
 });
 
 socket.on('update', (data) => {
@@ -98,7 +104,7 @@ socket.on('update', (data) => {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function updateStats(stats = {}) {
-    ['pending', 'in_progress', 'failed', 'resolved', 'total'].forEach(k => {
+    ['pending', 'in_progress', 'failed', 'resolved'].forEach(k => {
         const el = document.getElementById(`stat-${k}`);
         if (el) el.textContent = stats[k] ?? 0;
     });
@@ -142,30 +148,21 @@ function renderList(containerId, items) {
     const el = document.getElementById(containerId);
     if (!el) return;
     if (!items.length) {
-        el.innerHTML = '<div class="text-sm text-on-surface-variant bg-surface-container-low rounded-lg p-6 text-center border border-surface-variant border-dashed">Nothing here 🎉</div>';
+        el.innerHTML = '<div class="text-label" style="padding: 24px; text-align: center; background: var(--md-sys-color-surface-variant); border-radius: 16px;">Clean Slate.</div>';
         return;
     }
     el.innerHTML = items.map(pr => `
-        <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between md:items-center gap-4" data-id="${pr.id}">
-            <div class="flex items-start md:items-center gap-3">
-                <span class="w-3 h-3 rounded-full mt-1.5 md:mt-0 ${pr.status === 'failed' ? 'bg-error' : pr.status === 'resolved' ? 'bg-tertiary-container' : pr.status === 'in_progress' ? 'bg-[#f9ab00]' : 'bg-primary'} shadow-sm"></span>
-                <div class="flex flex-col">
-                    <div class="font-medium text-on-surface">${escHtml(pr.title || 'Untitled')}</div>
-                    <div class="text-xs text-on-surface-variant flex flex-wrap gap-2 mt-1">
-                        <span class="font-medium">${escHtml(pr.repo)}</span>
-                        ${pr.branch ? `<span>· ${escHtml(pr.branch)}</span>` : ''}
-                        ${pr.pr_number ? `<span>· PR #${pr.pr_number}</span>` : ''}
-                    </div>
-                </div>
+        <div class="card" style="display: flex; gap: 16px; align-items: center;">
+            <span class="material-symbols-outlined" style="color: ${pr.status === 'failed' ? 'var(--md-sys-color-error)' : pr.status === 'resolved' ? 'var(--md-sys-color-tertiary)' : pr.status === 'in_progress' ? '#f9ab00' : 'var(--md-sys-color-primary)'}">${pr.status === 'failed' ? 'error' : pr.status === 'resolved' ? 'check_circle' : 'pending'}</span>
+            <div style="flex: 1;">
+                <div class="text-body-md" style="font-weight: 600;">${escHtml(pr.title || 'Untitled')}</div>
+                <div style="font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px;">${escHtml(pr.repo)} · ${pr.type === 'merge_conflict' ? 'Conflict' : 'CI Failure'}</div>
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <a href="${escHtml(pr.url || '#')}" target="_blank" class="text-sm text-primary hover:text-primary-container font-medium flex items-center gap-1">View ↗</a>
-                <span class="px-2 py-1 rounded bg-surface-container text-on-surface-variant text-xs font-medium">${pr.type === 'merge_conflict' ? '⚡ Conflict' : '🔧 CI'}</span>
-                <select class="py-1 px-2 border border-outline-variant rounded bg-surface-container-lowest text-xs outline-none cursor-pointer" onchange="setStatus(${pr.id}, this.value)">
-                    ${['pending','in_progress','failed','resolved'].map(s =>
-                        `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`
-                    ).join('')}
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <select class="input-field" style="width: auto; height: 28px; padding: 0 8px; font-size: 11px; border-radius: 8px;" onchange="setStatus(${pr.id}, this.value)">
+                    ${['pending','in_progress','failed','resolved'].map(s => `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`).join('')}
                 </select>
+                <a href="${escHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--md-sys-color-primary); text-decoration: none;">open_in_new</a>
             </div>
         </div>`).join('');
 }
@@ -179,29 +176,42 @@ function renderRepos(repos) {
     badge.textContent = `${activeRepos.length} Active`;
 
     if (!repos.length) {
-        el.innerHTML = '<div class="text-sm text-on-surface-variant bg-surface-container-low rounded-lg p-6 text-center border border-surface-variant border-dashed md:col-span-2 lg:col-span-3 xl:col-span-4">Not tracking any repositories yet.</div>';
+        el.innerHTML = '<div class="text-label" style="grid-column: 1/-1; padding: 32px; text-align: center;">No repositories linked yet.</div>';
         return;
     }
 
-    el.innerHTML = repos.map(r => `
-        <div class="bg-surface-container-lowest rounded-lg p-4 shadow-sm border border-surface-variant hover:shadow-md transition-shadow flex flex-col justify-between" style="opacity: ${r.is_active ? '1' : '0.5'}">
-            <div class="flex justify-between items-start mb-4">
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full ${r.is_active ? 'bg-tertiary-fixed' : 'bg-outline'} shadow-sm"></span>
-                    <h3 class="font-medium text-on-surface truncate pr-2" title="${escHtml(r.full_name)}">${escHtml(r.full_name)}</h3>
+    // Bento Logic: Repos with most issues or "admin" perms get larger tiles
+    el.innerHTML = repos.map((r, idx) => {
+        const isBig = r.issue_count > 0 || r.permissions_level === 'admin' || idx === 0;
+        const spanClass = isBig ? 'span-2' : '';
+        const icon = r.language === 'Python' ? 'terminal' : r.language === 'JavaScript' ? 'javascript' : 'code';
+        
+        return `
+        <div class="bento-item ${spanClass}">
+            <span class="material-symbols-outlined bento-bg-icon">${icon}</span>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="text-label" style="font-size: 10px; color: var(--md-sys-color-primary);">${r.language}</div>
+                    <div class="text-title" style="margin-top: 4px; font-size: 18px;">${escHtml(r.full_name.split('/')[1])}</div>
+                    <div style="font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px;">${escHtml(r.full_name.split('/')[0])}</div>
+                </div>
+                <div style="background: ${r.is_active ? 'var(--md-sys-color-tertiary-container)' : 'var(--md-sys-color-surface-variant)'}; color: ${r.is_active ? 'var(--md-sys-color-on-tertiary-container)' : 'var(--md-sys-color-on-surface-variant)'}; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700;">
+                    ${r.is_active ? 'MONITORING' : 'IDLE'}
                 </div>
             </div>
-            <div class="flex flex-col gap-1 mb-4 text-sm text-on-surface-variant">
-                <div class="flex justify-between"><span>Status:</span> <span class="bg-surface-container-high text-on-surface px-2 rounded-full text-xs border border-outline-variant">${r.is_active ? 'Scanning' : 'Ignored'}</span></div>
-                <div class="flex justify-between"><span>Issues:</span> <span>${r.issue_count} total</span></div>
-                <div class="flex justify-between"><span>Perms:</span> <span>${escHtml(r.permission || 'read')}</span></div>
-                ${r.agent_permission ? `<div class="flex justify-between"><span>Agent:</span> <span class="${r.agent_permission === 'write' || r.agent_permission === 'admin' ? 'text-tertiary-container' : 'text-[#f9ab00]'} font-medium">${r.agent_permission === 'write' || r.agent_permission === 'admin' ? 'Active' : 'Observer'}</span></div>` : ''}
-            </div>
-            <div class="pt-3 border-t border-surface-variant flex justify-end items-center">
-                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="text-sm text-primary hover:text-primary-container font-medium flex items-center gap-1">View ↗</a>
+            <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span class="material-symbols-outlined" style="font-size: 14px; color: var(--md-sys-color-error);">error</span>
+                        <span style="font-size: 12px; font-weight: 600;">${r.issue_count}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${escHtml(r.permissions_level)}</div>
+                </div>
+                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--md-sys-color-primary); text-decoration: none; font-size: 20px;">arrow_forward</a>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ── Status update ─────────────────────────────────────────────────────────────
@@ -211,66 +221,10 @@ async function setStatus(issueId, status) {
             method: 'POST',
             body: JSON.stringify({ status }),
         });
+        showToast(`Status: ${capitalize(status)}`, 'success');
     } catch (e) {
-        showToast(`Failed to update status: ${e.message}`, 'error');
+        showToast(`Error: ${e.message}`, 'error');
     }
-}
-
-// ── Filter controls ───────────────────────────────────────────────────────────
-document.getElementById('repo-filter')?.addEventListener('change', e => {
-    activeFilters.repo = e.target.value; renderAll();
-});
-document.getElementById('type-filter')?.addEventListener('change', e => {
-    activeFilters.type = e.target.value; renderAll();
-});
-document.getElementById('search-input')?.addEventListener('input', e => {
-    activeFilters.search = e.target.value.toLowerCase(); renderAll();
-});
-
-
-
-// ── PWA push notifications ────────────────────────────────────────────────────
-async function requestNotificationPermission() {
-    if (!('Notification' in window)) return;
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') showToast('Notifications enabled!', 'success');
-}
-
-// Ask once on first visit
-if (localStorage.getItem('notif_asked') !== '1') {
-    setTimeout(() => {
-        requestNotificationPermission();
-        localStorage.setItem('notif_asked', '1');
-    }, 3000);
-}
-
-// Show notification on new issues
-socket.on('update', (data) => {
-    const newPending = (data.pending || []).length;
-    const oldPending = (allData.pending || []).length;
-    if (newPending > oldPending && Notification.permission === 'granted') {
-        new Notification('Bob — New PR Issue', {
-            body: `${newPending - oldPending} new issue(s) detected`,
-            icon: '/icons/icon-192.png',
-        });
-    }
-});
-
-// ── Service Worker registration ───────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(console.warn);
-}
-
-// ── Error query param handling ────────────────────────────────────────────────
-const urlErr = new URLSearchParams(window.location.search).get('error');
-if (urlErr) {
-    const msgs = {
-        invalid_state:    'Login failed: security check failed. Please try again.',
-        no_code:          'GitHub did not return an auth code.',
-        no_token:         'Token exchange failed. Check your OAuth app config.',
-        user_fetch_failed:'Could not fetch your GitHub profile.',
-    };
-    showToast(msgs[urlErr] || `Auth error: ${urlErr}`, 'error', 8000);
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────

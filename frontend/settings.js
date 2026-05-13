@@ -22,8 +22,12 @@ function toast(msg, type = 'info') {
 
 function renderExcluded() {
     const el = document.getElementById('excluded-list');
+    if (!excludedRepos.length) {
+        el.innerHTML = '<span style="font-size:.8rem;color:var(--text-3);padding:4px 0">No repositories excluded yet</span>';
+        return;
+    }
     el.innerHTML = excludedRepos.map((r, i) =>
-        `<span class="s-excluded-tag">${r}<button onclick="removeExcluded(${i})">✕</button></span>`
+        `<span class="s-tag">${r}<button class="s-tag-x" onclick="removeExcluded(${i})" title="Remove">✕</button></span>`
     ).join('');
 }
 
@@ -57,6 +61,10 @@ async function handlePushToggle(checkbox) {
 }
 
 async function saveSettings() {
+    const btn = document.getElementById('save-btn');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="10" style="animation:spin .7s linear infinite"/></svg> Saving…';
     try {
         await apiFetch('/api/settings', {
             method: 'POST',
@@ -69,6 +77,9 @@ async function saveSettings() {
         toast('Settings saved!', 'success');
     } catch (e) {
         toast(`Save failed: ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
     }
 }
 

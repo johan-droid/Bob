@@ -4,83 +4,180 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="description" content="Configure Bob PR Health Monitor — notifications, scan intervals, and repository settings.">
   <title>Settings — Bob</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='settings.css') }}">
 </head>
 <body>
+
+<!-- ─── Navbar ──────────────────────────────────────────────── -->
 <nav class="s-nav">
-  <a href="/dashboard" class="s-nav-back">← Dashboard</a>
-  <span class="s-nav-title">⚙️ Settings</span>
-  <img src="{{ user.avatar }}" class="s-nav-avatar" alt="">
+  <a href="/dashboard" class="s-nav-back" id="nav-back">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Dashboard
+  </a>
+  <div class="s-nav-brand">
+    <span style="font-size:1.1rem">🤖</span>
+    <span class="s-nav-wordmark">Bob</span>
+    <span class="s-nav-pill">Settings</span>
+  </div>
+  <img src="{{ user.avatar }}" class="s-nav-avatar" alt="{{ user.username }}">
 </nav>
 
-<div class="s-container">
-  <div id="toast-container" class="s-toasts"></div>
+<!-- ─── Toasts ───────────────────────────────────────────────── -->
+<div id="toast-container"></div>
 
-  <section class="s-card">
-    <h2 class="s-card-title">🔔 Notifications</h2>
-    <label class="s-toggle-row">
-      <span class="s-label">In-app notifications</span>
-      <label class="s-toggle">
-        <input type="checkbox" id="notify-in-app">
-        <span class="s-slider"></span>
-      </label>
-    </label>
-    <label class="s-toggle-row">
-      <span class="s-label">Browser push notifications</span>
-      <label class="s-toggle">
-        <input type="checkbox" id="notify-push" onchange="handlePushToggle(this)">
-        <span class="s-slider"></span>
-      </label>
-    </label>
-    <p class="s-hint">Push notifications appear even when Bob is in the background.</p>
-  </section>
+<!-- ─── Main ─────────────────────────────────────────────────── -->
+<main class="s-page">
 
-  <section class="s-card">
-    <h2 class="s-card-title">⏱ Scan Interval</h2>
-    <div class="s-row">
-      <label class="s-label">Background scan every</label>
-      <select id="scan-interval" class="s-select">
-        <option value="60">1 minute</option>
-        <option value="180">3 minutes</option>
-        <option value="300" selected>5 minutes</option>
-        <option value="600">10 minutes</option>
-        <option value="900">15 minutes</option>
-        <option value="1800">30 minutes</option>
-      </select>
+  <!-- Hero banner -->
+  <div class="s-hero">
+    <div class="s-hero-text">
+      <div class="s-hero-title">Preferences</div>
+      <div class="s-hero-sub">Customize how Bob monitors your repositories, when it alerts you, and what gets scanned.</div>
     </div>
-  </section>
+    <div class="s-hero-icon">⚙️</div>
+  </div>
 
-  <section class="s-card">
-    <h2 class="s-card-title">🚫 Excluded Repositories</h2>
-    <p class="s-hint">These repos will be skipped during scanning.</p>
-    <div id="excluded-list" class="s-excluded-list"></div>
-    <div class="s-row" style="margin-top:10px">
-      <input type="text" id="excluded-input" class="s-input" placeholder="owner/repo-name">
-      <button class="s-btn" onclick="addExcluded()">+ Add</button>
-    </div>
-  </section>
-
-  <section class="s-card">
-    <h2 class="s-card-title">👤 Account</h2>
-    <div class="s-profile-row">
-      <img src="{{ user.avatar }}" class="s-big-avatar" alt="">
+  <!-- ── Notifications ───────────────────────────────────────── -->
+  <section class="s-card" data-accent="blue" id="card-notifications">
+    <div class="s-card-head">
+      <div class="s-icon-box blue">🔔</div>
       <div>
-        <div class="s-profile-name">{{ user.name }}</div>
-        <div class="s-profile-user">@{{ user.username }}</div>
-        <div class="s-profile-email">{{ user.email or '' }}</div>
+        <div class="s-card-title">Notifications</div>
+        <div class="s-card-caption">Choose how Bob alerts you when PR issues are found</div>
       </div>
     </div>
-    <a href="/logout" class="s-btn s-btn-danger" style="margin-top:16px;display:inline-flex">Sign Out</a>
+    <div class="s-card-body">
+
+      <label class="s-toggle-row" id="row-inapp">
+        <div class="s-tl">
+          <div class="s-tl-name">In-app notifications</div>
+          <div class="s-tl-desc">Show live alerts inside the Bob dashboard</div>
+        </div>
+        <label class="s-toggle">
+          <input type="checkbox" id="notify-in-app">
+          <span class="s-knob"></span>
+        </label>
+      </label>
+
+      <label class="s-toggle-row" id="row-push">
+        <div class="s-tl">
+          <div class="s-tl-name">Browser push notifications</div>
+          <div class="s-tl-desc">Receive alerts even when this tab is in the background</div>
+        </div>
+        <label class="s-toggle">
+          <input type="checkbox" id="notify-push" onchange="handlePushToggle(this)">
+          <span class="s-knob"></span>
+        </label>
+      </label>
+
+    </div>
   </section>
 
-  <div class="s-actions">
-    <button class="s-btn s-btn-primary" onclick="saveSettings()">Save Settings</button>
-    <a href="/dashboard" class="s-btn">Cancel</a>
+  <!-- ── Scan Interval ───────────────────────────────────────── -->
+  <section class="s-card" data-accent="purple" id="card-scan">
+    <div class="s-card-head">
+      <div class="s-icon-box purple">⏱</div>
+      <div>
+        <div class="s-card-title">Scan Interval</div>
+        <div class="s-card-caption">How frequently Bob polls your repositories for issues</div>
+      </div>
+    </div>
+    <div class="s-card-body">
+      <div class="s-interval-row">
+        <div>
+          <div class="s-interval-label">Background scan frequency</div>
+          <div class="s-interval-sub">Lower intervals detect issues faster but use more API quota</div>
+        </div>
+        <select id="scan-interval" class="s-select">
+          <option value="60">Every 1 minute</option>
+          <option value="180">Every 3 minutes</option>
+          <option value="300" selected>Every 5 minutes</option>
+          <option value="600">Every 10 minutes</option>
+          <option value="900">Every 15 minutes</option>
+          <option value="1800">Every 30 minutes</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Excluded Repos ──────────────────────────────────────── -->
+  <section class="s-card" data-accent="amber" id="card-excluded">
+    <div class="s-card-head">
+      <div class="s-icon-box amber">🚫</div>
+      <div>
+        <div class="s-card-title">Excluded Repositories</div>
+        <div class="s-card-caption">Repos in this list are skipped during every scan</div>
+      </div>
+    </div>
+    <div class="s-card-body">
+      <div class="s-repo-area">
+        <div id="excluded-list" class="s-tags" aria-label="Excluded repos"></div>
+        <div class="s-add-row">
+          <input
+            type="text"
+            id="excluded-input"
+            class="s-input"
+            placeholder="owner/repo-name"
+            aria-label="Add excluded repository"
+            onkeydown="if(event.key==='Enter') addExcluded()"
+          >
+          <button class="btn btn-add" onclick="addExcluded()" id="add-excluded-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Account ─────────────────────────────────────────────── -->
+  <section class="s-card" data-accent="green" id="card-account">
+    <div class="s-card-head">
+      <div class="s-icon-box green">👤</div>
+      <div>
+        <div class="s-card-title">Account</div>
+        <div class="s-card-caption">Your GitHub identity linked to Bob</div>
+      </div>
+    </div>
+    <div class="s-card-body">
+      <div class="s-profile">
+        <div class="s-avatar-wrap">
+          <img src="{{ user.avatar }}" class="s-big-avatar" alt="{{ user.name }}">
+          <div class="s-avatar-ring"></div>
+        </div>
+        <div class="s-profile-info">
+          <div class="s-pname">{{ user.name }}</div>
+          <div class="s-phandle">@{{ user.username }}</div>
+          {% if user.email %}
+          <div class="s-pemail">{{ user.email }}</div>
+          {% endif %}
+        </div>
+        <a href="/logout" class="btn btn-danger" id="sign-out-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer actions ──────────────────────────────────────── -->
+  <div class="s-footer">
+    <span class="s-footer-hint">Changes are applied after saving</span>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a href="/dashboard" class="btn btn-ghost" id="cancel-btn">Cancel</a>
+      <button class="btn btn-primary" onclick="saveSettings()" id="save-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Settings
+      </button>
+    </div>
   </div>
-</div>
+
+</main>
 
 <script src="{{ url_for('static', filename='settings.js') }}"></script>
 </body>

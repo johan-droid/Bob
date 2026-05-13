@@ -1,5 +1,8 @@
-import eventlet
-eventlet.monkey_patch()
+import sys as _sys
+_USE_EVENTLET = _sys.platform != 'win32'
+if _USE_EVENTLET:
+    import eventlet
+    eventlet.monkey_patch()
 
 import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
@@ -60,12 +63,13 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, 
-                    cors_allowed_origins="*", 
-                    manage_session=False, 
-                    ping_timeout=30, 
-                    ping_interval=10, 
-                    async_mode='eventlet')
+_ASYNC_MODE = 'eventlet' if _USE_EVENTLET else 'threading'
+socketio = SocketIO(app,
+                    cors_allowed_origins="*",
+                    manage_session=False,
+                    ping_timeout=30,
+                    ping_interval=10,
+                    async_mode=_ASYNC_MODE)
 init_db(app)
 
 def ensure_schema():
@@ -767,4 +771,6 @@ if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
     threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    _local_dev = not _USE_EVENTLET  # True on Windows
+    socketio.run(app, host='0.0.0.0', port=port, debug=False,
+                 allow_unsafe_werkzeug=_local_dev)
