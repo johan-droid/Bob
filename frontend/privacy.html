@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Privacy information for Bob PR Health Monitoring.">
+    <title>Privacy | Bob</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            color: #1a1b1f;
+            background: linear-gradient(180deg, #fdfbff 0%, #f5f7fb 100%);
+        }
+        main {
+            width: min(960px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 72px 0 48px;
+        }
+        .card {
+            padding: 32px;
+            border: 1px solid #e1e2e8;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 12px 30px rgba(17, 23, 41, 0.08);
+        }
+        h1 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 400; letter-spacing: -0.04em; }
+        p { color: #44474e; line-height: 1.6; }
+        ul { color: #44474e; line-height: 1.6; padding-left: 20px; }
+        a { color: #0b57d0; text-decoration: none; }
+        .actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 24px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 18px; border-radius: 999px; border: 1px solid transparent; font-weight: 500; }
+        .primary { background: #0b57d0; color: white; }
+        .outline { border-color: rgba(11, 87, 208, 0.24); }
+    </style>
+</head>
+<body>
+    <main>
+        <section class="card">
+            <h1>Privacy</h1>
+            <p>Bob stores the minimum session data needed to keep authenticated users signed in and to support repository monitoring.</p>
+            <ul>
+                <li>OAuth tokens are kept server-side, not in the browser session.</li>
+                <li>Session data is limited to the fields required for the app flow.</li>
+                <li>GitHub API access follows the scopes requested during login.</li>
+            </ul>
+            <div class="actions">
+                <a class="btn primary" href="/">Back to landing</a>
+                <a class="btn outline" href="/docs">Read documentation</a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bob executive dashboard for organization-wide PR health monitoring.">
+    <title>Bob | Executive Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <aside id="nav-drawer" class="md3-drawer">
+            <div class="drawer-header">
+                <span class="material-icons-outlined logo-icon">merge_type</span>
+                <span class="brand-name">Bob Org</span>
+            </div>
+            <nav class="drawer-nav">
+                <a href="#pipeline-health" class="nav-item active">
+                    <span class="material-icons-outlined">dashboard</span>
+                    Pipeline Health
+                </a>
+                <a href="#team-velocity" class="nav-item">
+                    <span class="material-icons-outlined">group</span>
+                    Team Velocity
+                </a>
+                <a href="/org/settings" class="nav-item">
+                    <span class="material-icons-outlined">settings_applications</span>
+                    Repo Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="md3-top-app-bar">
+                <div class="app-bar-left">
+                    <button id="menu-toggle" class="icon-btn" aria-label="Toggle Menu">
+                        <span class="material-icons-outlined">menu</span>
+                    </button>
+                    <h1 class="page-title">Pipeline Health</h1>
+                </div>
+                <div class="app-bar-right">
+                    <div class="connection-status" id="ws-status" aria-live="polite">
+                        <span class="status-dot connecting"></span>
+                        <span class="status-text">Connecting...</span>
+                    </div>
+                    <button class="icon-btn" aria-label="Notifications">
+                        <span class="material-icons-outlined">notifications</span>
+                    </button>
+                    <div class="avatar-circle" title="{{ user.name }}">{{ user.name[:1] if user.name else user.username[:1] }}</div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <section class="kpi-grid" aria-label="Executive summary metrics">
+                    <div class="md3-card kpi-card alert-card">
+                        <div class="kpi-header">
+                            <span class="material-icons-outlined">warning</span>
+                            <h3>Merge Conflicts</h3>
+                        </div>
+                        <p class="kpi-value" id="kpi-conflicts">0</p>
+                    </div>
+                    <div class="md3-card kpi-card danger-card">
+                        <div class="kpi-header">
+                            <span class="material-icons-outlined">error_outline</span>
+                            <h3>Failing CI Checks</h3>
+                        </div>
+                        <p class="kpi-value" id="kpi-failing">0</p>
+                    </div>
+                    <div class="md3-card kpi-card success-card">
+                        <div class="kpi-header">
+                            <span class="material-icons-outlined">check_circle_outline</span>
+                            <h3>Ready to Merge</h3>
+                        </div>
+                        <p class="kpi-value" id="kpi-ready">0</p>
+                    </div>
+                </section>
+
+                <section id="pipeline-health" class="live-tracking-section">
+                    <div class="md3-card table-card">
+                        <div class="card-header">
+                            <h2>Live Pull Request Status</h2>
+                            <button class="icon-btn" aria-label="Filter">
+                                <span class="material-icons-outlined">filter_list</span>
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="md3-table">
+                                <thead>
+                                    <tr>
+                                        <th>Repository</th>
+                                        <th>PR Details</th>
+                                        <th>Developer</th>
+                                        <th>CI Status</th>
+                                        <th>Merge Health</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pr-table-body">
+                                    <tr class="empty-state-row">
+                                        <td colspan="5">
+                                            <div class="empty-state">
+                                                <span class="material-icons-outlined empty-icon">sync</span>
+                                                <p>Awaiting WebSocket payload from connected repositories...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="team-velocity" class="feed-grid">
+                    <div class="md3-card feed-card">
+                        <div class="card-header">
+                            <h2>Team Velocity</h2>
+                            <button class="icon-btn" aria-label="Refresh velocity feed">
+                                <span class="material-icons-outlined">refresh</span>
+                            </button>
+                        </div>
+                        <div id="velocity-feed" class="feed-empty">
+                            <span class="material-icons-outlined empty-icon">timeline</span>
+                            <p>Waiting for team activity events to populate this feed.</p>
+                        </div>
+                    </div>
+
+                    <div id="repo-settings" class="md3-card feed-card">
+                        <div class="card-header">
+                            <h2>Repository Settings</h2>
+                            <a class="icon-btn" href="/org/settings" aria-label="Open settings">
+                                <span class="material-icons-outlined">open_in_new</span>
+                            </a>
+                        </div>
+                        <div id="settings-feed" class="feed-empty">
+                            <span class="material-icons-outlined empty-icon">settings_suggest</span>
+                            <p>Organization-level repo settings will appear here once the WebSocket stream is connected.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

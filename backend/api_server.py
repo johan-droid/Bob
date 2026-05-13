@@ -115,13 +115,27 @@ def current_user():
 @app.route('/')
 def landing():
     if 'user' in session:
-        return redirect('/dashboard')
+        portal = session.get('oauth_portal', 'org')
+        return redirect('/user/dashboard' if portal == 'user' else '/org/dashboard')
     return render_template('landing.html')
 
 @app.route('/permissions')
 @login_required
 def permissions_page():
-    return render_template('permissions.html', user=session['user'])
+    portal = session.get('oauth_portal', 'org')
+    dashboard_url = '/user/dashboard' if portal == 'user' else '/org/dashboard'
+    auth_url = '/api/auth/github/login?scope=user' if portal == 'user' else '/api/auth/github/install'
+    return render_template('permissions.html', user=session['user'], portal=portal, dashboard_url=dashboard_url, auth_url=auth_url)
+
+@app.route('/org/dashboard')
+@login_required
+def org_dashboard():
+    return render_template('org/dashboard.html', user=session['user'])
+
+@app.route('/user/dashboard')
+@login_required
+def user_dashboard():
+    return render_template('user/dashboard.html', user=session['user'])
 
 @app.route('/dashboard')
 @login_required
@@ -131,11 +145,24 @@ def dashboard():
 @app.route('/settings')
 @login_required
 def settings_page():
-    return render_template('settings.html', user=session['user'])
+    return redirect(url_for('org_settings_page'))
+
+@app.route('/org/settings')
+@login_required
+def org_settings_page():
+    return render_template('org/settings.html', user=session['user'])
 
 @app.route('/error')
 def error_page():
     return render_template('error.html')
+
+@app.route('/docs')
+def docs_page():
+    return render_template('docs.html')
+
+@app.route('/privacy')
+def privacy_page():
+    return render_template('privacy.html')
 
 @app.route('/logout')
 @login_required
@@ -154,10 +181,20 @@ def get_csrf_token():
 def github_login():
     state = secrets.token_urlsafe(32)
     session['oauth_state'] = state
+    session['oauth_portal'] = 'user' if request.args.get('portal') == 'user' else 'org'
     scopes = 'repo read:org write:discussion workflow user:email'
     url = (f'https://github.com/login/oauth/authorize'
            f'?client_id={GITHUB_CLIENT_ID}&scope={scopes}&state={state}&allow_signup=true')
     return redirect(url)
+
+@app.route('/api/auth/github/login')
+def api_auth_github_login():
+    portal = 'user' if request.args.get('scope') == 'user' else 'org'
+    return redirect(url_for('github_login', portal=portal))
+
+@app.route('/api/auth/github/install')
+def api_auth_github_install():
+    return redirect(url_for('github_login', portal='org'))
 
 @app.route('/callback/github')
 def github_callback():

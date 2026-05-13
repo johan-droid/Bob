@@ -42,6 +42,7 @@ function populateUserChip() {
    MAIN FLOW
 ══════════════════════════════════════════════════════════════════════ */
 async function runSetupFlow() {
+    const authUrl = typeof AUTH_URL === 'string' && AUTH_URL ? AUTH_URL : '/api/auth/github/install';
     try {
         /* ── Phase 1: OAuth scopes ── */
         const scopeData = await apiFetch('/api/verify-permissions');
@@ -51,7 +52,7 @@ async function runSetupFlow() {
         if (!scopeData.all_granted) {
             showBanner('error', '🔒', 'Missing Permissions',
                 `Please re-authorize to grant: ${scopeData.missing.join(', ')}`,
-                '<a href="/login/github">Re-authorize →</a>');
+                `<a href="${authUrl}">Re-authorize →</a>`);
             markError();
             showCTA(false, true);
             return;
@@ -64,7 +65,7 @@ async function runSetupFlow() {
         if (!discovered || discovered.repos.length === 0) {
             showBanner('warning', '📭', 'No Repositories Found',
                 'No repositories were found for your account. Try re-authorizing or check your org memberships.',
-                '<a href="/login/github">Re-authorize →</a>');
+                `<a href="${authUrl}">Re-authorize →</a>`);
             setProgress(80);
             showCTA(false, true);
             return;
@@ -82,7 +83,7 @@ async function runSetupFlow() {
         console.error('[Setup flow]', err);
         showBanner('error', '⚠️', 'Setup Error',
             err.message || 'An unexpected error occurred.',
-            '<a href="/login/github">Retry →</a>');
+            `<a href="${authUrl}">Retry →</a>`);
         markError();
     }
 }
@@ -208,6 +209,7 @@ async function runInitialScan() {
 ══════════════════════════════════════════════════════════════════════ */
 function finishFlow(provision) {
     const { successCount, total } = provision;
+    const dashboardUrl = typeof DASHBOARD_URL === 'string' && DASHBOARD_URL ? DASHBOARD_URL : '/org/dashboard';
 
     setProgress(100);
     updateHeroSuccess();
@@ -216,7 +218,7 @@ function finishFlow(provision) {
     showBanner('success', '🚀',
         `${successCount} of ${total} repositories ready`,
         'PR health monitoring is active. Bob will continuously scan your repos. Redirecting to dashboard…',
-        '<a href="/dashboard">Go Now →</a>');
+        `<a href="${dashboardUrl}">Go Now →</a>`);
 
     showCTA(true, false);
 
@@ -227,10 +229,10 @@ function finishFlow(provision) {
         const tick = setInterval(() => {
             countdown--;
             if (cdEl) cdEl.innerHTML = `${svgGrid(18)} Opening Dashboard (${countdown}s)`;
-            if (countdown <= 0) { clearInterval(tick); window.location.href = '/dashboard'; }
+            if (countdown <= 0) { clearInterval(tick); window.location.href = dashboardUrl; }
         }, 1000);
     } else {
-        setTimeout(() => { window.location.href = '/dashboard'; }, 4000);
+        setTimeout(() => { window.location.href = dashboardUrl; }, 4000);
     }
 }
 
