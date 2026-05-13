@@ -3,7 +3,7 @@ services:
     name: bob-pr-monitor
     runtime: python-3.11
     buildCommand: pip install -r requirements.txt
-    startCommand: cd backend && gunicorn --worker-class eventlet -w 1 api_server:app
+    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class gevent -w 1 api_server:app
     envVars:
       - key: GITHUB_CLIENT_ID
         sync: false

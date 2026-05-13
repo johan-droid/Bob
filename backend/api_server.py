@@ -1,9 +1,7 @@
-import sys as _sys
-_USE_EVENTLET = _sys.platform != 'win32'
-if _USE_EVENTLET:
-    import eventlet
-    eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
 
+import sys as _sys
 import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
@@ -67,7 +65,7 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-_ASYNC_MODE = 'eventlet' if _USE_EVENTLET else 'threading'
+_ASYNC_MODE = 'gevent'
 socketio = SocketIO(app,
                     cors_allowed_origins="*",
                     manage_session=False,
@@ -812,6 +810,6 @@ if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
     threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
-    _local_dev = not _USE_EVENTLET  # True on Windows
+    _local_dev = (_sys.platform == 'win32')
     socketio.run(app, host='0.0.0.0', port=port, debug=False,
                  allow_unsafe_werkzeug=_local_dev)
