@@ -89,6 +89,8 @@ def ensure_schema():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Schema auto-repair failed: {e}")
+        finally:
+            db.session.remove()
 
 ensure_schema()
 
