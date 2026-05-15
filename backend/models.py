@@ -15,6 +15,7 @@ class User(db.Model):
     email      = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
+    access_token = db.Column(db.String(255), nullable=True)
 
     repos    = db.relationship('UserRepo',     backref='user', lazy='dynamic', cascade='all,delete-orphan')
     issues   = db.relationship('PRIssue',      backref='user', lazy='dynamic', cascade='all,delete-orphan')

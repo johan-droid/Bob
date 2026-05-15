@@ -79,6 +79,8 @@ def ensure_schema():
     with app.app_context():
         try:
             from sqlalchemy import text
+            # Add access_token to user
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token VARCHAR(255)"))
             # Add agent_permission to user_repo
             db.session.execute(text("ALTER TABLE user_repos ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
             # Add anti-spam columns to pr_issue
@@ -261,6 +263,7 @@ def github_callback():
         user.name       = ud.get('name') or username
         user.email      = ud.get('email')
         user.last_login = datetime.utcnow()
+        user.access_token = access_token
         db.session.commit()
 
         # Ensure user has settings row
@@ -277,8 +280,6 @@ def github_callback():
             'email':    ud.get('email'),
             'db_id':    user.id,
         }
-        # Store token server-side keyed by db user id (in-memory, replaced by Redis in prod)
-        app.config.setdefault('_user_tokens', {})[user.id] = access_token
 
         logger.info(f"Auth OK: {username}")
         return redirect('/permissions')
@@ -288,7 +289,8 @@ def github_callback():
 
 def get_user_token(user_id: int) -> str | None:
     """Retrieve the stored OAuth token for a user (server-side only)."""
-    return app.config.get('_user_tokens', {}).get(user_id)
+    user = User.query.get(user_id)
+    return user.access_token if user else None
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
