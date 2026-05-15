@@ -785,25 +785,48 @@ def handle_request_update():
 def background_scan():
     while True:
         time.sleep(SCAN_INTERVAL)
+
+        # Step 1: Fetch IDs in a brief, isolated transaction
         with app.app_context():
             try:
-                users = User.query.all()
-                for user in users:
+                user_ids = [u.id for u in User.query.all()]
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to fetch users for BG scan: {e}")
+                db.session.remove()
+                continue
+
+        # Step 2: Process each user in their own DB context
+        for uid in user_ids:
+            with app.app_context():
+                try:
+                    user = db.session.get(User, uid)
+                    if not user:
+                        continue
+
                     token = get_user_token(user.id) or GITHUB_TOKEN
                     if not token:
                         continue
+
                     settings = user.settings
                     excluded = settings.get_excluded_list() if settings else []
-                    repos    = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
+                    repos = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
+
                     if not repos:
                         continue
+
                     logger.info(f"BG scan: {user.username} → {len(repos)} repos")
                     scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
                     results = scanner.scan_all_repos()
                     _ingest_scan_results(results, user.id)
                     socketio.emit('update', _get_user_data(user.id), to=user.username)
-            except Exception as e:
-                logger.error(f"BG scan error: {e}")
+
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"BG scan error for user {uid}: {e}")
+                finally:
+                    # Crucial: Return the connection to the Neon DB pool
+                    db.session.remove()
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
