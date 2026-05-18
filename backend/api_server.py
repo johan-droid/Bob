@@ -46,7 +46,8 @@ DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 app = Flask(__name__, static_folder='../frontend', static_url_path='', template_folder='../frontend')
 app.secret_key = SECRET_KEY
 app.config.update(
-    SESSION_TYPE='filesystem',
+    SESSION_TYPE=os.getenv('SESSION_TYPE', 'filesystem'),
+    SESSION_SQLALCHEMY=db,
     SESSION_FILE_DIR=SESSION_DIR,
     SESSION_PERMANENT=False,
     SESSION_USE_SIGNER=True,
@@ -89,8 +90,19 @@ def ensure_schema():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Schema auto-repair failed: {e}")
+        finally:
+            db.session.remove()
 
 ensure_schema()
+
+def _start_bg_scan():
+    while True:
+        try:
+            background_scan()
+            break
+        except NameError:
+            time.sleep(1)
+threading.Thread(target=_start_bg_scan, daemon=True).start()
 
 
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
@@ -438,10 +450,9 @@ def _normalize_repo(r, source):
 def _handle_rate_limit(resp):
     remaining = int(resp.headers.get('X-RateLimit-Remaining', 999))
     if remaining < 5:
-        reset_at = int(resp.headers.get('X-RateLimit-Reset', time.time() + 60))
-        wait = max(0, reset_at - time.time()) + 2
-        logger.warning(f"Rate limit low ({remaining} remaining), sleeping {wait:.0f}s")
-        time.sleep(wait)
+        from flask import abort
+        logger.warning(f"Rate limit low ({remaining} remaining), aborting to avoid 502 gateway timeout")
+        abort(429, description="GitHub API rate limit reached.")
 
 # ── API: Auto Provision ───────────────────────────────────────────────────────
 @app.route('/api/auto-provision', methods=['POST'])
@@ -537,7 +548,10 @@ def trigger_scan():
                 socketio.emit('update', _get_user_data(user_id), to=username)
                 socketio.emit('scan_complete', {'status': 'success'}, to=username)
             except Exception as e:
+                db.session.rollback()
                 logger.error(f"Manual scan error: {e}")
+            finally:
+                db.session.remove() # CRITICAL: Release connection back to Neon pool
 
     import threading
     threading.Thread(target=execute_manual_scan, daemon=True).start()
@@ -649,10 +663,11 @@ def github_webhook():
 
 def _webhook_resolve_pr(repo, pr_number):
     key   = f'{repo}#{pr_number}'
-    issue = PRIssue.query.filter_by(repo=repo, issue_key=key).first()
-    if issue:
-        issue.status     = 'resolved'
-        issue.updated_at = datetime.utcnow()
+    issues = PRIssue.query.filter_by(repo=repo, issue_key=key).all()
+    if issues:
+        for issue in issues:
+            issue.status     = 'resolved'
+            issue.updated_at = datetime.utcnow()
         db.session.commit()
         _emit_to_repo_owners(repo)
 
@@ -819,7 +834,6 @@ def background_scan():
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
-    threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
     _local_dev = (_sys.platform == 'win32')
     socketio.run(app, host='0.0.0.0', port=port, debug=False,
