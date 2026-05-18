@@ -1,5 +1,5 @@
-from gevent import monkey
-monkey.patch_all()
+import eventlet
+eventlet.monkey_patch(os=False)
 
 import sys as _sys
 import os, secrets, hmac, hashlib, threading, time
@@ -68,7 +68,7 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-_ASYNC_MODE = 'gevent'
+_ASYNC_MODE = 'eventlet'
 socketio = SocketIO(app,
                     cors_allowed_origins="*",
                     manage_session=False,
