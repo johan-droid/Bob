@@ -81,35 +81,28 @@ def ensure_schema():
     """Manually add columns if they don't exist (since create_all doesn't migrate)."""
     with app.app_context():
         try:
-            from sqlalchemy import text
-<<<<<<< HEAD
-            
+            from sqlalchemy import inspect, text
+
             def column_exists(table_name, column_name):
-                """Check if a column exists in a table (SQLite)."""
-                result = db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-                return any(row[1] == column_name for row in result)
-            
+                inspector = inspect(db.engine)
+                return any(col['name'] == column_name for col in inspector.get_columns(table_name))
+
+            # Add access_token to users
+            if not column_exists('users', 'access_token'):
+                db.session.execute(text("ALTER TABLE users ADD COLUMN access_token VARCHAR(255)"))
+
             # Add agent_permission to user_repos
             if not column_exists('user_repos', 'agent_permission'):
                 db.session.execute(text("ALTER TABLE user_repos ADD COLUMN agent_permission VARCHAR(50) DEFAULT 'none'"))
-            
+
             # Add last_commented_at to pr_issues
             if not column_exists('pr_issues', 'last_commented_at'):
                 db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN last_commented_at TIMESTAMP"))
-            
+
             # Add comment_count to pr_issues
             if not column_exists('pr_issues', 'comment_count'):
                 db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"))
-            
-=======
-            # Add access_token to user
-            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token VARCHAR(255)"))
-            # Add agent_permission to user_repo
-            db.session.execute(text("ALTER TABLE user_repos ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
-            # Add anti-spam columns to pr_issue
-            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
-            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
->>>>>>> fcddd28a7524440bbfa462fe69cc3c0c52e307c7
+
             db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:

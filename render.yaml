@@ -1,7 +1,7 @@
 services:
   - type: web
     name: bob-pr-monitor
-    runtime: python-3.11
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 api_server:app
     envVars:
