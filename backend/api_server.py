@@ -6,6 +6,7 @@ import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
@@ -44,6 +45,7 @@ DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder='../frontend', static_url_path='', template_folder='../frontend')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = SECRET_KEY
 app.config.update(
     SESSION_TYPE=os.getenv('SESSION_TYPE', 'filesystem'),
