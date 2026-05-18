@@ -523,14 +523,29 @@ def trigger_scan():
 
     settings = user.settings
     excluded = settings.get_excluded_list() if settings else []
-    repos    = [r for r in repos if r not in excluded]
+    scan_repos = [r for r in repos if r not in excluded]
 
-    scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
-    results = scanner.scan_all_repos()
-    _ingest_scan_results(results, user.id, scanner=scanner)
-    data = _get_user_data(user.id)
-    socketio.emit('update', data, to=session['user']['username'])
-    return jsonify({'success': True, 'results': results})
+    username = session['user']['username']
+    user_id = user.id
+
+    def execute_manual_scan():
+        with app.app_context():
+            try:
+                scanner = PRHealthScanner(token, scan_repos, assignee=ASSIGNEE_USERNAME)
+                results = scanner.scan_all_repos()
+                _ingest_scan_results(results, user_id, scanner=scanner)
+                socketio.emit('update', _get_user_data(user_id), to=username)
+                socketio.emit('scan_complete', {'status': 'success'}, to=username)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Manual scan error: {e}")
+            finally:
+                db.session.remove() # CRITICAL: Release connection back to Neon pool
+
+    import threading
+    threading.Thread(target=execute_manual_scan, daemon=True).start()
+
+    return jsonify({'success': True, 'message': 'Scan initiated in background'}), 202
 
 @app.route('/api/repos')
 @login_required
@@ -637,10 +652,11 @@ def github_webhook():
 
 def _webhook_resolve_pr(repo, pr_number):
     key   = f'{repo}#{pr_number}'
-    issue = PRIssue.query.filter_by(repo=repo, issue_key=key).first()
-    if issue:
-        issue.status     = 'resolved'
-        issue.updated_at = datetime.utcnow()
+    issues = PRIssue.query.filter_by(repo=repo, issue_key=key).all()
+    if issues:
+        for issue in issues:
+            issue.status     = 'resolved'
+            issue.updated_at = datetime.utcnow()
         db.session.commit()
         _emit_to_repo_owners(repo)
 
@@ -721,7 +737,6 @@ def _trigger_auto_comment(issue, scanner):
     resp = scanner.create_comment(issue.repo, issue.pr_number, msg)
     
     if 'id' in resp or 'url' in resp:
-        issue.comment_sent = True
         issue.last_commented_at = datetime.utcnow()
         issue.comment_count = (issue.comment_count or 0) + 1
         db.session.commit() # Commit IMMEDIATELY to prevent race conditions
