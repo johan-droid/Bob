@@ -30,7 +30,7 @@ class UserRepo(db.Model):
     url               = db.Column(db.String(500))
     language          = db.Column(db.String(100), default='Unknown')
     permissions_level = db.Column(db.String(50),  default='read')
-    agent_permission  = db.Column(db.String(50),  default='none') # none|read|write|admin
+    agent_permission = db.Column(db.String(50), default='none')
     archived          = db.Column(db.Boolean, default=False)
     fork              = db.Column(db.Boolean, default=False)
     last_synced       = db.Column(db.DateTime, default=datetime.utcnow)
@@ -52,7 +52,7 @@ class PRIssue(db.Model):
     issue_type = db.Column(db.String(50))   # merge_conflict | ci_failure
     status     = db.Column(db.String(50), default='pending')  # pending|in_progress|failed|resolved
     comment_sent = db.Column(db.Boolean, default=False) # Legacy (keeping for compat)
-    last_commented_at = db.Column(db.DateTime)
+    last_commented_at = db.Column(db.DateTime, nullable=True)
     comment_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -71,6 +71,8 @@ class PRIssue(db.Model):
             'run_id':     self.run_id,
             'type':       self.issue_type,
             'status':     self.status,
+            'last_commented_at': self.last_commented_at.isoformat() if self.last_commented_at else None,
+            'comment_count': self.comment_count or 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
