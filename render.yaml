@@ -3,7 +3,7 @@ services:
     name: bob-pr-monitor
     runtime: python-3.11
     buildCommand: pip install -r requirements.txt
-    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class gevent -w 1 api_server:app
+    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 api_server:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11
@@ -14,13 +14,13 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_ORIGINS
-        value: http://localhost:5000
+        value: "http://localhost:5000,https://bob-7ae2.onrender.com"
       - key: DATABASE_URL
         fromDatabase:
           name: bob-db
           property: connectionString
       - key: SESSION_TYPE
-        value: filesystem
+        value: sqlalchemy
       - key: FLASK_ENV
         value: production
 

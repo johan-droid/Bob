@@ -6,6 +6,7 @@ import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
@@ -44,9 +45,11 @@ DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder='../frontend', static_url_path='', template_folder='../frontend')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = SECRET_KEY
 app.config.update(
-    SESSION_TYPE='filesystem',
+    SESSION_TYPE=os.getenv('SESSION_TYPE', 'filesystem'),
+    SESSION_SQLALCHEMY=db,
     SESSION_FILE_DIR=SESSION_DIR,
     SESSION_PERMANENT=False,
     SESSION_USE_SIGNER=True,
@@ -79,6 +82,7 @@ def ensure_schema():
     with app.app_context():
         try:
             from sqlalchemy import text
+<<<<<<< HEAD
             
             def column_exists(table_name, column_name):
                 """Check if a column exists in a table (SQLite)."""
@@ -97,13 +101,33 @@ def ensure_schema():
             if not column_exists('pr_issues', 'comment_count'):
                 db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"))
             
+=======
+            # Add access_token to user
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_token VARCHAR(255)"))
+            # Add agent_permission to user_repo
+            db.session.execute(text("ALTER TABLE user_repos ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
+            # Add anti-spam columns to pr_issue
+            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
+            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
+>>>>>>> fcddd28a7524440bbfa462fe69cc3c0c52e307c7
             db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:
             db.session.rollback()
             logger.error(f"Schema auto-repair failed: {e}")
+        finally:
+            db.session.remove()
 
 ensure_schema()
+
+def _start_bg_scan():
+    while True:
+        try:
+            background_scan()
+            break
+        except NameError:
+            time.sleep(1)
+threading.Thread(target=_start_bg_scan, daemon=True).start()
 
 
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
@@ -292,6 +316,7 @@ def github_callback():
         user.name       = ud.get('name') or username
         user.email      = ud.get('email')
         user.last_login = datetime.utcnow()
+        user.access_token = access_token
         db.session.commit()
 
         # Ensure user has settings row
@@ -308,8 +333,6 @@ def github_callback():
             'email':    ud.get('email'),
             'db_id':    user.id,
         }
-        # Store token server-side keyed by db user id (in-memory, replaced by Redis in prod)
-        app.config.setdefault('_user_tokens', {})[user.id] = access_token
 
         logger.info(f"Auth OK: {username}")
         return redirect('/permissions')
@@ -319,7 +342,8 @@ def github_callback():
 
 def get_user_token(user_id: int) -> str | None:
     """Retrieve the stored OAuth token for a user (server-side only)."""
-    return app.config.get('_user_tokens', {}).get(user_id)
+    user = User.query.get(user_id)
+    return user.access_token if user else None
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
@@ -469,10 +493,9 @@ def _normalize_repo(r, source):
 def _handle_rate_limit(resp):
     remaining = int(resp.headers.get('X-RateLimit-Remaining', 999))
     if remaining < 5:
-        reset_at = int(resp.headers.get('X-RateLimit-Reset', time.time() + 60))
-        wait = max(0, reset_at - time.time()) + 2
-        logger.warning(f"Rate limit low ({remaining} remaining), sleeping {wait:.0f}s")
-        time.sleep(wait)
+        from flask import abort
+        logger.warning(f"Rate limit low ({remaining} remaining), aborting to avoid 502 gateway timeout")
+        abort(429, description="GitHub API rate limit reached.")
 
 # ── API: Auto Provision ───────────────────────────────────────────────────────
 @app.route('/api/auto-provision', methods=['POST'])
@@ -554,14 +577,29 @@ def trigger_scan():
 
     settings = user.settings
     excluded = settings.get_excluded_list() if settings else []
-    repos    = [r for r in repos if r not in excluded]
+    scan_repos = [r for r in repos if r not in excluded]
 
-    scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
-    results = scanner.scan_all_repos()
-    _ingest_scan_results(results, user.id, scanner=scanner)
-    data = _get_user_data(user.id)
-    socketio.emit('update', data, to=session['user']['username'])
-    return jsonify({'success': True, 'results': results})
+    username = session['user']['username']
+    user_id = user.id
+
+    def execute_manual_scan():
+        with app.app_context():
+            try:
+                scanner = PRHealthScanner(token, scan_repos, assignee=ASSIGNEE_USERNAME)
+                results = scanner.scan_all_repos()
+                _ingest_scan_results(results, user_id, scanner=scanner)
+                socketio.emit('update', _get_user_data(user_id), to=username)
+                socketio.emit('scan_complete', {'status': 'success'}, to=username)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Manual scan error: {e}")
+            finally:
+                db.session.remove() # CRITICAL: Release connection back to Neon pool
+
+    import threading
+    threading.Thread(target=execute_manual_scan, daemon=True).start()
+
+    return jsonify({'success': True, 'message': 'Scan initiated in background'}), 202
 
 @app.route('/api/repos')
 @login_required
@@ -668,10 +706,11 @@ def github_webhook():
 
 def _webhook_resolve_pr(repo, pr_number):
     key   = f'{repo}#{pr_number}'
-    issue = PRIssue.query.filter_by(repo=repo, issue_key=key).first()
-    if issue:
-        issue.status     = 'resolved'
-        issue.updated_at = datetime.utcnow()
+    issues = PRIssue.query.filter_by(repo=repo, issue_key=key).all()
+    if issues:
+        for issue in issues:
+            issue.status     = 'resolved'
+            issue.updated_at = datetime.utcnow()
         db.session.commit()
         _emit_to_repo_owners(repo)
 
@@ -752,7 +791,6 @@ def _trigger_auto_comment(issue, scanner):
     resp = scanner.create_comment(issue.repo, issue.pr_number, msg)
     
     if 'id' in resp or 'url' in resp:
-        issue.comment_sent = True
         issue.last_commented_at = datetime.utcnow()
         issue.comment_count = (issue.comment_count or 0) + 1
         db.session.commit() # Commit IMMEDIATELY to prevent race conditions
@@ -816,30 +854,52 @@ def handle_request_update():
 def background_scan():
     while True:
         time.sleep(SCAN_INTERVAL)
+
+        # Step 1: Fetch IDs in a brief, isolated transaction
         with app.app_context():
             try:
-                users = User.query.all()
-                for user in users:
+                user_ids = [u.id for u in User.query.all()]
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to fetch users for BG scan: {e}")
+                db.session.remove()
+                continue
+
+        # Step 2: Process each user in their own DB context
+        for uid in user_ids:
+            with app.app_context():
+                try:
+                    user = db.session.get(User, uid)
+                    if not user:
+                        continue
+
                     token = get_user_token(user.id) or GITHUB_TOKEN
                     if not token:
                         continue
+
                     settings = user.settings
                     excluded = settings.get_excluded_list() if settings else []
-                    repos    = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
+                    repos = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
+
                     if not repos:
                         continue
+
                     logger.info(f"BG scan: {user.username} → {len(repos)} repos")
                     scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
                     results = scanner.scan_all_repos()
                     _ingest_scan_results(results, user.id)
                     socketio.emit('update', _get_user_data(user.id), to=user.username)
-            except Exception as e:
-                logger.error(f"BG scan error: {e}")
+
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"BG scan error for user {uid}: {e}")
+                finally:
+                    # Crucial: Return the connection to the Neon DB pool
+                    db.session.remove()
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
-    threading.Thread(target=background_scan, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
     _local_dev = (_sys.platform == 'win32')
     socketio.run(app, host='0.0.0.0', port=port, debug=False,

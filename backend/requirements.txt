@@ -11,7 +11,11 @@ Flask-Session==0.8.0
 Flask-WTF==1.2.1
 WTForms==3.1.2
 Flask-SQLAlchemy==3.1.1
+<<<<<<< HEAD
 SQLAlchemy==2.0.49
+=======
+SQLAlchemy==2.0.36
+>>>>>>> fcddd28a7524440bbfa462fe69cc3c0c52e307c7
 pytest==8.3.0
 pytest-flask==1.3.0
 psycopg2-binary==2.9.10
