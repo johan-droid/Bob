@@ -42,6 +42,7 @@ SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')]
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
+GITHUB_REDIRECT_URI   = os.getenv('GITHUB_REDIRECT_URI', '').strip()
 
 SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -150,8 +151,10 @@ def current_user():
     return User.query.filter_by(github_id=session['user']['id']).first()
 
 def _github_redirect_uri():
+    if GITHUB_REDIRECT_URI:
+        return GITHUB_REDIRECT_URI
     if PUBLIC_BASE_URL:
-        return f"{PUBLIC_BASE_URL}{url_for('github_callback')}"
+        return f"{PUBLIC_BASE_URL}/callback/github"
     return url_for('github_callback', _external=True)
 
 def _react_export_exists():
