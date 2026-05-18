@@ -14,7 +14,7 @@ export default function UserLoginPage() {
           <h1 className="auth-title">Sign in with GitHub</h1>
           <p>Track your pull requests, view assigned work, and keep your personal workspace in sync.</p>
           <div className="auth__actions" style={{ justifyContent: 'center' }}>
-            <Link href="/auth/github?portal=user" className="button">Continue with GitHub</Link>
+            <a href="/auth/github?portal=user" className="button">Continue with GitHub</a>
             <Link href="/" className="button-secondary">Back to home</Link>
           </div>
           <p className="auth-note">The backend OAuth callback is still supported for compatibility.</p>

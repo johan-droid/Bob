@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Bob monitors pull request health with real-time GitHub signals, CI failure detection, and merge conflict alerts.">
+    <meta name="description" content="Bob monitors pull request health with real GitHub data after OAuth sign-in.">
     <title>Bob | PR Health Monitor</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-
     <link rel="stylesheet" href="/landing.css">
 </head>
 <body>
@@ -22,8 +21,8 @@
             <span class="brand-mark">B</span>
             <span>Bob</span>
         </a>
-        <a href="#demo">Live demo</a>
-        <a href="#signals">Signals</a>
+        <a href="#flow">Auth flow</a>
+        <a href="#signals">Live data</a>
         <a href="/docs">Docs</a>
         <a href="/user/login">Developer login</a>
         <a href="/auth/github?portal=org" class="drawer-cta">Connect GitHub</a>
@@ -36,8 +35,8 @@
                 <span>Bob</span>
             </a>
             <div class="nav-links">
-                <a href="#demo">Live demo</a>
-                <a href="#signals">Signals</a>
+                <a href="#flow">Auth flow</a>
+                <a href="#signals">Live data</a>
                 <a href="/docs">Docs</a>
                 <a href="/privacy">Privacy</a>
             </div>
@@ -69,97 +68,59 @@
                     <span class="chip-dot red"></span>
                     <span class="chip-dot yellow"></span>
                     <span class="chip-dot green"></span>
-                    Real-time GitHub operations
+                    Real GitHub data after sign-in
                 </div>
                 <h1>Bob PR Health Monitor</h1>
                 <p>
-                    A clean command center for merge conflicts, failing CI, and repository risk. Bob turns GitHub activity into a focused queue your team can act on immediately.
+                    Connect GitHub, verify scopes, and let Bob build your dashboard from authenticated repository data. The public page stays focused on sign-in; workspace data appears only after OAuth succeeds.
                 </p>
                 <div class="hero-actions">
                     <a href="/auth/github?portal=org" class="button button-primary">
-                        <span class="material-symbols-outlined">rocket_launch</span>
-                        Start monitoring
+                        <span class="material-symbols-outlined">login</span>
+                        Start GitHub sign-in
                     </a>
-                    <a href="/user/login" class="button button-secondary">
+                    <a href="/auth/github?portal=user" class="button button-secondary">
                         <span class="material-symbols-outlined">code</span>
                         Developer sign in
                     </a>
                 </div>
-                <div class="trust-strip" aria-label="Monitoring highlights">
-                    <span><strong>42</strong> repos tracked</span>
-                    <span><strong>8</strong> active blockers</span>
-                    <span><strong>96%</strong> signal coverage</span>
-                </div>
             </div>
 
-            <div class="hero-demo" id="demo" data-tilt-card>
-                <div class="demo-toolbar">
+            <div class="auth-card auth-panel" id="flow">
+                <div class="auth-toolbar">
                     <div>
-                        <span class="eyebrow">Bob workspace</span>
-                        <h2>Pipeline health</h2>
+                        <span class="eyebrow">Authentication path</span>
+                        <h2>GitHub first, dashboard second.</h2>
                     </div>
-                    <span class="live-pill"><span></span> Live</span>
+                    <span class="live-pill"><span></span> Ready</span>
                 </div>
 
                 <div class="search-pill">
-                    <span class="material-symbols-outlined">search</span>
-                    <span id="demo-query">show merge conflicts across active repos</span>
+                    <span class="material-symbols-outlined">route</span>
+                    <span>/auth/github?portal=org</span>
                 </div>
 
-                <div class="segmented-control" role="tablist" aria-label="Demo signal type">
-                    <button class="segment active" type="button" data-demo="conflicts" role="tab" aria-selected="true">
-                        <span class="material-symbols-outlined">merge_type</span>
-                        Conflicts
-                    </button>
-                    <button class="segment" type="button" data-demo="ci" role="tab" aria-selected="false">
-                        <span class="material-symbols-outlined">emergency</span>
-                        CI failures
-                    </button>
-                    <button class="segment" type="button" data-demo="ready" role="tab" aria-selected="false">
-                        <span class="material-symbols-outlined">done_all</span>
-                        Ready queue
-                    </button>
-                </div>
-
-                <div class="metric-grid">
-                    <article class="metric-tile blue">
-                        <span>Open signals</span>
-                        <strong id="metric-open">8</strong>
-                    </article>
-                    <article class="metric-tile yellow">
-                        <span>Median age</span>
-                        <strong id="metric-age">31m</strong>
-                    </article>
-                    <article class="metric-tile green">
-                        <span>Owners found</span>
-                        <strong id="metric-owners">6</strong>
-                    </article>
-                </div>
-
-                <div class="signal-list" id="signal-list" aria-live="polite">
-                    <article class="signal-row active">
-                        <span class="repo-dot blue"></span>
+                <div class="auth-steps">
+                    <article>
+                        <span class="step-index blue-icon">01</span>
                         <div>
-                            <strong>platform/auth</strong>
-                            <p>PR #482 has a base branch conflict</p>
+                            <h3>Redirect to GitHub</h3>
+                            <p>Bob sends GitHub the exact callback URL used during token exchange.</p>
                         </div>
-                        <span class="status warning">Needs owner</span>
                     </article>
-                    <article class="signal-row">
-                        <span class="repo-dot red"></span>
+                    <article>
+                        <span class="step-index red-icon">02</span>
                         <div>
-                            <strong>web/dashboard</strong>
-                            <p>Workflow failed after dependency install</p>
+                            <h3>Store the access token</h3>
+                            <p>The backend stores OAuth tokens server-side and keeps browser sessions scoped.</p>
                         </div>
-                        <span class="status danger">Failing CI</span>
                     </article>
-                    <article class="signal-row">
-                        <span class="repo-dot green"></span>
+                    <article>
+                        <span class="step-index green-icon">03</span>
                         <div>
-                            <strong>api/scanner</strong>
-                            <p>All checks green and ready to merge</p>
+                            <h3>Load live workspace</h3>
+                            <p>Repository, issue, and status cards render from authenticated API data after login.</p>
                         </div>
-                        <span class="status success">Ready</span>
                     </article>
                 </div>
             </div>
@@ -167,43 +128,31 @@
 
         <section class="workflow-band" id="signals">
             <div class="section-heading">
-                <span class="eyebrow">Focused by design</span>
-                <h2>Every signal lands where work actually happens.</h2>
+                <span class="eyebrow">Authenticated dashboard</span>
+                <h2>The public page only explains the flow. Data appears after GitHub auth.</h2>
             </div>
             <div class="workflow-grid">
                 <article class="workflow-card">
-                    <span class="material-symbols-outlined blue-icon">travel_explore</span>
+                    <span class="step-index blue-icon">01</span>
+                    <h3>Authorize</h3>
+                    <p>Start a real GitHub OAuth session through the Flask backend.</p>
+                </article>
+                <article class="workflow-card">
+                    <span class="step-index red-icon">02</span>
                     <h3>Discover</h3>
-                    <p>Bob maps accessible repositories and keeps the monitoring set current after GitHub authorization.</p>
+                    <p>After sign-in, Bob loads repositories from the authenticated GitHub account.</p>
                 </article>
                 <article class="workflow-card">
-                    <span class="material-symbols-outlined red-icon">priority_high</span>
-                    <h3>Prioritize</h3>
-                    <p>Merge conflicts and failed workflows are grouped into a queue that is easy to scan during standup.</p>
+                    <span class="step-index yellow-icon">03</span>
+                    <h3>Monitor</h3>
+                    <p>Dashboards populate from live API and WebSocket data only.</p>
                 </article>
                 <article class="workflow-card">
-                    <span class="material-symbols-outlined yellow-icon">alternate_email</span>
-                    <h3>Route</h3>
-                    <p>Repository owners and PR authors get the right nudge without turning the dashboard into noise.</p>
-                </article>
-                <article class="workflow-card">
-                    <span class="material-symbols-outlined green-icon">monitoring</span>
-                    <h3>Track</h3>
-                    <p>Leads get a live view of bottlenecks, recovery, and delivery health across the organization.</p>
+                    <span class="step-index green-icon">04</span>
+                    <h3>Act</h3>
+                    <p>Use the authenticated workspace to triage conflicts and failing checks.</p>
                 </article>
             </div>
-        </section>
-
-        <section class="cta-band">
-            <div>
-                <span class="eyebrow">GitHub OAuth ready</span>
-                <h2>Start from the route GitHub expects.</h2>
-                <p>The landing page now points straight into the clean `/auth/github` flow, keeping sign-in aligned with the backend callback.</p>
-            </div>
-            <a href="/auth/github?portal=org" class="button button-primary">
-                <span class="material-symbols-outlined">login</span>
-                Continue with GitHub
-            </a>
         </section>
     </main>
 

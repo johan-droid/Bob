@@ -377,7 +377,7 @@ a {
     font-size: 25px;
 }
 
-.hero-demo {
+.auth-card {
     position: relative;
     z-index: 1;
     min-height: 620px;
@@ -391,7 +391,7 @@ a {
     transition: transform 160ms ease;
 }
 
-.demo-toolbar,
+.auth-toolbar,
 .section-heading,
 .cta-band,
 .site-footer {
@@ -401,7 +401,7 @@ a {
     gap: 24px;
 }
 
-.demo-toolbar h2,
+.auth-toolbar h2,
 .section-heading h2,
 .cta-band h2 {
     margin: 4px 0 0;
@@ -439,6 +439,36 @@ a {
     border-radius: 999px;
     font-size: 15px;
     font-weight: 700;
+}
+
+.auth-steps {
+    margin-top: 20px;
+    display: grid;
+    gap: 12px;
+}
+
+.auth-steps article {
+    min-height: 84px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+}
+
+.auth-steps h3 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.auth-steps p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .segmented-control {
@@ -625,12 +655,17 @@ a {
     box-shadow: 0 16px 34px rgba(60, 64, 67, 0.12);
 }
 
+.step-index,
 .workflow-card .material-symbols-outlined {
     width: 48px;
     height: 48px;
     display: inline-grid;
     place-items: center;
     border-radius: 16px;
+    font-weight: 900;
+}
+
+.workflow-card .material-symbols-outlined {
     margin-bottom: 18px;
 }
 
@@ -729,7 +764,7 @@ a {
         padding-top: 130px;
     }
 
-    .hero-demo {
+    .auth-card {
         min-height: auto;
     }
 
@@ -778,12 +813,12 @@ a {
         padding-inline: 14px;
     }
 
-    .hero-demo {
+    .auth-card {
         padding: 16px;
         border-radius: 26px;
     }
 
-    .demo-toolbar,
+    .auth-toolbar,
     .section-heading,
     .site-footer {
         align-items: flex-start;

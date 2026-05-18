@@ -2,7 +2,7 @@ services:
   - type: web
     name: bob-pr-monitor
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: npm ci && NEXT_OUTPUT_EXPORT=1 npm run build && pip install -r requirements.txt
     startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class eventlet -w 1 api_server:app
     envVars:
       - key: PYTHON_VERSION

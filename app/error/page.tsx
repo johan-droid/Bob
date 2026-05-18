@@ -1,4 +1,8 @@
+"use client";
+
 import Link from 'next/link';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SiteHeader } from '@/components/site-header';
 
 const messages: Record<string, { title: string; body: string }> = {
@@ -20,9 +24,9 @@ const messages: Record<string, { title: string; body: string }> = {
   }
 };
 
-export default async function ErrorPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
-  const params = searchParams ? await searchParams : {};
-  const error = params.error || 'oauth_failed';
+function ErrorContent() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get('error') || 'oauth_failed';
   const message = messages[error] || messages.oauth_failed;
 
   return (
@@ -43,5 +47,13 @@ export default async function ErrorPage({ searchParams }: { searchParams?: Promi
         </section>
       </main>
     </>
+  );
+}
+
+export default function ErrorPage() {
+  return (
+    <Suspense fallback={null}>
+      <ErrorContent />
+    </Suspense>
   );
 }

@@ -126,7 +126,7 @@ export function SetupFlow({ portal = 'org' }: Props) {
         {done ? <div className="success-banner" style={{ marginTop: 18 }}>Your GitHub session is ready.</div> : null}
 
         <div className="auth__actions">
-          <Link href={authUrl} className="button">Re-authorize GitHub</Link>
+          <a href={authUrl} className="button">Re-authorize GitHub</a>
           <Link href={dashboardUrl} className="button-secondary">Open dashboard</Link>
           <button type="button" onClick={() => void runSetup()} className="button-ghost">Run setup again</button>
         </div>

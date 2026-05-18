@@ -37,7 +37,7 @@ type Props = {
   mode: 'org' | 'user';
 };
 
-const socketBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+const socketBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 function combineIssues(data: DashboardPayload) {
   return [
@@ -52,6 +52,7 @@ export function DashboardView({ mode }: Props) {
   const [data, setData] = useState<DashboardPayload>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   const issues = useMemo(() => combineIssues(data), [data]);
   const stats = data.stats || {};
@@ -76,13 +77,14 @@ export function DashboardView({ mode }: Props) {
 
     void load();
 
-    socket = io(socketBaseUrl, {
+    socket = io(socketBaseUrl || window.location.origin, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       withCredentials: true
     });
 
     socket.on('connect', () => {
+      setLiveStatus('connected');
       socket?.emit('request_update');
     });
 
@@ -95,6 +97,7 @@ export function DashboardView({ mode }: Props) {
 
     socket.on('disconnect', () => {
       if (!mounted) return;
+      setLiveStatus('disconnected');
       setError((current) => current || 'Live sync disconnected; showing cached data.');
     });
 
@@ -118,8 +121,9 @@ export function DashboardView({ mode }: Props) {
           <p className="muted">{subtitle}</p>
         </div>
         <div className="stack" style={{ minWidth: '260px' }}>
-          <span className="status-pill success">Connected</span>
-          <span className="muted">Socket host: {socketBaseUrl}</span>
+          <span className={`status-pill ${liveStatus === 'connected' ? 'success' : liveStatus === 'disconnected' ? 'danger' : 'warning'}`}>
+            {liveStatus === 'connected' ? 'Live sync connected' : liveStatus === 'disconnected' ? 'Live sync offline' : 'Connecting live sync'}
+          </span>
         </div>
       </div>
 

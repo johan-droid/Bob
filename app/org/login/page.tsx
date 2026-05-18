@@ -14,7 +14,7 @@ export default function OrgLoginPage() {
           <h1 className="auth-title">Connect your GitHub org</h1>
           <p>Authorize Bob once, discover every accessible repository, and launch automated PR health monitoring.</p>
           <div className="auth__actions" style={{ justifyContent: 'center' }}>
-            <Link href="/auth/github?portal=org" className="button">Connect GitHub Workspace</Link>
+            <a href="/auth/github?portal=org" className="button">Connect GitHub Workspace</a>
             <Link href="/org/signup" className="button-secondary">Read the setup path</Link>
           </div>
           <p className="auth-note">Organization onboarding now starts from a single simplified GitHub auth URL.</p>

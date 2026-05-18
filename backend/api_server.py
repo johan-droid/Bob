@@ -21,6 +21,10 @@ from models import db, User, UserRepo, PRIssue, UserSettings
 from logger import get_logger
 from pr_health_scanner import PRHealthScanner
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
+REACT_DIST_DIR = os.path.join(PROJECT_ROOT, 'out')
+
 load_dotenv()
 logger = get_logger(__name__)
 
@@ -46,7 +50,7 @@ DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(os.path.dirna
 DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
-app = Flask(__name__, static_folder='../frontend', static_url_path='', template_folder='../frontend')
+app = Flask(__name__, static_folder=None, template_folder=FRONTEND_DIR)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = SECRET_KEY
 app.config.update(
@@ -145,13 +149,48 @@ def current_user():
         return None
     return User.query.filter_by(github_id=session['user']['id']).first()
 
+def _github_redirect_uri():
+    if PUBLIC_BASE_URL:
+        return f"{PUBLIC_BASE_URL}{url_for('github_callback')}"
+    return url_for('github_callback', _external=True)
+
+def _react_export_exists():
+    return os.path.exists(os.path.join(REACT_DIST_DIR, 'index.html'))
+
+def _react_page_response(route_path=''):
+    """Serve the exported Next.js page when available; fall back to legacy templates locally."""
+    normalized = route_path.strip('/')
+    candidates = []
+    if not normalized:
+        candidates.append(os.path.join(REACT_DIST_DIR, 'index.html'))
+    else:
+        candidates.extend([
+            os.path.join(REACT_DIST_DIR, normalized, 'index.html'),
+            os.path.join(REACT_DIST_DIR, f'{normalized}.html'),
+        ])
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return send_from_directory(os.path.dirname(candidate), os.path.basename(candidate))
+
+    if _react_export_exists():
+        return send_from_directory(REACT_DIST_DIR, 'index.html')
+
+    return None
+
+def _page_response(route_path, fallback_template, **context):
+    react_response = _react_page_response(route_path)
+    if react_response:
+        return react_response
+    return render_template(fallback_template, **context)
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 @app.route('/')
 def landing():
     if 'user' in session:
         portal = session.get('oauth_portal', 'org')
         return redirect('/user/dashboard' if portal == 'user' else '/org/dashboard')
-    return render_template('landing.html')
+    return _page_response('', 'landing.html')
 
 @app.route('/permissions')
 @login_required
@@ -159,22 +198,24 @@ def permissions_page():
     portal = session.get('oauth_portal', 'org')
     dashboard_url = '/user/dashboard' if portal == 'user' else '/org/dashboard'
     auth_url = '/api/auth/github/login?scope=user' if portal == 'user' else '/api/auth/github/install'
-    return render_template('permissions.html', user=session['user'], portal=portal, dashboard_url=dashboard_url, auth_url=auth_url)
+    return _page_response('permissions', 'permissions.html',
+                          user=session['user'], portal=portal,
+                          dashboard_url=dashboard_url, auth_url=auth_url)
 
 @app.route('/org/dashboard')
 @login_required
 def org_dashboard():
-    return render_template('org/dashboard.html', user=session['user'])
+    return _page_response('org/dashboard', 'org/dashboard.html', user=session['user'])
 
 @app.route('/user/dashboard')
 @login_required
 def user_dashboard():
-    return render_template('user/dashboard.html', user=session['user'])
+    return _page_response('user/dashboard', 'user/dashboard.html', user=session['user'])
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('index.html', user=session['user'])
+    return redirect('/org/dashboard')
 
 @app.route('/settings')
 @login_required
@@ -184,31 +225,31 @@ def settings_page():
 @app.route('/org/settings')
 @login_required
 def org_settings_page():
-    return render_template('org/settings.html', user=session['user'])
+    return _page_response('org/settings', 'org/settings.html', user=session['user'])
 
 @app.route('/error')
 def error_page():
-    return render_template('error.html')
+    return _page_response('error', 'error.html')
 
 @app.route('/docs')
 def docs_page():
-    return render_template('docs.html')
+    return _page_response('docs', 'docs.html')
 
 @app.route('/privacy')
 def privacy_page():
-    return render_template('privacy.html')
+    return _page_response('privacy', 'privacy.html')
 
 @app.route('/user/login')
 def user_login_page():
-    return render_template('user/login.html')
+    return _page_response('user/login', 'user/login.html')
 
 @app.route('/org/login')
 def org_login_page():
-    return render_template('org/login.html')
+    return _page_response('org/login', 'org/login.html')
 
 @app.route('/org/signup')
 def org_signup_page():
-    return render_template('org/signup.html')
+    return _page_response('org/signup', 'org/signup.html')
 
 @app.route('/logout')
 @login_required
@@ -229,15 +270,11 @@ def github_login():
     session['oauth_state'] = state
     session['oauth_portal'] = 'user' if request.args.get('portal') == 'user' else 'org'
     scopes = 'repo read:org write:discussion workflow user:email'
-    if PUBLIC_BASE_URL:
-        redirect_uri = f"{PUBLIC_BASE_URL}{url_for('github_callback')}"
-    else:
-        redirect_uri = url_for('github_callback', _external=True)
     params = urlencode({
         'client_id': GITHUB_CLIENT_ID,
         'scope': scopes,
         'state': state,
-        'redirect_uri': redirect_uri,
+        'redirect_uri': _github_redirect_uri(),
         'allow_signup': 'true',
     })
     url = f'https://github.com/login/oauth/authorize?{params}'
@@ -294,7 +331,8 @@ def github_callback():
                         'client_id': GITHUB_CLIENT_ID,
                         'client_secret': GITHUB_CLIENT_SECRET,
                         'code': code,
-                        'state': returned_state
+                        'state': returned_state,
+                        'redirect_uri': _github_redirect_uri(),
                     },
                     timeout=4 # Fail fast to allow more retries
                 )
@@ -562,25 +600,33 @@ def _check_and_provision(full_repo, username, user_token, server_token):
     return {**base, 'status': 'read', 'message': 'Read-only access'}
 
 # ── PWA & Static Assets ───────────────────────────────────────────────────────
+@app.route('/_next/<path:path>')
+def serve_next_asset(path):
+    return send_from_directory(os.path.join(REACT_DIST_DIR, '_next'), path)
+
 @app.route('/favicon.ico')
 def favicon():
-    return send_from_directory(app.static_folder, 'icons/icon-192.png')
+    return send_from_directory(os.path.join(FRONTEND_DIR, 'icons'), 'icon-192.png')
 
 @app.route('/icons/<path:path>')
 def send_icons(path):
-    return send_from_directory(os.path.join(app.static_folder, 'icons'), path)
+    return send_from_directory(os.path.join(FRONTEND_DIR, 'icons'), path)
 
 @app.route('/sw.js')
 def serve_sw():
-    return send_from_directory(app.static_folder, 'sw.js', mimetype='application/javascript')
+    return send_from_directory(FRONTEND_DIR, 'sw.js', mimetype='application/javascript')
 
 @app.route('/manifest.json')
 def serve_manifest():
-    return send_from_directory(app.static_folder, 'manifest.json', mimetype='application/json')
+    return send_from_directory(FRONTEND_DIR, 'manifest.json', mimetype='application/json')
+
+@app.route('/offline')
+def offline_page():
+    return _page_response('offline', 'offline.html')
 
 @app.route('/offline.html')
 def serve_offline():
-    return render_template('offline.html')
+    return _page_response('offline', 'offline.html')
 
 # ── API: Scan ─────────────────────────────────────────────────────────────────
 @app.route('/api/scan', methods=['POST'])
@@ -913,6 +959,47 @@ def background_scan():
                 finally:
                     # Crucial: Return the connection to the Neon DB pool
                     db.session.remove()
+
+@app.route('/<path:route_path>')
+def react_fallback(route_path):
+    legacy_redirects = {
+        'index.html': '/',
+        'landing.html': '/',
+        'permissions.html': '/permissions',
+        'docs.html': '/docs',
+        'privacy.html': '/privacy',
+        'error.html': '/error',
+        'offline.html': '/offline',
+        'user/login.html': '/user/login',
+        'user/dashboard.html': '/user/dashboard',
+        'org/login.html': '/org/login',
+        'org/signup.html': '/org/signup',
+        'org/dashboard.html': '/org/dashboard',
+        'org/settings.html': '/org/settings',
+    }
+    if route_path in legacy_redirects:
+        return redirect(legacy_redirects[route_path], code=301)
+
+    static_exts = ('.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico', '.json', '.txt')
+    if route_path.endswith(static_exts):
+        asset_path = os.path.normpath(os.path.join(FRONTEND_DIR, route_path))
+        frontend_root = os.path.normpath(FRONTEND_DIR)
+        if asset_path.startswith(frontend_root) and os.path.isfile(asset_path):
+            return send_from_directory(os.path.dirname(asset_path), os.path.basename(asset_path))
+        abort(404)
+
+    protected_routes = ('org/dashboard', 'user/dashboard', 'org/settings', 'permissions')
+    if route_path in protected_routes and 'user' not in session:
+        return redirect('/')
+
+    backend_prefixes = ('api/', 'auth/', 'login/', 'callback/', 'socket.io/')
+    if route_path.startswith(backend_prefixes):
+        abort(404)
+
+    react_response = _react_page_response(route_path)
+    if react_response:
+        return react_response
+    abort(404)
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':

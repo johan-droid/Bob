@@ -31,7 +31,7 @@ export default function OrgSignupPage() {
           </div>
 
           <div className="doc__actions">
-            <Link href="/auth/github?portal=org" className="button">Start GitHub authorization</Link>
+            <a href="/auth/github?portal=org" className="button">Start GitHub authorization</a>
             <Link href="/permissions" className="button-secondary">Open setup screen</Link>
           </div>
         </section>

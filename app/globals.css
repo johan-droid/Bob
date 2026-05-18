@@ -666,8 +666,7 @@ button, input, textarea, select {
 .google-nav nav,
 .google-actions,
 .google-chip,
-.google-demo-head,
-.google-tabs,
+.google-panel-head,
 .google-modules {
   display: flex;
   align-items: center;
@@ -760,7 +759,7 @@ button, input, textarea, select {
 .google-ribbon.green { top: 202px; right: 8vw; background: #34a853; }
 
 .google-copy,
-.google-demo,
+.google-auth-card,
 .google-modules {
   position: relative;
   z-index: 1;
@@ -779,8 +778,7 @@ button, input, textarea, select {
   font-weight: 800;
 }
 
-.google-chip i,
-.google-signal-list i {
+.google-chip i {
   display: inline-block;
   border-radius: 999px;
 }
@@ -819,7 +817,7 @@ button, input, textarea, select {
   margin-top: 34px;
 }
 
-.google-demo {
+.google-auth-card {
   min-height: 620px;
   padding: 24px;
   color: #202124;
@@ -830,19 +828,19 @@ button, input, textarea, select {
   backdrop-filter: blur(18px);
 }
 
-.google-demo-head {
+.google-panel-head {
   justify-content: space-between;
   gap: 24px;
 }
 
-.google-demo-head span,
+.google-panel-head span,
 .google-eyebrow {
   color: #5f6368;
   font-size: 13px;
   font-weight: 800;
 }
 
-.google-demo-head h2,
+.google-panel-head h2,
 .google-modules h2 {
   margin: 4px 0 0;
   color: #202124;
@@ -851,7 +849,7 @@ button, input, textarea, select {
   letter-spacing: 0;
 }
 
-.google-demo-head strong {
+.google-panel-head strong {
   min-height: 38px;
   padding: 0 14px;
   display: inline-flex;
@@ -871,113 +869,43 @@ button, input, textarea, select {
   font-weight: 800;
 }
 
-.google-tabs {
+.google-auth-steps,
+.google-module-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.google-auth-steps {
   margin-top: 20px;
-  padding: 6px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  background: #f8fafd;
-  border: 1px solid #dadce0;
-  border-radius: 22px;
 }
 
-.google-tabs span {
-  min-height: 46px;
-  display: grid;
-  place-items: center;
-  color: #5f6368;
-  border-radius: 17px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.google-tabs span:first-child {
-  color: #202124;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(60, 64, 67, 0.12);
-}
-
-.google-metrics {
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.google-metrics article,
-.google-signal-list article,
+.google-auth-steps article,
 .google-module-grid article {
   background: #fff;
   border: 1px solid #dadce0;
   border-radius: 22px;
 }
 
-.google-metrics article {
-  min-height: 116px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.google-metrics article:nth-child(1) { background: #e8f0fe; }
-.google-metrics article:nth-child(2) { background: #fef7e0; }
-.google-metrics article:nth-child(3) { background: #e6f4ea; }
-
-.google-metrics span {
-  color: #5f6368;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.google-metrics strong {
-  color: #202124;
-  font-size: 38px;
-  line-height: 1;
-}
-
-.google-signal-list {
-  margin-top: 20px;
-  display: grid;
-  gap: 12px;
-}
-
-.google-signal-list article {
+.google-auth-steps article {
   min-height: 84px;
   padding: 16px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 14px;
 }
 
-.google-signal-list i {
-  width: 14px;
-  height: 44px;
-}
-
-.google-signal-list strong {
+.google-auth-steps h3 {
+  margin: 0;
   color: #202124;
+  font-size: 17px;
 }
 
-.google-signal-list p {
+.google-auth-steps p {
   margin: 4px 0 0;
   color: #5f6368;
   font-size: 13px;
   font-weight: 700;
-}
-
-.google-signal-list article > span {
-  min-height: 32px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  color: #5f6368;
-  background: #f1f3f4;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .google-modules {
@@ -1070,24 +998,13 @@ button, input, textarea, select {
     width: 100%;
   }
 
-  .google-demo {
+  .google-auth-card {
     min-height: auto;
     padding: 16px;
     border-radius: 26px;
   }
 
-  .google-tabs,
-  .google-metrics,
   .google-module-grid {
     grid-template-columns: 1fr;
-  }
-
-  .google-signal-list article {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .google-signal-list article > span {
-    grid-column: 2;
-    width: fit-content;
   }
 }
