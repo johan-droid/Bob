@@ -152,7 +152,11 @@ def current_user():
 
 def _github_redirect_uri():
     if GITHUB_REDIRECT_URI:
-        return GITHUB_REDIRECT_URI
+        configured_uri = GITHUB_REDIRECT_URI.rstrip('/')
+        legacy_callback = '/auth/github/callback'
+        if configured_uri.endswith(legacy_callback):
+            return f"{configured_uri[:-len(legacy_callback)]}/callback/github"
+        return configured_uri
     if PUBLIC_BASE_URL:
         return f"{PUBLIC_BASE_URL}/callback/github"
     return url_for('github_callback', _external=True)
