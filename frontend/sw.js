@@ -1,5 +1,5 @@
 /* sw.js — Bob Service Worker */
-const CACHE = 'bob-v2';
+const CACHE = 'bob-v3';
 const OFFLINE_URLS = ['/', '/offline.html'];
 
 self.addEventListener('install', e => {
@@ -31,6 +31,7 @@ self.addEventListener('fetch', e => {
     // Skip API, Socket.IO, and OAuth routes
     if (url.pathname.startsWith('/api/') || 
         url.pathname.startsWith('/socket.io/') ||
+        url.pathname.startsWith('/auth/') ||
         url.pathname.startsWith('/login/') ||
         url.pathname.startsWith('/callback/')) {
         return;

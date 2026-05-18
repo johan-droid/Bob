@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Bob | Galaxy PR Intelligence',
-  description: 'Bob is a high-fidelity PR health monitor with real-time analysis and proactive conflict detection.',
+  title: 'Bob | PR Health Monitor',
+  description: 'Bob monitors pull request health with real-time GitHub signals, CI failure detection, and merge conflict alerts.',
   metadataBase: new URL('http://localhost:3000'),
   icons: {
     icon: '/icon.svg'

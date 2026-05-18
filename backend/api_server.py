@@ -5,6 +5,7 @@ import sys as _sys
 import os, secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
+from urllib.parse import urlencode
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
@@ -36,6 +37,7 @@ ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')]
+PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
 
 SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -196,6 +198,18 @@ def docs_page():
 def privacy_page():
     return render_template('privacy.html')
 
+@app.route('/user/login')
+def user_login_page():
+    return render_template('user/login.html')
+
+@app.route('/org/login')
+def org_login_page():
+    return render_template('org/login.html')
+
+@app.route('/org/signup')
+def org_signup_page():
+    return render_template('org/signup.html')
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -215,8 +229,18 @@ def github_login():
     session['oauth_state'] = state
     session['oauth_portal'] = 'user' if request.args.get('portal') == 'user' else 'org'
     scopes = 'repo read:org write:discussion workflow user:email'
-    url = (f'https://github.com/login/oauth/authorize'
-           f'?client_id={GITHUB_CLIENT_ID}&scope={scopes}&state={state}&allow_signup=true')
+    if PUBLIC_BASE_URL:
+        redirect_uri = f"{PUBLIC_BASE_URL}{url_for('github_callback')}"
+    else:
+        redirect_uri = url_for('github_callback', _external=True)
+    params = urlencode({
+        'client_id': GITHUB_CLIENT_ID,
+        'scope': scopes,
+        'state': state,
+        'redirect_uri': redirect_uri,
+        'allow_signup': 'true',
+    })
+    url = f'https://github.com/login/oauth/authorize?{params}'
     return redirect(url)
 
 

@@ -30,11 +30,7 @@ const nextConfig = {
       { source: '/error.html', destination: '/error', permanent: true },
       { source: '/offline.html', destination: '/offline', permanent: true },
       { source: '/settings', destination: '/org/settings', permanent: true },
-      { source: '/dashboard', destination: '/org/dashboard', permanent: true },
-      { source: '/login/github', destination: '/auth/github?portal=user', permanent: true },
-      { source: '/api/auth/github/login', destination: '/auth/github?portal=user', permanent: true },
-      { source: '/api/auth/github/install', destination: '/auth/github?portal=org', permanent: true },
-      { source: '/callback/github', destination: '/auth/github/callback', permanent: true }
+      { source: '/dashboard', destination: '/org/dashboard', permanent: true }
     ];
   }
 };

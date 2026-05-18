@@ -1,146 +1,109 @@
 import Link from 'next/link';
-import { SiteHeader } from '@/components/site-header';
-import { SiteFooter } from '@/components/site-footer';
 
-const features = [
-  {
-    title: 'Proactive detection',
-    text: 'Scan repositories continuously to catch merge conflicts and CI failures before they block the team.'
-  },
-  {
-    title: 'Intelligent tagging',
-    text: 'Route work to the right people automatically with scoped GitHub access and live alerts.'
-  },
-  {
-    title: 'Executive control',
-    text: 'Give engineering leads a clean dashboard for delivery health across the entire organization.'
-  }
+const signals = [
+  ['blue', 'platform/auth', 'PR #482 has a base branch conflict', 'Needs owner'],
+  ['red', 'web/dashboard', 'Workflow failed after dependency install', 'Failing CI'],
+  ['green', 'api/scanner', 'All checks green and ready to merge', 'Ready']
 ];
 
-const steps = [
-  'Sign in with GitHub',
-  'Verify required scopes',
-  'Discover repositories',
-  'Launch the first scan'
+const modules = [
+  ['01', 'Discover', 'Map accessible repositories after GitHub authorization.'],
+  ['02', 'Prioritize', 'Group conflicts and failed workflows into a clean action queue.'],
+  ['03', 'Route', 'Nudge the right owners without flooding the team.'],
+  ['04', 'Track', 'Give leads a live view of delivery health.']
 ];
 
 export default function LandingPage() {
   return (
-    <>
-      <SiteHeader />
-      <main>
-        <section className="hero page">
-          <div className="hero__grid">
-            <div>
-              <div className="eyebrow">Next-gen pipeline intelligence</div>
-              <h1>Engineering health, at galaxy scale.</h1>
-              <p>
-                Bob gives your team real-time visibility into pull request health, GitHub Action failures,
-                and repo-level risk signals. The new Next.js front end keeps the experience fast and clean.
-              </p>
+    <main className="google-landing">
+      <header className="google-nav">
+        <Link href="/" className="google-brand" aria-label="Bob home">
+          <span>B</span>
+          Bob
+        </Link>
+        <nav aria-label="Primary">
+          <Link href="/docs">Docs</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/user/login">Sign in</Link>
+          <Link href="/auth/github?portal=org" className="google-primary">Connect GitHub</Link>
+        </nav>
+      </header>
 
-              <div className="hero__actions">
-                <Link href="/org/login" className="button">Start with GitHub</Link>
-                <Link href="/docs" className="button-secondary">Read docs</Link>
-              </div>
+      <section className="google-hero">
+        <div className="google-ribbons" aria-hidden="true">
+          <span className="google-ribbon blue" />
+          <span className="google-ribbon red" />
+          <span className="google-ribbon yellow" />
+          <span className="google-ribbon green" />
+        </div>
 
-              <div className="stack" style={{ marginTop: 26 }}>
-                <div className="kicker">Launch path</div>
-                <div className="step-grid">
-                  {steps.map((step, index) => (
-                    <div className="step-card" key={step}>
-                      <div className="badge">0{index + 1}</div>
-                      <h3>{step}</h3>
-                      <p>One clean path from login to active monitoring.</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="hero__visual">
-              <div className="visual-grid">
-                <div className="visual-card">
-                  <div className="toggle-row">
-                    <div>
-                      <div className="kicker">Live dashboard</div>
-                      <h3>Bob command center</h3>
-                    </div>
-                    <span className="status-pill success">Online</span>
-                  </div>
-                  <div className="kpi-grid" style={{ marginTop: 16 }}>
-                    <div className="stat-card"><h3>42</h3><p>Tracked repos</p></div>
-                    <div className="stat-card"><h3>8</h3><p>Pending items</p></div>
-                    <div className="stat-card"><h3>96%</h3><p>Signal coverage</p></div>
-                  </div>
-                </div>
-
-                <div className="visual-card">
-                  <div className="toggle-row">
-                    <div>
-                      <div className="kicker">Auth flow</div>
-                      <h3>Simplified sign-in</h3>
-                    </div>
-                    <span className="status-pill">/auth/github</span>
-                  </div>
-                  <p style={{ marginTop: 14 }}>
-                    The frontend now uses a single GitHub auth entrypoint and the backend callback is preserved for compatibility.
-                  </p>
-                </div>
-              </div>
-            </div>
+        <div className="google-copy">
+          <div className="google-chip">
+            <i className="blue" />
+            <i className="red" />
+            <i className="yellow" />
+            <i className="green" />
+            Real-time GitHub operations
           </div>
-        </section>
-
-        <section className="section page">
-          <div className="section__head">
-            <div>
-              <div className="kicker">Core modules</div>
-              <h2>Autonomous monitoring</h2>
-            </div>
-            <Link href="/permissions" className="button-ghost">See onboarding</Link>
+          <h1>Bob PR Health Monitor</h1>
+          <p>
+            A clean command center for merge conflicts, failing CI, and repository risk. Bob turns GitHub activity into a focused queue your team can act on immediately.
+          </p>
+          <div className="google-actions">
+            <Link href="/auth/github?portal=org" className="google-primary">Start monitoring</Link>
+            <Link href="/user/login" className="google-secondary">Developer sign in</Link>
           </div>
+        </div>
 
-          <div className="feature-grid">
-            {features.map((feature) => (
-              <article className="feature-card" key={feature.title}>
-                <div className="feature-icon">✦</div>
-                <h3>{feature.title}</h3>
-                <p>{feature.text}</p>
+        <div className="google-demo">
+          <div className="google-demo-head">
+            <div>
+              <span>Bob workspace</span>
+              <h2>Pipeline health</h2>
+            </div>
+            <strong>Live</strong>
+          </div>
+          <div className="google-search">show merge conflicts across active repos</div>
+          <div className="google-tabs">
+            <span>Conflicts</span>
+            <span>CI failures</span>
+            <span>Ready queue</span>
+          </div>
+          <div className="google-metrics">
+            <article><span>Open signals</span><strong>8</strong></article>
+            <article><span>Median age</span><strong>31m</strong></article>
+            <article><span>Owners found</span><strong>6</strong></article>
+          </div>
+          <div className="google-signal-list">
+            {signals.map(([tone, repo, detail, label]) => (
+              <article key={repo}>
+                <i className={tone} />
+                <div>
+                  <strong>{repo}</strong>
+                  <p>{detail}</p>
+                </div>
+                <span>{label}</span>
               </article>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="section page">
-          <div className="panel-grid">
-            <div className="panel">
-              <div className="kicker">Routes</div>
-              <h3>Migration-safe URLs</h3>
-              <p>
-                Legacy HTML pages now redirect to clean React routes while backend API and OAuth paths are proxied through Next.js.
-              </p>
-              <div className="auth__actions">
-                <Link href="/user/login" className="button-secondary">Developer login</Link>
-                <Link href="/org/login" className="button">Organization login</Link>
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="kicker">Docs</div>
-              <h3>What changed</h3>
-              <p>
-                The front end now runs as a Next.js app. Authentication links are simplified, and the dashboards use live backend data.
-              </p>
-              <div className="auth__actions">
-                <Link href="/docs" className="button-secondary">Open docs</Link>
-                <Link href="/privacy" className="button-ghost">Privacy</Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <SiteFooter />
-    </>
+      <section className="google-modules">
+        <div>
+          <span className="google-eyebrow">Focused by design</span>
+          <h2>Every signal lands where work actually happens.</h2>
+        </div>
+        <div className="google-module-grid">
+          {modules.map(([step, title, text], index) => (
+            <article key={title}>
+              <span className={`google-module-index tone-${index}`}>{step}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
