@@ -1,61 +1,132 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api, type AppSettings, type AppState, type RepoItem } from '@/lib/api';
 
 export function SettingsForm() {
-  const [slackWebhook, setSlackWebhook] = useState('');
-  const [discordWebhook, setDiscordWebhook] = useState('');
-  const [labelConflict, setLabelConflict] = useState(true);
-  const [tagAuthor, setTagAuthor] = useState(true);
+  const [state, setState] = useState<AppState>({});
+  const [draft, setDraft] = useState<AppSettings>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
-  const isDirty = useMemo(() => true, [slackWebhook, discordWebhook, labelConflict, tagAuthor]);
+  const repos = state.dashboard?.repos || [];
+  const excluded = new Set(draft.excluded_repos || []);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const payload = await api.appState();
+      setState(payload);
+      setDraft(payload.settings || {});
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load settings.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const save = async (nextDraft = draft) => {
+    try {
+      setSaving(true);
+      await api.saveSettings(nextDraft);
+      setSavedAt(new Date().toLocaleTimeString());
+      const payload = await api.appState();
+      setState(payload);
+      setDraft(payload.settings || nextDraft);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleRepo = async (repo: RepoItem) => {
+    if (!repo.full_name) return;
+    const nextExcluded = new Set(draft.excluded_repos || []);
+    if (nextExcluded.has(repo.full_name)) {
+      nextExcluded.delete(repo.full_name);
+    } else {
+      nextExcluded.add(repo.full_name);
+    }
+    const nextDraft = { ...draft, excluded_repos: Array.from(nextExcluded) };
+    setDraft(nextDraft);
+    await save(nextDraft);
+  };
 
   return (
     <div className="settings-grid">
       <section className="settings-card">
-        <div className="kicker">Org settings</div>
-        <h1 className="auth-title" style={{ marginTop: 10 }}>Automation preferences</h1>
-        <p>Keep the org-level routing rules, webhook destinations, and auto-tagging behavior in one place.</p>
+        <div className="kicker">Backend settings</div>
+        <h1 className="auth-title" style={{ marginTop: 10 }}>PR management controls</h1>
+        <p>These settings are loaded from and saved to Bob's Flask API, so every control persists on the backend.</p>
+
+        {error ? <div className="error-banner" style={{ marginTop: 18 }}>{error}</div> : null}
+        {savedAt ? <div className="success-banner" style={{ marginTop: 18 }}>Saved at {savedAt}</div> : null}
 
         <div className="stack" style={{ marginTop: 22 }}>
           <label className="field">
-            <span>Slack webhook</span>
-            <input value={slackWebhook} onChange={(event) => setSlackWebhook(event.target.value)} placeholder="https://hooks.slack.com/..." />
-          </label>
-
-          <label className="field">
-            <span>Discord webhook</span>
-            <input value={discordWebhook} onChange={(event) => setDiscordWebhook(event.target.value)} placeholder="https://discord.com/api/webhooks/..." />
-          </label>
-
-          <label className="toggle-row feature-card">
-            <span>Auto-label merge conflicts</span>
-            <input type="checkbox" checked={labelConflict} onChange={(event) => setLabelConflict(event.target.checked)} />
+            <span>Scan interval seconds</span>
+            <input
+              type="number"
+              min={60}
+              value={draft.scan_interval ?? 300}
+              disabled={loading || saving}
+              onChange={(event) => setDraft((current) => ({ ...current, scan_interval: Number(event.target.value) }))}
+            />
           </label>
 
           <label className="toggle-row feature-card">
-            <span>Tag author on failing CI</span>
-            <input type="checkbox" checked={tagAuthor} onChange={(event) => setTagAuthor(event.target.checked)} />
+            <span>
+              <strong>In-app notifications</strong>
+              <p>Use the stored backend notification preference.</p>
+            </span>
+            <input
+              type="checkbox"
+              checked={draft.notify_in_app ?? true}
+              disabled={loading || saving}
+              onChange={(event) => setDraft((current) => ({ ...current, notify_in_app: event.target.checked }))}
+            />
           </label>
 
           <div className="auth__actions">
-            <button type="button" className="button" disabled={!isDirty} onClick={() => setSavedAt(new Date().toLocaleTimeString())}>
-              Save changes
+            <button type="button" className="button" disabled={loading || saving} onClick={() => void save()}>
+              {saving ? 'Saving...' : 'Save settings'}
             </button>
-            <button type="button" className="button-secondary">Force sync</button>
+            <button type="button" className="button-secondary" disabled={loading || saving} onClick={() => void load()}>
+              Reload from API
+            </button>
           </div>
-
-          {savedAt ? <div className="success-banner">Saved at {savedAt}</div> : null}
         </div>
       </section>
 
       <aside className="settings-card">
-        <div className="kicker">What changes</div>
+        <div className="kicker">Repository monitoring</div>
         <div className="stack" style={{ marginTop: 18 }}>
-          <div className="step-card"><h3>Webhook routing</h3><p>Choose where Bob posts issue notifications and reminders.</p></div>
-          <div className="step-card"><h3>Conflict handling</h3><p>Enable or disable automatic labeling when merge conflicts are found.</p></div>
-          <div className="step-card"><h3>Author nudges</h3><p>Configure whether failing checks should mention the PR author.</p></div>
+          {loading ? <div className="empty-state">Loading repositories from backend...</div> : null}
+          {!loading && repos.length ? repos.map((repo) => (
+            <div className="repo-card" key={repo.full_name}>
+              <div className="toggle-row">
+                <div>
+                  <h3>{repo.full_name}</h3>
+                  <p>{repo.language || 'Unknown language'} · {repo.issue_count ?? 0} linked risk(s)</p>
+                </div>
+                <button type="button" className="button-ghost" disabled={saving} onClick={() => void toggleRepo(repo)}>
+                  {excluded.has(repo.full_name || '') ? 'Resume' : 'Pause'}
+                </button>
+              </div>
+            </div>
+          )) : null}
+          {!loading && !repos.length ? (
+            <div className="empty-state">No repositories are connected yet. Return to setup or dashboard discovery first.</div>
+          ) : null}
         </div>
       </aside>
     </div>

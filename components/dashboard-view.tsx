@@ -2,77 +2,82 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { io } from 'socket.io-client';
-import { apiFetch } from '@/lib/api';
-
-type IssueItem = {
-  repo?: string;
-  title?: string;
-  author?: string;
-  ci_status?: string;
-  merge_health?: string;
-  status?: string;
-  url?: string;
-  number?: number;
-};
-
-type RepoItem = {
-  full_name?: string;
-  permission?: string;
-  agent_permission?: string;
-  language?: string;
-  issue_count?: number;
-  is_active?: boolean;
-};
-
-type DashboardPayload = {
-  stats?: { total?: number; pending?: number; in_progress?: number; failed?: number; resolved?: number };
-  pending?: IssueItem[];
-  in_progress?: IssueItem[];
-  failed?: IssueItem[];
-  resolved?: IssueItem[];
-  repos?: RepoItem[];
-};
+import { api, type AppSettings, type AppState, type DashboardPayload, type IssueItem, type IssueStatus, type RepoItem } from '@/lib/api';
 
 type Props = {
   mode: 'org' | 'user';
 };
 
+type LiveStatus = 'connecting' | 'connected' | 'disconnected';
+
 const socketBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+const issueStatuses: IssueStatus[] = ['pending', 'in_progress', 'failed', 'resolved'];
 
 function combineIssues(data: DashboardPayload) {
-  return [
-    ...(data.pending || []).map((item) => ({ ...item, group: 'Pending' })),
-    ...(data.in_progress || []).map((item) => ({ ...item, group: 'In progress' })),
-    ...(data.failed || []).map((item) => ({ ...item, group: 'Failed' })),
-    ...(data.resolved || []).map((item) => ({ ...item, group: 'Resolved' }))
-  ];
+  return issueStatuses.flatMap((status) => (
+    (data[status] || []).map((item) => ({ ...item, status: item.status || status }))
+  ));
+}
+
+function formatStatus(status?: string) {
+  return (status || 'pending').replace(/_/g, ' ');
+}
+
+function issueTone(issue: IssueItem) {
+  if (issue.status === 'resolved') return 'success';
+  if (issue.status === 'in_progress') return 'warning';
+  if (issue.type === 'ci_failure' || issue.status === 'failed') return 'danger';
+  return 'attention';
+}
+
+function issueLabel(issue: IssueItem) {
+  if (issue.type === 'merge_conflict') return 'Merge conflict';
+  if (issue.type === 'ci_failure') return 'CI failure';
+  return 'PR risk';
+}
+
+function uniqueRepos(issues: IssueItem[]) {
+  return new Set(issues.map((issue) => issue.repo).filter(Boolean)).size;
 }
 
 export function DashboardView({ mode }: Props) {
-  const [data, setData] = useState<DashboardPayload>({});
+  const [state, setState] = useState<AppState>({});
   const [loading, setLoading] = useState(true);
+  const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [liveStatus, setLiveStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting');
 
-  const issues = useMemo(() => combineIssues(data), [data]);
-  const stats = data.stats || {};
-  const repos = data.repos || [];
+  const dashboard = state.dashboard || {};
+  const settings = state.settings || {};
+  const issues = useMemo(() => combineIssues(dashboard), [dashboard]);
+  const repos = dashboard.repos || [];
+  const openIssues = issues.filter((issue) => issue.status !== 'resolved');
+  const mergeConflicts = openIssues.filter((issue) => issue.type === 'merge_conflict');
+  const ciFailures = openIssues.filter((issue) => issue.type === 'ci_failure');
+  const activeRepos = repos.filter((repo) => repo.is_active);
+  const cleanRepos = activeRepos.filter((repo) => !repo.issue_count);
+
+  const refreshState = async (quiet = false) => {
+    try {
+      if (!quiet) setAction('Refreshing workspace');
+      const payload = await api.appState();
+      setState(payload);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load Bob workspace.');
+    } finally {
+      setLoading(false);
+      if (!quiet) setAction(null);
+    }
+  };
 
   useEffect(() => {
     let socket: ReturnType<typeof io> | null = null;
     let mounted = true;
 
     const load = async () => {
-      try {
-        const payload = await apiFetch<DashboardPayload>('/api/dashboard-data');
-        if (!mounted) return;
-        setData(payload);
-        setLoading(false);
-      } catch (err) {
-        if (!mounted) return;
-        setError(err instanceof Error ? err.message : 'Unable to load dashboard data');
-        setLoading(false);
-      }
+      await refreshState(true);
     };
 
     void load();
@@ -84,21 +89,27 @@ export function DashboardView({ mode }: Props) {
     });
 
     socket.on('connect', () => {
+      if (!mounted) return;
       setLiveStatus('connected');
       socket?.emit('request_update');
     });
 
     socket.on('update', (payload: DashboardPayload) => {
       if (!mounted) return;
-      setData(payload);
+      setState((current) => ({ ...current, dashboard: payload }));
       setLoading(false);
       setError(null);
+    });
+
+    socket.on('scan_complete', () => {
+      if (!mounted) return;
+      setNotice('Scan completed. Dashboard refreshed from backend results.');
+      void refreshState(true);
     });
 
     socket.on('disconnect', () => {
       if (!mounted) return;
       setLiveStatus('disconnected');
-      setError((current) => current || 'Live sync disconnected; showing cached data.');
     });
 
     return () => {
@@ -107,92 +118,272 @@ export function DashboardView({ mode }: Props) {
     };
   }, []);
 
-  const title = mode === 'org' ? 'Org Command Center' : 'Developer Workspace';
+  const runScan = async () => {
+    try {
+      setAction('Starting scan');
+      setNotice(null);
+      await api.scan();
+      setNotice('Scan started. Bob will update this dashboard when GitHub results arrive.');
+      await refreshState(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to start scan.');
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const discoverRepos = async () => {
+    try {
+      setAction('Discovering repositories');
+      setNotice(null);
+      await api.discoverRepos();
+      await refreshState(true);
+      setNotice('Repository discovery completed from your GitHub account.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to discover repositories.');
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const changeIssueStatus = async (issue: IssueItem, status: IssueStatus) => {
+    if (!issue.id) return;
+    try {
+      setAction(`Updating ${issue.repo || 'issue'}`);
+      await api.updateIssueStatus(issue.id, status);
+      await refreshState(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update issue status.');
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const saveSettings = async (nextSettings: AppSettings) => {
+    try {
+      setAction('Saving settings');
+      await api.saveSettings(nextSettings);
+      await refreshState(true);
+      setNotice('Monitoring settings saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const toggleRepo = async (repo: RepoItem) => {
+    if (!repo.full_name) return;
+    const excluded = new Set(settings.excluded_repos || []);
+    if (excluded.has(repo.full_name)) {
+      excluded.delete(repo.full_name);
+    } else {
+      excluded.add(repo.full_name);
+    }
+    await saveSettings({ ...settings, excluded_repos: Array.from(excluded) });
+  };
+
+  const updateScanInterval = async (value: string) => {
+    const scanInterval = Number(value);
+    if (!Number.isFinite(scanInterval)) return;
+    await saveSettings({ ...settings, scan_interval: Math.max(60, scanInterval) });
+  };
+
+  const title = mode === 'org' ? 'PR command center' : 'My PR command center';
   const subtitle = mode === 'org'
-    ? 'Monitor every repository, triage failing checks, and keep delivery moving.'
-    : 'Track your active pull requests and fix issues assigned to you.';
+    ? 'Bob monitors authenticated GitHub repositories, groups delivery risks, and keeps repo controls close to the work.'
+    : 'Bob tracks your authenticated pull request risks and turns them into a focused action queue.';
 
   return (
-    <div className="dashboard-page page">
-      <div className="dashboard-topbar">
-        <div className="stack">
-          <div className="kicker">Live sync enabled</div>
-          <h1 className="page-title">{title}</h1>
-          <p className="muted">{subtitle}</p>
+    <main className="ops-shell">
+      <aside className="ops-sidebar">
+        <a href="/" className="ops-brand" aria-label="Bob home">
+          <span>B</span>
+          Bob
+        </a>
+        <nav aria-label="Dashboard sections">
+          <a href="#overview" className="active">Overview</a>
+          <a href="#queue">Risk queue</a>
+          <a href="#repos">Repositories</a>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div className="ops-sidebar-card">
+          <span>Live channel</span>
+          <strong className={`ops-dot ${liveStatus}`}>{formatStatus(liveStatus)}</strong>
+          <p>REST is the source of truth. WebSocket only refreshes live updates.</p>
         </div>
-        <div className="stack" style={{ minWidth: '260px' }}>
-          <span className={`status-pill ${liveStatus === 'connected' ? 'success' : liveStatus === 'disconnected' ? 'danger' : 'warning'}`}>
-            {liveStatus === 'connected' ? 'Live sync connected' : liveStatus === 'disconnected' ? 'Live sync offline' : 'Connecting live sync'}
-          </span>
+      </aside>
+
+      <section className="ops-main">
+        <header className="ops-header" id="overview">
+          <div>
+            <p className="ops-kicker">GitHub authenticated workspace</p>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+          <div className="ops-actions">
+            <button type="button" className="ops-button secondary" onClick={() => void discoverRepos()} disabled={!!action}>
+              Discover repos
+            </button>
+            <button type="button" className="ops-button secondary" onClick={() => void refreshState()} disabled={!!action}>
+              Refresh
+            </button>
+            <button type="button" className="ops-button" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
+              Run PR scan
+            </button>
+          </div>
+        </header>
+
+        {error ? <div className="ops-alert danger">{error}</div> : null}
+        {notice ? <div className="ops-alert success">{notice}</div> : null}
+        {action ? <div className="ops-alert neutral">{action}...</div> : null}
+
+        <div className="ops-metrics">
+          <article>
+            <span>Open risks</span>
+            <strong>{openIssues.length}</strong>
+            <p>{uniqueRepos(openIssues)} repositories currently need attention.</p>
+          </article>
+          <article>
+            <span>Merge conflicts</span>
+            <strong>{mergeConflicts.length}</strong>
+            <p>Real conflicts found by Bob's GitHub scanner.</p>
+          </article>
+          <article>
+            <span>CI failures</span>
+            <strong>{ciFailures.length}</strong>
+            <p>Failed workflow runs from connected repositories.</p>
+          </article>
+          <article>
+            <span>Clean active repos</span>
+            <strong>{cleanRepos.length}</strong>
+            <p>{activeRepos.length} active repositories are monitored.</p>
+          </article>
         </div>
-      </div>
 
-      {error ? <div className="error-banner">{error}</div> : null}
-
-      <div className="stats-grid" style={{ marginTop: 20 }}>
-        <div className="stat-card"><div className="kicker">Total</div><h3>{stats.total ?? 0}</h3><p>Open items across all repositories.</p></div>
-        <div className="stat-card"><div className="kicker">Pending</div><h3>{stats.pending ?? 0}</h3><p>Items waiting for review or triage.</p></div>
-        <div className="stat-card"><div className="kicker">In progress</div><h3>{stats.in_progress ?? 0}</h3><p>Issues already being worked on.</p></div>
-        <div className="stat-card"><div className="kicker">Resolved</div><h3>{stats.resolved ?? 0}</h3><p>Closed or completed work items.</p></div>
-      </div>
-
-      <div className="dashboard-grid" style={{ marginTop: 20 }}>
-        <section className="panel">
-          <div className="section__head" style={{ marginBottom: 16 }}>
-            <div>
-              <div className="kicker">Issues</div>
-              <h2>{mode === 'org' ? 'Organization issues' : 'My active work'}</h2>
+        <section className="ops-grid">
+          <div className="ops-panel large" id="queue">
+            <div className="ops-panel-head">
+              <div>
+                <p className="ops-kicker">Management queue</p>
+                <h2>Pull request risks</h2>
+              </div>
+              <span>{loading ? 'Loading' : `${openIssues.length} open`}</span>
             </div>
+
+            {loading ? (
+              <div className="ops-empty">Loading real GitHub data from the backend...</div>
+            ) : openIssues.length ? (
+              <div className="ops-issue-list">
+                {openIssues.map((issue) => (
+                  <article className="ops-issue" key={issue.id || issue.issue_key}>
+                    <div className={`ops-issue-mark ${issueTone(issue)}`} />
+                    <div>
+                      <div className="ops-issue-meta">
+                        <span>{issueLabel(issue)}</span>
+                        <span>{issue.repo || 'Unknown repository'}</span>
+                        {issue.pr_number ? <span>PR #{issue.pr_number}</span> : null}
+                      </div>
+                      <h3>{issue.title || 'Untitled GitHub issue'}</h3>
+                      <p>{issue.branch ? `Branch: ${issue.branch}` : 'Branch data unavailable'} · Status: {formatStatus(issue.status)}</p>
+                      <div className="ops-row-actions">
+                        {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer">Open in GitHub</a> : null}
+                        <button type="button" onClick={() => void changeIssueStatus(issue, 'in_progress')}>Start</button>
+                        <button type="button" onClick={() => void changeIssueStatus(issue, 'resolved')}>Resolve</button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="ops-empty">
+                <strong>No open PR risks in the database.</strong>
+                <p>Run discovery and a PR scan to populate this queue from GitHub.</p>
+                <button type="button" className="ops-button" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
+                  Run PR scan
+                </button>
+              </div>
+            )}
           </div>
 
-          {loading ? (
-            <div className="loading-list">Loading dashboard data…</div>
-          ) : issues.length ? (
-            <div className="stack">
-              {issues.slice(0, 8).map((item, index) => (
-                <div className="issue-card" key={`${item.repo}-${item.title}-${index}`}>
-                  <div className="toggle-row" style={{ alignItems: 'start' }}>
-                    <div>
-                      <div className="kicker">{item.group}</div>
-                      <h3>{item.title || 'Untitled issue'}</h3>
-                      <p>{item.repo || 'Repository unavailable'}{item.number ? ` • #${item.number}` : ''}</p>
-                    </div>
-                    <span className="status-pill">{item.ci_status || item.merge_health || 'Queued'}</span>
+          <aside className="ops-panel" id="settings">
+            <div className="ops-panel-head">
+              <div>
+                <p className="ops-kicker">Automation settings</p>
+                <h2>Controls</h2>
+              </div>
+            </div>
+
+            <label className="ops-field">
+              <span>Scan interval seconds</span>
+              <input
+                type="number"
+                min={60}
+                value={settings.scan_interval ?? 300}
+                onChange={(event) => setState((current) => ({
+                  ...current,
+                  settings: { ...(current.settings || {}), scan_interval: Number(event.target.value) }
+                }))}
+                onBlur={(event) => void updateScanInterval(event.target.value)}
+              />
+            </label>
+
+            <label className="ops-switch">
+              <span>
+                <strong>In-app notifications</strong>
+                <small>Stored in backend settings.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.notify_in_app ?? true}
+                onChange={(event) => void saveSettings({ ...settings, notify_in_app: event.target.checked })}
+              />
+            </label>
+
+            <div className="ops-settings-note">
+              <strong>{state.meta?.active_repo_count ?? activeRepos.length}</strong>
+              <span>active repos</span>
+            </div>
+          </aside>
+        </section>
+
+        <section className="ops-panel" id="repos">
+          <div className="ops-panel-head">
+            <div>
+              <p className="ops-kicker">Repository management</p>
+              <h2>Connected repositories</h2>
+            </div>
+            <span>{repos.length} discovered</span>
+          </div>
+
+          {repos.length ? (
+            <div className="ops-repo-grid">
+              {repos.map((repo) => (
+                <article className="ops-repo" key={repo.full_name}>
+                  <div>
+                    <h3>{repo.full_name}</h3>
+                    <p>{repo.language || 'Unknown language'} · {repo.permission || repo.permissions_level || 'unknown'} access</p>
                   </div>
-                </div>
+                  <div className="ops-repo-foot">
+                    <span>{repo.issue_count ?? 0} linked risks</span>
+                    <button type="button" onClick={() => void toggleRepo(repo)} disabled={!!action}>
+                      {repo.is_active ? 'Pause monitoring' : 'Resume monitoring'}
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           ) : (
-            <div className="empty-state">No open issues found right now.</div>
+            <div className="ops-empty">
+              <strong>No repositories have been discovered yet.</strong>
+              <p>Use GitHub discovery after sign-in to load repositories from the backend.</p>
+              <button type="button" className="ops-button" onClick={() => void discoverRepos()} disabled={!!action}>
+                Discover repositories
+              </button>
+            </div>
           )}
         </section>
-
-        <section className="panel">
-          <div className="section__head" style={{ marginBottom: 16 }}>
-            <div>
-              <div className="kicker">Repositories</div>
-              <h2>{mode === 'org' ? 'Tracked repos' : 'Your repos'}</h2>
-            </div>
-          </div>
-
-          <div className="stack">
-            {repos.length ? repos.slice(0, 8).map((repo) => (
-              <div className="repo-card" key={repo.full_name}>
-                <div className="toggle-row" style={{ alignItems: 'start' }}>
-                  <div>
-                    <h3>{repo.full_name || 'Unknown repo'}</h3>
-                    <p>{repo.language || 'Unknown language'} • {repo.permission || 'unknown'} access</p>
-                  </div>
-                  <span className={`status-pill ${repo.is_active ? 'success' : 'warning'}`}>
-                    {repo.is_active ? 'Active' : 'Paused'}
-                  </span>
-                </div>
-                <p style={{ marginTop: 10 }}>{repo.issue_count ?? 0} linked item(s).</p>
-              </div>
-            )) : <div className="empty-state">No repositories synced yet.</div>}
-          </div>
-        </section>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -149,6 +149,14 @@ def current_user():
         return None
     return User.query.filter_by(github_id=session['user']['id']).first()
 
+def _ensure_user_settings(user):
+    if not user.settings:
+        settings = UserSettings(user_id=user.id)
+        db.session.add(settings)
+        db.session.commit()
+        return settings
+    return user.settings
+
 def _react_export_exists():
     return os.path.exists(os.path.join(REACT_DIST_DIR, 'index.html'))
 
@@ -627,7 +635,7 @@ def serve_offline():
 def trigger_scan():
     user  = current_user()
     token = get_user_token(user.id) or GITHUB_TOKEN
-    repos = session['user'].get('repos', TARGET_REPOS_OVERRIDE)
+    repos = session['user'].get('repos') or [repo.full_name for repo in user.repos] or TARGET_REPOS_OVERRIDE
     if not repos:
         return jsonify({'success': False, 'error': 'No repos discovered yet.'}), 400
 
@@ -662,7 +670,10 @@ def trigger_scan():
 def list_repos():
     user  = current_user()
     repos = [{'full_name': ur.full_name, 'private': ur.private,
-               'language': ur.language, 'permissions_level': ur.permissions_level}
+               'language': ur.language, 'permissions_level': ur.permissions_level,
+               'agent_permission': ur.agent_permission,
+               'archived': ur.archived, 'fork': ur.fork,
+               'last_synced': ur.last_synced.isoformat() if ur.last_synced else None}
              for ur in user.repos]
     return jsonify({'repos': repos, 'total': len(repos)})
 
@@ -687,13 +698,9 @@ def get_issues():
 @login_required
 def user_settings():
     user = current_user()
-    if not user.settings:
-        s = UserSettings(user_id=user.id)
-        db.session.add(s)
-        db.session.commit()
+    s = _ensure_user_settings(user)
 
     if request.method == 'GET':
-        s = user.settings
         return jsonify({
             'scan_interval':  s.scan_interval,
             'excluded_repos': s.get_excluded_list(),
@@ -854,7 +861,7 @@ def _trigger_auto_comment(issue, scanner):
         logger.warning(f"Failed to auto-comment: {resp}")
 
 def _get_user_data(user_id):
-    issues = PRIssue.query.filter_by(user_id=user_id).all()
+    issues = PRIssue.query.filter_by(user_id=user_id).order_by(PRIssue.updated_at.desc()).all()
     by_status = {'pending': [], 'in_progress': [], 'failed': [], 'resolved': []}
     for i in issues:
         by_status.get(i.status, by_status['pending']).append(i.to_dict())
@@ -868,6 +875,11 @@ def _get_user_data(user_id):
         repo_issues = [i for i in issues if i.repo == ur.full_name]
         repos_list.append({
             'full_name': ur.full_name,
+            'private': ur.private,
+            'url': ur.url,
+            'archived': ur.archived,
+            'fork': ur.fork,
+            'last_synced': ur.last_synced.isoformat() if ur.last_synced else None,
             'is_active': ur.full_name not in excluded,
             'issue_count': len(repo_issues),
             'permission': ur.permissions_level,
@@ -880,7 +892,42 @@ def _get_user_data(user_id):
         'stats': {k: len(v) for k, v in by_status.items()} | {'total': len(issues)},
         'repos': repos_list,
     }
+
+def _get_app_state(user):
+    settings = _ensure_user_settings(user)
+    dashboard = _get_user_data(user.id)
+    return {
+        'user': {
+            'id': user.id,
+            'github_id': user.github_id,
+            'username': user.username,
+            'name': user.name,
+            'email': user.email,
+            'avatar': user.avatar,
+            'last_login': user.last_login.isoformat() if user.last_login else None,
+        },
+        'dashboard': dashboard,
+        'settings': {
+            'scan_interval': settings.scan_interval,
+            'excluded_repos': settings.get_excluded_list(),
+            'notify_in_app': settings.notify_in_app,
+            'updated_at': settings.updated_at.isoformat() if settings.updated_at else None,
+        },
+        'meta': {
+            'scan_interval_seconds': settings.scan_interval,
+            'tracked_repo_count': len(dashboard.get('repos', [])),
+            'active_repo_count': len([repo for repo in dashboard.get('repos', []) if repo.get('is_active')]),
+            'target_repos_configured': bool(TARGET_REPOS_OVERRIDE),
+            'websocket_path': '/socket.io',
+        }
+    }
  
+@app.route('/api/app-state')
+@login_required
+def get_app_state():
+    user = current_user()
+    return jsonify(_get_app_state(user))
+
 @app.route('/api/dashboard-data')
 @login_required
 def get_dashboard_data():
