@@ -42,7 +42,6 @@ SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')]
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
-GITHUB_REDIRECT_URI   = os.getenv('GITHUB_REDIRECT_URI', '').strip()
 
 SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -149,17 +148,6 @@ def current_user():
     if 'user' not in session:
         return None
     return User.query.filter_by(github_id=session['user']['id']).first()
-
-def _github_redirect_uri():
-    if GITHUB_REDIRECT_URI:
-        configured_uri = GITHUB_REDIRECT_URI.rstrip('/')
-        legacy_callback = '/auth/github/callback'
-        if configured_uri.endswith(legacy_callback):
-            return f"{configured_uri[:-len(legacy_callback)]}/callback/github"
-        return configured_uri
-    if PUBLIC_BASE_URL:
-        return f"{PUBLIC_BASE_URL}/callback/github"
-    return url_for('github_callback', _external=True)
 
 def _react_export_exists():
     return os.path.exists(os.path.join(REACT_DIST_DIR, 'index.html'))
@@ -281,7 +269,6 @@ def github_login():
         'client_id': GITHUB_CLIENT_ID,
         'scope': scopes,
         'state': state,
-        'redirect_uri': _github_redirect_uri(),
         'allow_signup': 'true',
     })
     url = f'https://github.com/login/oauth/authorize?{params}'
@@ -339,7 +326,6 @@ def github_callback():
                         'client_secret': GITHUB_CLIENT_SECRET,
                         'code': code,
                         'state': returned_state,
-                        'redirect_uri': _github_redirect_uri(),
                     },
                     timeout=4 # Fail fast to allow more retries
                 )
