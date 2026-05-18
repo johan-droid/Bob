@@ -5,6 +5,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class gevent -w 1 api_server:app
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET

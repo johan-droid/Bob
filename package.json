@@ -1,0 +1,28 @@
+{
+  "name": "bob-web",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "dev:frontend": "next dev -p 3000",
+    "dev:backend": ".\\.venv\\Scripts\\python.exe backend\\api_server.py",
+    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.30",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "socket.io-client": "4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.7",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.30",
+    "typescript": "5.6.3"
+  }
+}

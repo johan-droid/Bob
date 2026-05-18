@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bob | Offline</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:#050816; color:#f8fbff; font-family: Inter, system-ui, sans-serif; }
+    .card { width:min(720px, calc(100% - 32px)); padding:32px; border-radius:24px; background:rgba(12,18,38,.88); border:1px solid rgba(148,163,184,.18); box-shadow:0 24px 80px rgba(0,0,0,.38); }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+    .brand span:first-child { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,#7c3aed,#22d3ee); }
+    p { color:#a8b3cf; line-height:1.7; }
+    a { color:#fff; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand"><span>✦</span><span>Bob</span></div>
+    <h1>Offline</h1>
+    <p>The app can still show cached content, but live GitHub synchronization is unavailable until the network returns.</p>
+    <p><a href="/">Return home</a></p>
+  </main>
+</body>
+</html>

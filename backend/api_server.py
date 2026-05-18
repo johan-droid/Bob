@@ -79,11 +79,24 @@ def ensure_schema():
     with app.app_context():
         try:
             from sqlalchemy import text
-            # Add agent_permission to user_repo
-            db.session.execute(text("ALTER TABLE user_repos ADD COLUMN IF NOT EXISTS agent_permission VARCHAR(50) DEFAULT 'none'"))
-            # Add anti-spam columns to pr_issue
-            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS last_commented_at TIMESTAMP"))
-            db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN IF NOT EXISTS comment_count INTEGER DEFAULT 0"))
+            
+            def column_exists(table_name, column_name):
+                """Check if a column exists in a table (SQLite)."""
+                result = db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+                return any(row[1] == column_name for row in result)
+            
+            # Add agent_permission to user_repos
+            if not column_exists('user_repos', 'agent_permission'):
+                db.session.execute(text("ALTER TABLE user_repos ADD COLUMN agent_permission VARCHAR(50) DEFAULT 'none'"))
+            
+            # Add last_commented_at to pr_issues
+            if not column_exists('pr_issues', 'last_commented_at'):
+                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN last_commented_at TIMESTAMP"))
+            
+            # Add comment_count to pr_issues
+            if not column_exists('pr_issues', 'comment_count'):
+                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"))
+            
             db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:
@@ -189,6 +202,23 @@ def github_login():
            f'?client_id={GITHUB_CLIENT_ID}&scope={scopes}&state={state}&allow_signup=true')
     return redirect(url)
 
+
+@app.route('/auth/github')
+def auth_github():
+    """Simplified auth entrypoint. Use `?portal=user` or `?portal=org`.
+    Keeps frontend URLs short and stable.
+    """
+    portal = request.args.get('portal')
+    # Backwards-compat: support scope=user or install flag
+    if not portal:
+        if request.args.get('scope') == 'user':
+            portal = 'user'
+        elif request.args.get('install'):
+            portal = 'org'
+        else:
+            portal = 'user'
+    return redirect(url_for('github_login', portal=portal))
+
 @app.route('/api/auth/github/login')
 def api_auth_github_login():
     portal = 'user' if request.args.get('scope') == 'user' else 'org'
@@ -199,6 +229,7 @@ def api_auth_github_install():
     return redirect(url_for('github_login', portal='org'))
 
 @app.route('/callback/github')
+@app.route('/auth/github/callback')
 def github_callback():
     returned_state = request.args.get('state')
     stored_state   = session.pop('oauth_state', None)
