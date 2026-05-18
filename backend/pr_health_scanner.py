@@ -10,15 +10,16 @@ class PRHealthScanner:
         self.token    = token
         self.repos    = repos
         self.assignee = assignee
-        self.headers  = {
+        self.session  = requests.Session()
+        self.session.headers.update({
             'Authorization': f'token {token}',
             'Accept': 'application/vnd.github.v3+json',
-        }
+        })
 
     def _get(self, url: str, params: dict = None, retries: int = 4) -> Any:
         for attempt in range(retries):
             try:
-                r = requests.get(url, headers=self.headers, params=params, timeout=15)
+                r = self.session.get(url, params=params, timeout=15)
                 remaining = int(r.headers.get('X-RateLimit-Remaining', 999))
                 if remaining < 10:
                     reset_at = int(r.headers.get('X-RateLimit-Reset', time.time() + 60))
@@ -38,7 +39,7 @@ class PRHealthScanner:
 
     def _post(self, url: str, json_data: dict) -> Any:
         try:
-            r = requests.post(url, headers=self.headers, json=json_data, timeout=10)
+            r = self.session.post(url, json=json_data, timeout=10)
             return r.json()
         except Exception as e:
             return {'error': str(e)}
