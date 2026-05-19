@@ -6,6 +6,8 @@ import { api, type AppSettings, type AppState, type DashboardPayload, type Issue
 
 type Props = {
   mode: 'org' | 'user';
+  demo?: boolean;
+  demoData?: DashboardPayload;
 };
 
 type LiveStatus = 'connecting' | 'connected' | 'disconnected';
@@ -40,8 +42,8 @@ function uniqueRepos(issues: IssueItem[]) {
   return new Set(issues.map((issue) => issue.repo).filter(Boolean)).size;
 }
 
-export function DashboardView({ mode }: Props) {
-  const [state, setState] = useState<AppState>({});
+export function DashboardView({ mode, demo = false, demoData }: Props) {
+  const [state, setState] = useState<AppState>(() => (demo ? { dashboard: demoData } : {}));
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,14 @@ export function DashboardView({ mode }: Props) {
   };
 
   useEffect(() => {
+    // Demo mode: use provided demoData and skip websocket/live refresh.
+    if (demo) {
+      setState((current) => ({ ...current, dashboard: demoData }));
+      setLoading(false);
+      setLiveStatus('connected');
+      return;
+    }
+
     let socket: ReturnType<typeof io> | null = null;
     let mounted = true;
 
@@ -116,7 +126,7 @@ export function DashboardView({ mode }: Props) {
       mounted = false;
       socket?.disconnect();
     };
-  }, []);
+  }, [demo, demoData]);
 
   const runScan = async () => {
     try {
