@@ -295,6 +295,11 @@ body {
         align-items: center;
         z-index: 1000;
     }
+    /* Ensure main content isn't hidden behind the fixed bottom nav */
+    .scroll-content, .dash-container, body { padding-bottom: calc(72px + 32px); }
+    /* Respect safe area on iOS devices */
+    .bottom-nav { padding-bottom: env(safe-area-inset-bottom, 12px); height: calc(72px + env(safe-area-inset-bottom, 12px)); }
+    .fab { bottom: calc(72px + 20px); right: 16px; }
 }
 
 @media (min-width: 1025px) { .bottom-nav { display: none; } }

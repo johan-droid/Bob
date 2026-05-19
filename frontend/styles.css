@@ -363,3 +363,15 @@ body {
   .nav-logo { font-size: 1.25rem; }
   .nav-title { font-size: 1.1rem; }
 }
+
+/* Bottom-nav safe area and FAB adjustments for mobile */
+@media (max-width: 1024px) {
+  body, .dash-container, .scroll-content { padding-bottom: calc(72px + env(safe-area-inset-bottom, 12px)); }
+  .bottom-nav { padding-bottom: env(safe-area-inset-bottom, 12px); height: calc(72px + env(safe-area-inset-bottom, 12px)); }
+  .fab { bottom: calc(72px + 20px + env(safe-area-inset-bottom, 12px)); right: 16px; }
+}
+
+@media (max-width: 768px) {
+  /* Make header search input full width on small screens */
+  #search-input { width: 100% !important; max-width: none !important; }
+}

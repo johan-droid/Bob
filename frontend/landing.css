@@ -852,8 +852,10 @@ a {
     .nav-links, .nav-actions { display: none; }
     .mobile-menu-toggle { display: block; }
     
-    .hero-headline { font-size: 40px; }
-    .cta-headline { font-size: 32px; }
+    .site-header { padding: 12px; }
+    .hero { padding: 100px 16px 60px; }
+    .hero-headline { font-size: 32px; }
+    .cta-headline { font-size: 28px; }
     
     .steps-track { grid-template-columns: 1fr; }
     .features-grid { grid-template-columns: 1fr; }
@@ -863,6 +865,11 @@ a {
     
     .footer-inner { flex-direction: column; gap: 24px; text-align: center; }
     .footer-links { flex-direction: column; gap: 16px; }
+}
+
+/* Provide extra bottom padding on smaller screens to avoid overlap with fixed controls */
+@media (max-width: 1024px) {
+    body { padding-bottom: env(safe-area-inset-bottom, 16px); }
 }
 
 /* Mobile Drawer Overlay */

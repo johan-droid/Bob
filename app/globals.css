@@ -800,6 +800,48 @@ button, input, textarea, select {
   padding: 24px;
 }
 
+/* Mobile responsiveness tweaks */
+@media (max-width: 768px) {
+  .page,
+  .site-header__inner,
+  .site-footer__inner,
+  .hero,
+  .section,
+  .auth-page,
+  .dashboard-page {
+    width: calc(100% - 32px);
+    margin: 0 16px;
+  }
+
+  .site-header__inner { padding: 12px 0; gap: 12px; }
+  .nav-links { display: none; }
+
+  .hero { padding: 32px 0; }
+  .hero__grid { grid-template-columns: 1fr; }
+  .hero__visual { min-height: 220px; padding: 18px; border-radius: 16px; }
+  .hero h1 { font-size: clamp(1.6rem, 6vw, 2.6rem); max-width: 100%; }
+  .hero p { font-size: 0.98rem; max-width: 100%; }
+
+  .button, .button-secondary, .button-ghost { padding: 10px 14px; font-size: 0.95rem; }
+
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .feature-grid, .panel-grid, .stats-grid, .repo-grid, .doc-grid, .step-grid { grid-template-columns: 1fr; }
+
+  .dashboard-grid, .settings-grid, .setup-grid { grid-template-columns: 1fr; }
+
+  .table { min-width: 0; }
+
+  aside.sidebar { display: none; }
+  .main-wrapper { margin-left: 0; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; display: flex; justify-content: space-around; align-items: center; background: rgba(5,8,22,0.95); border-top: 1px solid rgba(148,163,184,0.08); padding: 8px 12px; z-index: 100; }
+
+  .fab { position: fixed; bottom: 80px; right: 20px; }
+
+  .panel { padding: 18px; }
+  .auth-card, .doc-card, .settings-card { width: 100%; border-radius: 12px; padding: 20px; }
+}
+
 .bento-inner {
   background: #18181b;
   border: 1px solid rgba(255, 255, 255, 0.05);
