@@ -1,0 +1,187 @@
+.saas-setup-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  width: 100%;
+}
+
+.saas-setup-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 480px;
+  width: 100%;
+  padding: 40px;
+  text-align: center;
+}
+
+/* ================== ANIMATED NODES ================== */
+.connection-nodes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 48px;
+  width: 100%;
+}
+
+.node {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.bob-node {
+  color: var(--blue, #3b82f6);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+.github-node {
+  color: var(--text-main, #ffffff);
+}
+
+.sync-line {
+  flex-grow: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.sync-pulse {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.sync-pulse.active {
+  opacity: 1;
+  animation: scan 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, transparent, var(--blue, #3b82f6), transparent);
+}
+
+.sync-pulse.success {
+  opacity: 1;
+  width: 100%;
+  transform: translateX(0);
+  background: var(--green, #10b981);
+  transition: all 0.5s ease;
+}
+
+.sync-pulse.error {
+  opacity: 1;
+  width: 100%;
+  transform: translateX(0);
+  background: var(--red, #ef4444);
+  transition: all 0.5s ease;
+}
+
+@keyframes scan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ================== STATUS TEXT ================== */
+.status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-heading {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-main, #ffffff);
+  margin: 0;
+}
+
+.status-string {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: monospace;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 8px 16px;
+  border-radius: 999px;
+}
+
+.text-muted {
+  color: var(--text-muted, #a1a1aa);
+}
+
+.text-success {
+  color: var(--green, #10b981);
+  font-weight: 500;
+}
+
+.text-error {
+  color: var(--red, #ef4444);
+  font-weight: 500;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--blue, #3b82f6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ================== ERROR ACTIONS ================== */
+.error-actions {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.error-detail {
+  font-size: 14px;
+  color: var(--text-muted, #a1a1aa);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: var(--text-main, #ffffff);
+  color: #000;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.button-primary:hover {
+  opacity: 0.9;
+}
