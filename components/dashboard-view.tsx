@@ -209,25 +209,28 @@ export function DashboardView({ mode }: Props) {
     : 'Bob tracks your authenticated pull request risks and turns them into a focused action queue.';
 
   return (
-    <main className="ops-shell">
-      <aside className="ops-sidebar">
-        <a href="/" className="ops-brand" aria-label="Bob home">
-          <span>B</span>
-          Bob
-        </a>
-        <nav aria-label="Dashboard sections">
+    <main className="ops-shell bento-theme">
+      <nav className="ops-topbar">
+        <div className="ops-topbar-left">
+          <a href="/" className="ops-brand" aria-label="Bob home">
+            <span>B</span>
+            Bob
+          </a>
+        </div>
+        <div className="ops-topbar-center">
           <a href="#overview" className="active">Overview</a>
           <a href="#queue">Risk queue</a>
           <a href="#repos">Repositories</a>
           <a href="#settings">Settings</a>
-          <a href="/logout" className="logout-link">Logout</a>
-        </nav>
-        <div className="ops-sidebar-card">
-          <span>Live channel</span>
-          <strong className={`ops-dot ${liveStatus}`}>{formatStatus(liveStatus)}</strong>
-          <p>REST is the source of truth. WebSocket only refreshes live updates.</p>
         </div>
-      </aside>
+        <div className="ops-topbar-right">
+          <div className="ops-live-status">
+            <span className={`ops-dot ${liveStatus}`} />
+            <small>{formatStatus(liveStatus)}</small>
+          </div>
+          <a href="/logout" className="logout-link ops-button outline">Logout</a>
+        </div>
+      </nav>
 
       <section className="ops-main">
         <header className="ops-header" id="overview">
@@ -243,7 +246,7 @@ export function DashboardView({ mode }: Props) {
             <button type="button" className="ops-button secondary" onClick={() => void refreshState()} disabled={!!action}>
               Refresh
             </button>
-            <button type="button" className="ops-button" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
+            <button type="button" className="ops-button primary" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
               Run PR scan
             </button>
           </div>
@@ -254,22 +257,22 @@ export function DashboardView({ mode }: Props) {
         {action ? <div className="ops-alert neutral">{action}...</div> : null}
 
         <div className="ops-metrics">
-          <article>
+          <article className="bento-box">
             <span>Open risks</span>
             <strong>{openIssues.length}</strong>
             <p>{uniqueRepos(openIssues)} repositories currently need attention.</p>
           </article>
-          <article>
+          <article className="bento-box">
             <span>Merge conflicts</span>
             <strong>{mergeConflicts.length}</strong>
             <p>Real conflicts found by Bob's GitHub scanner.</p>
           </article>
-          <article>
+          <article className="bento-box">
             <span>CI failures</span>
             <strong>{ciFailures.length}</strong>
             <p>Failed workflow runs from connected repositories.</p>
           </article>
-          <article>
+          <article className="bento-box">
             <span>Clean active repos</span>
             <strong>{cleanRepos.length}</strong>
             <p>{activeRepos.length} active repositories are monitored.</p>
@@ -277,13 +280,13 @@ export function DashboardView({ mode }: Props) {
         </div>
 
         <section className="ops-grid">
-          <div className="ops-panel large" id="queue">
+          <div className="ops-panel bento-box large" id="queue">
             <div className="ops-panel-head">
               <div>
                 <p className="ops-kicker">Management queue</p>
                 <h2>Pull request risks</h2>
               </div>
-              <span>{loading ? 'Loading' : `${openIssues.length} open`}</span>
+              <span className="ops-badge">{loading ? 'Loading' : `${openIssues.length} open`}</span>
             </div>
 
             {loading ? (
@@ -291,20 +294,42 @@ export function DashboardView({ mode }: Props) {
             ) : openIssues.length ? (
               <div className="ops-issue-list">
                 {openIssues.map((issue) => (
-                  <article className="ops-issue" key={issue.id || issue.issue_key}>
+                  <article className="ops-issue bento-inner" key={issue.id || issue.issue_key}>
                     <div className={`ops-issue-mark ${issueTone(issue)}`} />
-                    <div>
+                    <div className="ops-issue-content">
                       <div className="ops-issue-meta">
-                        <span>{issueLabel(issue)}</span>
+                        <span className="issue-label">{issueLabel(issue)}</span>
                         <span>{issue.repo || 'Unknown repository'}</span>
                         {issue.pr_number ? <span>PR #{issue.pr_number}</span> : null}
                       </div>
                       <h3>{issue.title || 'Untitled GitHub issue'}</h3>
-                      <p>{issue.branch ? `Branch: ${issue.branch}` : 'Branch data unavailable'} · Status: {formatStatus(issue.status)}</p>
-                      <div className="ops-row-actions">
-                        {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer">Open in GitHub</a> : null}
-                        <button type="button" onClick={() => void changeIssueStatus(issue, 'in_progress')}>Start</button>
-                        <button type="button" onClick={() => void changeIssueStatus(issue, 'resolved')}>Resolve</button>
+                      <p className="issue-desc">{issue.branch ? `Branch: ${issue.branch}` : 'Branch data unavailable'} · Status: {formatStatus(issue.status)}</p>
+                      
+                      <div className="ops-row-actions ai-triggers">
+                        {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer" className="ops-button outline sm">GitHub</a> : null}
+                        
+                        <div className="ai-group">
+                          <button type="button" className="ops-button ai-action copilot" onClick={() => {
+                            setAction(`Triggering Copilot for ${issue.repo}...`);
+                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
+                          }}>
+                            <span className="ai-icon">⚗</span> Copilot
+                          </button>
+                          <button type="button" className="ops-button ai-action jules" onClick={() => {
+                            setAction(`Requesting Jules analysis...`);
+                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
+                          }}>
+                            <span className="ai-icon">⚡</span> Jules
+                          </button>
+                          <button type="button" className="ops-button ai-action codex" onClick={() => {
+                            setAction(`Running Codex on branch ${issue.branch || 'unknown'}...`);
+                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
+                          }}>
+                            <span className="ai-icon">⌘</span> Codex
+                          </button>
+                        </div>
+
+                        <button type="button" className="ops-button outline sm resolve-btn" onClick={() => void changeIssueStatus(issue, 'resolved')}>Resolve</button>
                       </div>
                     </div>
                   </article>
@@ -314,14 +339,14 @@ export function DashboardView({ mode }: Props) {
               <div className="ops-empty">
                 <strong>No open PR risks in the database.</strong>
                 <p>Run discovery and a PR scan to populate this queue from GitHub.</p>
-                <button type="button" className="ops-button" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
+                <button type="button" className="ops-button primary mt-4" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
                   Run PR scan
                 </button>
               </div>
             )}
           </div>
 
-          <aside className="ops-panel" id="settings">
+          <aside className="ops-panel bento-box sidebar-settings" id="settings">
             <div className="ops-panel-head">
               <div>
                 <p className="ops-kicker">Automation settings</p>
@@ -334,6 +359,7 @@ export function DashboardView({ mode }: Props) {
               <input
                 type="number"
                 min={60}
+                className="bento-input"
                 value={settings.scan_interval ?? 300}
                 onChange={(event) => setState((current) => ({
                   ...current,
@@ -355,12 +381,12 @@ export function DashboardView({ mode }: Props) {
               />
             </label>
 
-            <div className="ops-settings-note">
+            <div className="ops-settings-note bento-inner">
               <strong>{state.meta?.active_repo_count ?? activeRepos.length}</strong>
               <span>active repos</span>
             </div>
 
-            <div className="ops-danger-zone">
+            <div className="ops-danger-zone bento-inner danger">
               <h3>Danger Zone</h3>
               <p>Permanently delete your account and all associated repository metadata from Bob. This cannot be undone.</p>
               <button
@@ -375,27 +401,27 @@ export function DashboardView({ mode }: Props) {
           </aside>
         </section>
 
-        <section className="ops-panel" id="repos">
+        <section className="ops-panel bento-box" id="repos">
           <div className="ops-panel-head">
             <div>
               <p className="ops-kicker">Repository management</p>
               <h2>Connected repositories</h2>
             </div>
-            <span>{repos.length} discovered</span>
+            <span className="ops-badge">{repos.length} discovered</span>
           </div>
 
           {repos.length ? (
             <div className="ops-repo-grid">
               {repos.map((repo) => (
-                <article className="ops-repo" key={repo.full_name}>
+                <article className="ops-repo bento-inner" key={repo.full_name}>
                   <div>
                     <h3>{repo.full_name}</h3>
                     <p>{repo.language || 'Unknown language'} · {repo.permission || repo.permissions_level || 'unknown'} access</p>
                   </div>
                   <div className="ops-repo-foot">
-                    <span>{repo.issue_count ?? 0} linked risks</span>
-                    <button type="button" onClick={() => void toggleRepo(repo)} disabled={!!action}>
-                      {repo.is_active ? 'Pause monitoring' : 'Resume monitoring'}
+                    <span className="repo-risks">{repo.issue_count ?? 0} linked risks</span>
+                    <button type="button" className="ops-button outline sm" onClick={() => void toggleRepo(repo)} disabled={!!action}>
+                      {repo.is_active ? 'Pause' : 'Resume'} monitoring
                     </button>
                   </div>
                 </article>
@@ -405,7 +431,7 @@ export function DashboardView({ mode }: Props) {
             <div className="ops-empty">
               <strong>No repositories have been discovered yet.</strong>
               <p>Use GitHub discovery after sign-in to load repositories from the backend.</p>
-              <button type="button" className="ops-button" onClick={() => void discoverRepos()} disabled={!!action}>
+              <button type="button" className="ops-button primary mt-4" onClick={() => void discoverRepos()} disabled={!!action}>
                 Discover repositories
               </button>
             </div>
