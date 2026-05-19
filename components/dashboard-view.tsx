@@ -60,6 +60,7 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   const ciFailures = openIssues.filter((issue) => issue.type === 'ci_failure');
   const activeRepos = repos.filter((repo) => repo.is_active);
   const cleanRepos = activeRepos.filter((repo) => !repo.issue_count);
+  const affectedRepoCount = uniqueRepos(openIssues);
 
   const refreshState = async (quiet = false) => {
     try {
@@ -76,14 +77,20 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   };
 
   useEffect(() => {
-    // close the mobile settings panel if viewport is resized larger
     const onResize = () => {
-      if (window.innerWidth > 1024 && showSettings) setShowSettings(false);
+      if (window.innerWidth > 1024) {
+        setShowSettings(false);
+      }
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
 
-    // Demo mode: use provided demoData and skip websocket/live refresh.
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  useEffect(() => {
     if (demo) {
       setState((current) => ({ ...current, dashboard: demoData }));
       setLoading(false);
@@ -207,6 +214,13 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
     await saveSettings({ ...settings, scan_interval: Math.max(60, scanInterval) });
   };
 
+  const routeIssueToAgent = (issue: IssueItem, agentName: string) => {
+    setAction(`Routing ${issue.repo || 'issue'} to ${agentName}`);
+    window.setTimeout(() => {
+      void changeIssueStatus(issue, 'in_progress');
+    }, 450);
+  };
+
   const handleDeleteAccount = async () => {
     if (!window.confirm("Are you sure you want to permanently delete your account and all associated repository metadata? This action cannot be undone.")) {
       return;
@@ -225,24 +239,26 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   const subtitle = mode === 'org'
     ? 'Bob monitors authenticated GitHub repositories, groups delivery risks, and keeps repo controls close to the work.'
     : 'Bob tracks your authenticated pull request risks and turns them into a focused action queue.';
+  const modeLabel = mode === 'org' ? 'Org workspace' : 'Personal workspace';
+  const activeRepoCount = state.meta?.active_repo_count ?? activeRepos.length;
 
   return (
     <main className="ops-shell bento-theme">
       <nav className="ops-topbar">
-        <div className="ops-topbar-left">
+        <div className="ops-topbar-main">
           <a href="/" className="ops-brand" aria-label="Bob home">
             <span>B</span>
             Bob
           </a>
-        </div>
-        <div className="ops-topbar-center">
-          <a href="#overview" className="active">Overview</a>
-          <a href="#queue">Risk queue</a>
-          <a href="#repos">Repositories</a>
-          <a href="#settings">Settings</a>
+          <div className="ops-topbar-center">
+            <a href="#overview" className="active">Overview</a>
+            <a href="#queue">Risk queue</a>
+            <a href="#repos">Repositories</a>
+            <a href="#settings">Settings</a>
+          </div>
         </div>
         <div className="ops-topbar-right">
-          <div className="ops-live-status">
+          <div className="ops-live-status" aria-live="polite">
             <span className={`ops-dot ${liveStatus}`} />
             <small>{formatStatus(liveStatus)}</small>
           </div>
@@ -260,49 +276,79 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
       </nav>
 
       <section className="ops-main">
-        <header className="ops-header" id="overview">
-          <div>
-            <p className="ops-kicker">GitHub authenticated workspace</p>
+        <header className="ops-hero" id="overview">
+          <div className="ops-hero-copy">
+            <div className="ops-hero-badges">
+              <p className="ops-kicker">GitHub authenticated workspace</p>
+              <span className="ops-mode-pill">{modeLabel}</span>
+            </div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
+            <div className="ops-actions">
+              <button type="button" className="ops-button secondary" onClick={() => void discoverRepos()} disabled={!!action}>
+                Discover repos
+              </button>
+              <button type="button" className="ops-button secondary" onClick={() => void refreshState()} disabled={!!action}>
+                Refresh
+              </button>
+              <button type="button" className="ops-button primary" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
+                Run PR scan
+              </button>
+            </div>
           </div>
-          <div className="ops-actions">
-            <button type="button" className="ops-button secondary" onClick={() => void discoverRepos()} disabled={!!action}>
-              Discover repos
-            </button>
-            <button type="button" className="ops-button secondary" onClick={() => void refreshState()} disabled={!!action}>
-              Refresh
-            </button>
-            <button type="button" className="ops-button primary" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
-              Run PR scan
-            </button>
-          </div>
+
+          <aside className="ops-hero-card bento-box" aria-label="Workspace summary">
+            <p className="ops-card-label">Workspace pulse</p>
+            <div className="ops-hero-score">
+              <strong>{openIssues.length}</strong>
+              <span>open risks across {affectedRepoCount} repositories</span>
+            </div>
+            <div className="ops-hero-stats">
+              <div>
+                <strong>{activeRepoCount}</strong>
+                <span>active repos</span>
+              </div>
+              <div>
+                <strong>{settings.scan_interval ?? 300}s</strong>
+                <span>scan cadence</span>
+              </div>
+              <div>
+                <strong>{ciFailures.length + mergeConflicts.length}</strong>
+                <span>critical blockers</span>
+              </div>
+            </div>
+            <p className="ops-hero-note">
+              Use discovery to populate new repos, then run a scan to refresh live GitHub risk signals.
+            </p>
+          </aside>
         </header>
 
-        {error ? <div className="ops-alert danger">{error}</div> : null}
-        {notice ? <div className="ops-alert success">{notice}</div> : null}
-        {action ? <div className="ops-alert neutral">{action}...</div> : null}
+        <div className="ops-alert-stack">
+          {error ? <div className="ops-alert danger">{error}</div> : null}
+          {notice ? <div className="ops-alert success">{notice}</div> : null}
+          {action ? <div className="ops-alert neutral">{action}...</div> : null}
+        </div>
 
         <div className="ops-metrics">
-          <article className="bento-box">
+          <article className="bento-box ops-metric-card">
             <span>Open risks</span>
             <strong>{openIssues.length}</strong>
-            <p>{uniqueRepos(openIssues)} repositories currently need attention.</p>
+            <p>{affectedRepoCount} repositories currently need attention.</p>
           </article>
-          <article className="bento-box">
+          <article className="bento-box ops-metric-card">
             <span>Merge conflicts</span>
             <strong>{mergeConflicts.length}</strong>
-            <p>Real conflicts found by Bob's GitHub scanner.</p>
+            <p>Branch collisions that need intervention before merge.</p>
           </article>
-          <article className="bento-box">
+          <article className="bento-box ops-metric-card">
             <span>CI failures</span>
             <strong>{ciFailures.length}</strong>
-            <p>Failed workflow runs from connected repositories.</p>
+            <p>Workflow runs that are red and blocking confidence.</p>
           </article>
-          <article className="bento-box">
+          <article className="bento-box ops-metric-card">
             <span>Clean active repos</span>
             <strong>{cleanRepos.length}</strong>
-            <p>{activeRepos.length} active repositories are monitored.</p>
+            <p>{activeRepos.length} active repositories are currently being watched.</p>
           </article>
         </div>
 
@@ -324,39 +370,37 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
                   <article className="ops-issue bento-inner" key={issue.id || issue.issue_key}>
                     <div className={`ops-issue-mark ${issueTone(issue)}`} />
                     <div className="ops-issue-content">
-                      <div className="ops-issue-meta">
-                        <span className="issue-label">{issueLabel(issue)}</span>
-                        <span>{issue.repo || 'Unknown repository'}</span>
-                        {issue.pr_number ? <span>PR #{issue.pr_number}</span> : null}
+                      <div className="ops-issue-head">
+                        <div className="ops-issue-meta">
+                          <span className="issue-label">{issueLabel(issue)}</span>
+                          <span className="ops-meta-pill">{issue.repo || 'Unknown repository'}</span>
+                          {issue.pr_number ? <span className="ops-meta-pill">PR #{issue.pr_number}</span> : null}
+                        </div>
+                        <span className={`ops-status-pill ${issueTone(issue)}`}>{formatStatus(issue.status)}</span>
                       </div>
                       <h3>{issue.title || 'Untitled GitHub issue'}</h3>
                       <p className="issue-desc">{issue.branch ? `Branch: ${issue.branch}` : 'Branch data unavailable'} · Status: {formatStatus(issue.status)}</p>
-                      
+
                       <div className="ops-row-actions ai-triggers">
-                        {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer" className="ops-button outline sm">GitHub</a> : null}
-                        
-                        <div className="ai-group">
-                          <button type="button" className="ops-button ai-action copilot" onClick={() => {
-                            setAction(`Triggering Copilot for ${issue.repo}...`);
-                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
-                          }}>
-                            <span className="ai-icon">⚗</span> Copilot
-                          </button>
-                          <button type="button" className="ops-button ai-action jules" onClick={() => {
-                            setAction(`Requesting Jules analysis...`);
-                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
-                          }}>
-                            <span className="ai-icon">⚡</span> Jules
-                          </button>
-                          <button type="button" className="ops-button ai-action codex" onClick={() => {
-                            setAction(`Running Codex on branch ${issue.branch || 'unknown'}...`);
-                            setTimeout(() => { changeIssueStatus(issue, 'in_progress'); }, 1000);
-                          }}>
-                            <span className="ai-icon">⌘</span> Codex
+                        <div className="ops-primary-actions">
+                          {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer" className="ops-button outline sm">Open GitHub</a> : null}
+                          <button type="button" className="ops-button outline sm resolve-btn" onClick={() => void changeIssueStatus(issue, 'resolved')}>
+                            Resolve
                           </button>
                         </div>
 
-                        <button type="button" className="ops-button outline sm resolve-btn" onClick={() => void changeIssueStatus(issue, 'resolved')}>Resolve</button>
+                        <div className="ai-group">
+                          <span className="ai-group-label">Route to</span>
+                          <button type="button" className="ops-button ai-action copilot" onClick={() => routeIssueToAgent(issue, 'Copilot')}>
+                            Copilot
+                          </button>
+                          <button type="button" className="ops-button ai-action jules" onClick={() => routeIssueToAgent(issue, 'Jules')}>
+                            Jules
+                          </button>
+                          <button type="button" className="ops-button ai-action codex" onClick={() => routeIssueToAgent(issue, 'Codex')}>
+                            Codex
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -392,49 +436,54 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
               </button>
             </div>
 
-            <label className="ops-field">
-              <span>Scan interval seconds</span>
-              <input
-                type="number"
-                min={60}
-                className="bento-input"
-                value={settings.scan_interval ?? 300}
-                onChange={(event) => setState((current) => ({
-                  ...current,
-                  settings: { ...(current.settings || {}), scan_interval: Number(event.target.value) }
-                }))}
-                onBlur={(event) => void updateScanInterval(event.target.value)}
-              />
-            </label>
+            <div className="ops-settings-stack">
+              <label className="ops-field">
+                <span>Scan interval seconds</span>
+                <input
+                  type="number"
+                  min={60}
+                  className="bento-input"
+                  value={settings.scan_interval ?? 300}
+                  onChange={(event) => setState((current) => ({
+                    ...current,
+                    settings: { ...(current.settings || {}), scan_interval: Number(event.target.value) }
+                  }))}
+                  onBlur={(event) => void updateScanInterval(event.target.value)}
+                />
+              </label>
 
-            <label className="ops-switch">
-              <span>
-                <strong>In-app notifications</strong>
-                <small>Stored in backend settings.</small>
-              </span>
-              <input
-                type="checkbox"
-                checked={settings.notify_in_app ?? true}
-                onChange={(event) => void saveSettings({ ...settings, notify_in_app: event.target.checked })}
-              />
-            </label>
+              <label className="ops-switch">
+                <span>
+                  <strong>In-app notifications</strong>
+                  <small>Stored in backend settings.</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.notify_in_app ?? true}
+                  onChange={(event) => void saveSettings({ ...settings, notify_in_app: event.target.checked })}
+                />
+              </label>
 
-            <div className="ops-settings-note bento-inner">
-              <strong>{state.meta?.active_repo_count ?? activeRepos.length}</strong>
-              <span>active repos</span>
-            </div>
+              <div className="ops-settings-note bento-inner">
+                <strong>{activeRepoCount}</strong>
+                <div>
+                  <span>active repos</span>
+                  <small>{repos.length} repositories discovered</small>
+                </div>
+              </div>
 
-            <div className="ops-danger-zone bento-inner danger">
-              <h3>Danger Zone</h3>
-              <p>Permanently delete your account and all associated repository metadata from Bob. This cannot be undone.</p>
-              <button
-                type="button"
-                className="ops-button danger"
-                onClick={() => void handleDeleteAccount()}
-                disabled={!!action}
-              >
-                Delete Account
-              </button>
+              <div className="ops-danger-zone bento-inner danger">
+                <h3>Danger Zone</h3>
+                <p>Permanently delete your account and all associated repository metadata from Bob. This cannot be undone.</p>
+                <button
+                  type="button"
+                  className="ops-button danger"
+                  onClick={() => void handleDeleteAccount()}
+                  disabled={!!action}
+                >
+                  Delete Account
+                </button>
+              </div>
             </div>
           </aside>
         </section>
@@ -452,9 +501,14 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
             <div className="ops-repo-grid">
               {repos.map((repo) => (
                 <article className="ops-repo bento-inner" key={repo.full_name}>
-                  <div>
-                    <h3>{repo.full_name}</h3>
-                    <p>{repo.language || 'Unknown language'} · {repo.permission || repo.permissions_level || 'unknown'} access</p>
+                  <div className="ops-repo-head">
+                    <div>
+                      <h3>{repo.full_name}</h3>
+                      <p>{repo.language || 'Unknown language'} · {repo.permission || repo.permissions_level || 'unknown'} access</p>
+                    </div>
+                    <span className={`ops-status-pill ${repo.is_active ? 'success' : 'neutral'}`}>
+                      {repo.is_active ? 'Monitoring on' : 'Paused'}
+                    </span>
                   </div>
                   <div className="ops-repo-foot">
                     <span className="repo-risks">{repo.issue_count ?? 0} linked risks</span>

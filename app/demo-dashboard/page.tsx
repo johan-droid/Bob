@@ -1,6 +1,7 @@
 import { DashboardView } from '@/components/dashboard-view';
+import type { DashboardPayload } from '@/lib/api';
 
-const demoData = {
+const demoData: DashboardPayload = {
   pending: [
     { id: 1, repo: 'acme/frontend', title: 'Fix vulnerability in dependency', branch: 'fix/security', pr_number: 412, type: 'pr_risk', status: 'pending' },
     { id: 2, repo: 'acme/backend', title: 'Resolve merge conflict in main', branch: 'feature/merge', pr_number: 98, type: 'merge_conflict', status: 'pending' }
