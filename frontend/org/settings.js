@@ -77,5 +77,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1200);
     });
 
+    const deleteBtn = document.getElementById('delete-account-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm("Are you sure you want to permanently delete your account and all associated repository metadata? This action cannot be undone.")) {
+                return;
+            }
+            try {
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = 'Deleting...';
+                
+                // Get CSRF Token
+                const csrfRes = await fetch('/api/csrf-token');
+                const csrfData = await csrfRes.json();
+                const csrfToken = csrfData.csrf_token;
+
+                const response = await fetch('/api/account/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to delete account.');
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = 'Delete Account';
+                }
+            } catch (err) {
+                console.error(err);
+                alert('An error occurred while deleting your account.');
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = 'Delete Account';
+            }
+        });
+    }
+
     setSaveState();
 });

@@ -25,6 +25,10 @@
                     <span class="material-icons-outlined">settings_applications</span>
                     Org Settings
                 </a>
+                <a href="/logout" class="nav-item logout-link" style="color: var(--red, #ef4444); margin-top: auto;">
+                    <span class="material-icons-outlined">logout</span>
+                    Logout
+                </a>
             </nav>
         </aside>
 
@@ -108,6 +112,16 @@
                                 <span class="slider"></span>
                             </label>
                         </div>
+                    </div>
+                </section>
+
+                <section class="settings-section md3-card danger-zone-section" style="border-top: 2px solid var(--red, #ef4444); margin-top: 24px;">
+                    <div class="section-header">
+                        <h2 style="color: var(--red, #ef4444);">Danger Zone</h2>
+                        <p class="section-desc">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <button class="md3-btn" id="delete-account-btn" type="button" style="background-color: var(--red, #ef4444); color: white; border: none; padding: 10px 20px; border-radius: 999px; font-weight: bold; cursor: pointer;">Delete Account</button>
                     </div>
                 </section>
             </div>

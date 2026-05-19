@@ -137,5 +137,6 @@ export const api = {
   updateIssueStatus: (issueId: number, status: IssueStatus) => apiFetch<{ saved: boolean; issue: IssueItem }>(
     `/api/issues/${issueId}/status`,
     { method: 'POST', body: JSON.stringify({ status }) }
-  )
+  ),
+  deleteAccount: () => apiFetch<{ success: boolean }>('/api/account/delete', { method: 'POST' })
 };

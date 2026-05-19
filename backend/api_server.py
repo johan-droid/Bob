@@ -717,6 +717,25 @@ def user_settings():
     db.session.commit()
     return jsonify({'saved': True})
 
+# ── API: Delete Account ───────────────────────────────────────────────────────
+@app.route('/api/account/delete', methods=['POST'])
+@login_required
+def delete_account():
+    user = current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    try:
+        username = user.username
+        db.session.delete(user)
+        db.session.commit()
+        session.clear()
+        logger.info(f"User account deleted permanently: {username}")
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete account: {e}")
+        return jsonify({'error': 'Failed to delete account due to a server error'}), 500
+
 # ── API: Update Issue Status ──────────────────────────────────────────────────
 @app.route('/api/issues/<int:issue_id>/status', methods=['POST'])
 @login_required

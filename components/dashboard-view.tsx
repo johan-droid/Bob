@@ -189,6 +189,20 @@ export function DashboardView({ mode }: Props) {
     await saveSettings({ ...settings, scan_interval: Math.max(60, scanInterval) });
   };
 
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete your account and all associated repository metadata? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      setAction('Deleting account');
+      await api.deleteAccount();
+      window.location.href = '/';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete account.');
+      setAction(null);
+    }
+  };
+
   const title = mode === 'org' ? 'PR command center' : 'My PR command center';
   const subtitle = mode === 'org'
     ? 'Bob monitors authenticated GitHub repositories, groups delivery risks, and keeps repo controls close to the work.'
@@ -206,6 +220,7 @@ export function DashboardView({ mode }: Props) {
           <a href="#queue">Risk queue</a>
           <a href="#repos">Repositories</a>
           <a href="#settings">Settings</a>
+          <a href="/logout" className="logout-link">Logout</a>
         </nav>
         <div className="ops-sidebar-card">
           <span>Live channel</span>
@@ -343,6 +358,19 @@ export function DashboardView({ mode }: Props) {
             <div className="ops-settings-note">
               <strong>{state.meta?.active_repo_count ?? activeRepos.length}</strong>
               <span>active repos</span>
+            </div>
+
+            <div className="ops-danger-zone">
+              <h3>Danger Zone</h3>
+              <p>Permanently delete your account and all associated repository metadata from Bob. This cannot be undone.</p>
+              <button
+                type="button"
+                className="ops-button danger"
+                onClick={() => void handleDeleteAccount()}
+                disabled={!!action}
+              >
+                Delete Account
+              </button>
             </div>
           </aside>
         </section>

@@ -307,6 +307,7 @@ a {
 .headline-accent {
     background: linear-gradient(to right, #fff, #a1a1aa);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     border-right: 3px solid var(--blue);
     padding-right: 4px;
@@ -528,6 +529,7 @@ a {
     line-height: 1;
     background: linear-gradient(135deg, #fff, #a1a1aa);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 

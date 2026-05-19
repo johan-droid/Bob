@@ -53,3 +53,43 @@ def test_health_check(client):
     assert r.status_code == 200
     data = r.get_json()
     assert data['status'] == 'ok'
+
+def test_delete_account_requires_auth(client):
+    r = client.post('/api/account/delete')
+    assert r.status_code == 401
+
+def test_delete_account_success(client):
+    from models import db, User
+    with flask_app.app_context():
+        # Create a test user in DB
+        u = User(username='delete_me', github_id='999999')
+        db.session.add(u)
+        db.session.commit()
+        user_id = u.id
+
+    # Log in
+    with client.session_transaction() as s:
+        s['user'] = {
+            'id': 999999,
+            'db_id': user_id,
+            'username': 'delete_me',
+            'avatar': '',
+            'name': 'Delete Me',
+            'email': ''
+        }
+
+    # Perform deletion
+    r = client.post('/api/account/delete')
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data['success'] is True
+
+    # Verify session is cleared
+    with client.session_transaction() as s:
+        assert 'user' not in s
+
+    # Verify user is deleted from DB
+    with flask_app.app_context():
+        u_db = db.session.get(User, user_id)
+        assert u_db is None
+
