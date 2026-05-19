@@ -602,7 +602,6 @@ button, input, textarea, select {
   font-family: 'JetBrains Mono', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
-
 .ops-topbar {
   position: sticky;
   top: 0;
@@ -610,11 +609,14 @@ button, input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 32px;
-  background: rgba(9, 9, 11, 0.85);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
+  padding: 12px 20px;
+  background: rgba(9, 9, 11, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
 }
+
+/* expose topbar height for sticky calculations */
+.ops-shell.bento-theme { --ops-topbar-height: 64px; }
 
 .ops-topbar-left {
   display: flex;
@@ -698,12 +700,12 @@ button, input, textarea, select {
 
 .ops-main {
   flex: 1;
-  width: min(1280px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 48px 32px;
+  padding: 36px 24px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
 .ops-header {
@@ -795,9 +797,9 @@ button, input, textarea, select {
 /* Bento Boxes */
 .bento-box {
   background: #111113;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 20px;
 }
 
 /* Mobile responsiveness tweaks */
@@ -866,10 +868,10 @@ button, input, textarea, select {
 
 .ops-metrics .bento-box strong {
   display: block;
-  font-size: 3.5rem;
+  font-size: 2.6rem;
   font-weight: 800;
   line-height: 1;
-  margin: 12px 0;
+  margin: 10px 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
   background: linear-gradient(135deg, #fff, #a1a1aa);
   -webkit-background-clip: text;
@@ -886,8 +888,8 @@ button, input, textarea, select {
 /* Main Grid Layout */
 .ops-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr);
-  gap: 24px;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
 }
 
 .ops-panel-head {
@@ -895,6 +897,11 @@ button, input, textarea, select {
   justify-content: space-between;
   align-items: flex-end;
   margin-bottom: 24px;
+  position: sticky;
+  top: calc(var(--ops-topbar-height) + 12px);
+  z-index: 20;
+  background: linear-gradient(180deg, rgba(17,17,19,0.0), rgba(17,17,19,0.02));
+  padding-top: 6px;
 }
 
 .ops-panel-head h2 {
@@ -1015,6 +1022,42 @@ button, input, textarea, select {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Collapsible settings panel for small screens */
+@media (max-width: 1024px) {
+  .sidebar-settings { display: none; }
+  .sidebar-settings.show {
+    display: flex;
+    position: fixed;
+    right: 16px;
+    top: calc(var(--ops-topbar-height) + 12px);
+    width: 340px;
+    max-width: calc(100% - 40px);
+    height: calc(100vh - (var(--ops-topbar-height) + 32px));
+    background: #0b0b0d;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    overflow: auto;
+    z-index: 1200;
+  }
+
+  .settings-toggle { display: inline-flex; }
+  .settings-close { display: inline-flex; }
+}
+
+/* Hide setting toggle on large screens */
+.settings-toggle { display: none; }
+.settings-close { display: none; }
+
+/* small-screen close button inside settings panel */
+.sidebar-settings .settings-close {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.04);
+  color: #fff;
 }
 
 .ops-field {
@@ -1138,6 +1181,13 @@ button, input, textarea, select {
   .ops-topbar-center {
     flex-wrap: wrap;
   }
+}
+
+@media (max-width: 480px) {
+  .ops-topbar-center { display: none; }
+  .ops-metrics .bento-box strong { font-size: 1.8rem; }
+  .ops-main { padding: 20px 16px; }
+  .ops-grid { grid-template-columns: 1fr; }
 }
 
 .google-landing {

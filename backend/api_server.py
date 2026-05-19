@@ -784,6 +784,51 @@ def github_webhook():
         if cs.get('conclusion') == 'failure':
             _webhook_ci_failure(repo_name, cs)
 
+    # Handle GitHub App installation events so repos get registered in DB
+    elif event == 'installation' or event == 'installation_repositories':
+        action = payload.get('action')
+        # Payload may contain repositories or repositories_added/removed
+        repos = payload.get('repositories', []) or payload.get('repositories_added', [])
+        repos_removed = payload.get('repositories_removed', [])
+        # Normalize list of repo dicts to full_name strings
+        added = [r.get('full_name') for r in repos if r.get('full_name')]
+        removed = [r.get('full_name') for r in repos_removed if r.get('full_name')]
+
+        logger.info(f"Installation event ({action}) — added: {added}, removed: {removed}")
+
+        # For added repos: upsert a UserRepo for any user whose username matches the repo owner
+        for full in added:
+            try:
+                owner = full.split('/', 1)[0]
+                repo_name = full
+                users = User.query.filter_by(username=owner).all()
+                for u in users:
+                    existing = UserRepo.query.filter_by(user_id=u.id, full_name=repo_name).first()
+                    if not existing:
+                        ur = UserRepo(user_id=u.id, full_name=repo_name, private=False, url=f'https://github.com/{repo_name}', language=None)
+                        db.session.add(ur)
+                        logger.info(f"Registered repo {repo_name} for user {u.username} via installation payload")
+                db.session.commit()
+                # Notify affected users
+                _emit_to_repo_owners(repo_name)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to register repo from installation webhook: {e}")
+
+        # For removed repos: mark them archived or remove from user_repos
+        for full in removed:
+            try:
+                urs = UserRepo.query.filter_by(full_name=full).all()
+                for ur in urs:
+                    db.session.delete(ur)
+                db.session.commit()
+                logger.info(f"Removed repo entries for {full} via installation_repositories payload")
+                # Notify previous owners that this repo was removed
+                _emit_to_repo_owners(full)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to remove repo from installation webhook: {e}")
+
     return jsonify({'ok': True}), 200
 
 def _webhook_resolve_pr(repo, pr_number):

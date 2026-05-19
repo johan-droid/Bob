@@ -49,7 +49,7 @@ body {
     margin: 0;
     height: 100vh;
     display: flex;
-    overflow: hidden;
+    overflow: auto;
     -webkit-font-smoothing: antialiased;
 }
 

@@ -49,6 +49,7 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting');
+  const [showSettings, setShowSettings] = useState(false);
 
   const dashboard = state.dashboard || {};
   const settings = state.settings || {};
@@ -75,6 +76,13 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   };
 
   useEffect(() => {
+    // close the mobile settings panel if viewport is resized larger
+    const onResize = () => {
+      if (window.innerWidth > 1024 && showSettings) setShowSettings(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+
     // Demo mode: use provided demoData and skip websocket/live refresh.
     if (demo) {
       setState((current) => ({ ...current, dashboard: demoData }));
@@ -238,6 +246,15 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
             <span className={`ops-dot ${liveStatus}`} />
             <small>{formatStatus(liveStatus)}</small>
           </div>
+          <button
+            type="button"
+            className="ops-button settings-toggle"
+            aria-expanded={showSettings}
+            onClick={() => setShowSettings((s) => !s)}
+            title="Toggle settings"
+          >
+            {showSettings ? 'Close' : 'Settings'}
+          </button>
           <a href="/logout" className="logout-link ops-button outline">Logout</a>
         </div>
       </nav>
@@ -356,12 +373,23 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
             )}
           </div>
 
-          <aside className="ops-panel bento-box sidebar-settings" id="settings">
+          <aside
+            id="settings"
+            className={`ops-panel bento-box sidebar-settings ${showSettings ? 'show' : ''}`}
+          >
             <div className="ops-panel-head">
               <div>
                 <p className="ops-kicker">Automation settings</p>
                 <h2>Controls</h2>
               </div>
+              <button
+                type="button"
+                className="ops-button settings-close"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close settings"
+              >
+                Close
+              </button>
             </div>
 
             <label className="ops-field">
