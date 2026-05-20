@@ -759,7 +759,7 @@ def github_webhook():
     if WEBHOOK_SECRET:
         sig = request.headers.get('X-Hub-Signature-256', '')
         expected = 'sha256=' + hmac.new(
-            WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
+            WEBHOOK_SECRET.encode(), request.get_data(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
             logger.warning('Webhook signature mismatch')
             abort(403)
