@@ -89,6 +89,8 @@ def ensure_schema():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Schema auto-repair failed: {e}")
+        finally:
+            db.session.remove()
 
 ensure_schema()
 
@@ -804,6 +806,8 @@ def background_scan():
                     socketio.emit('update', _get_user_data(user.id), to=user.username)
             except Exception as e:
                 logger.error(f"BG scan error: {e}")
+            finally:
+                db.session.remove()
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':

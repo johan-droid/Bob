@@ -61,3 +61,5 @@ wheels/
 ehthumbs.db
 Thumbs.db
 ```
+# Session files
+backend/flask_sessions/
