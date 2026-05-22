@@ -1,0 +1,4 @@
+## 2024-05-24 - [XSS via textContent -> innerHTML Conversion]
+**Vulnerability:** A Cross-Site Scripting (XSS) vulnerability was found in `frontend/app.js`'s `escHtml` function. It used DOM creation (`textContent` assignment followed by reading `innerHTML`) to encode user data. While this handles `<` and `>`, it fails to encode double quotes (`"`) and single quotes (`'`). This meant user-controlled fields such as URLs could break out of HTML attribute contexts (e.g., `<a href="${escHtml(pr.url)}">`) to inject arbitrary JavaScript like `onmouseover="alert(1)"`.
+**Learning:** Using `textContent` to escape strings is insufficient for context-aware escaping, especially within HTML attributes. Characters like quotes bypass this logic.
+**Prevention:** Always use regex-based replacements covering all 5 crucial HTML entities (`&`, `<`, `>`, `"`, `'`) for consistent, context-safe HTML encoding.
