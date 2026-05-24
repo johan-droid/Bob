@@ -67,7 +67,7 @@ function showToast(msg, type = 'info', duration = 4000) {
     `;
     el.innerHTML = `
         <span class="material-symbols-outlined" style="color: ${themeColors[type]};">${icons[type]}</span>
-        <span style="flex: 1; font-weight: 600; color: white; font-size: 13px;">${escHtml(msg)}</span>
+        <span style="flex: 1; font-weight: 600; color: white; font-size: 13px;">${escapeHtml(msg)}</span>
         <span class="material-symbols-outlined" style="cursor: pointer; font-size: 18px; color: var(--on-surface-variant);" onclick="this.parentElement.remove()">close</span>`;
     document.getElementById('toast-container').prepend(el);
     setTimeout(() => { 
@@ -170,16 +170,16 @@ function renderList(containerId, items) {
                 ${pr.status === 'failed' ? 'report' : pr.status === 'resolved' ? 'check_circle' : pr.status === 'in_progress' ? 'hourglass_top' : 'emergency_home'}
             </span>
             <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 700; color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(pr.title || 'Untitled Operation')}</div>
+                <div style="font-weight: 700; color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(pr.title || 'Untitled Operation')}</div>
                 <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--on-surface-variant); margin-top: 4px;">
-                    ${escHtml(pr.repo)} · ${pr.type === 'merge_conflict' ? 'CONFLICT' : 'CI FAILURE'}
+                    ${escapeHtml(pr.repo)} · ${pr.type === 'merge_conflict' ? 'CONFLICT' : 'CI FAILURE'}
                 </div>
             </div>
             <div style="display: flex; gap: 12px; align-items: center;">
                 <select class="input-field" style="background: rgba(255,255,255,0.05); border: 1px solid var(--outline); color: white; height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${pr.id}, this.value)">
                     ${['pending','in_progress','failed','resolved'].map(s => `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`).join('')}
                 </select>
-                <a href="${escHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 22px;">open_in_new</a>
+                <a href="${escapeHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 22px;">open_in_new</a>
             </div>
         </div>`;
     }).join('');
@@ -209,8 +209,8 @@ function renderRepos(repos) {
             <div style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 1;">
                 <div>
                     <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--primary); font-weight: 700; letter-spacing: 1px;">${r.language || 'UNKNOWN'}</div>
-                    <div class="text-title" style="margin-top: 6px; font-size: 20px; color: white;">${escHtml(r.full_name.split('/')[1])}</div>
-                    <div style="font-size: 12px; color: var(--on-surface-variant); margin-top: 4px; font-weight: 500;">${escHtml(r.full_name.split('/')[0])}</div>
+                    <div class="text-title" style="margin-top: 6px; font-size: 20px; color: white;">${escapeHtml(r.full_name.split('/')[1])}</div>
+                    <div style="font-size: 12px; color: var(--on-surface-variant); margin-top: 4px; font-weight: 500;">${escapeHtml(r.full_name.split('/')[0])}</div>
                 </div>
                 <div style="background: ${r.is_active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${r.is_active ? '#10b981' : 'var(--on-surface-variant)'}; padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 800; border: 1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.2)' : 'var(--outline)'};">
                     ${r.is_active ? 'MONITORED' : 'IDLE'}
@@ -222,9 +222,9 @@ function renderRepos(repos) {
                         <span class="material-symbols-outlined" style="font-size: 16px; color: var(--error);">report</span>
                         <span style="font-size: 14px; font-weight: 700; color: white;">${r.issue_count}</span>
                     </div>
-                    <div style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escHtml(r.permissions_level)}</div>
+                    <div style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(r.permissions_level)}</div>
                 </div>
-                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
+                <a href="https://github.com/${escapeHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
             </div>
         </div>
         `;
@@ -251,9 +251,12 @@ document.getElementById('search-input')?.addEventListener('input', (e) => {
 });
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-function escHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s || '');
-    return d.innerHTML;
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 function capitalize(s) { return s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
