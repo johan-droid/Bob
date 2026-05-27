@@ -1,10 +1,9 @@
 import sys as _sys
 import os
 
-_ASYNC_MODE = 'eventlet'
-if _sys.platform == 'win32':
-    _ASYNC_MODE = 'threading'
-
+# Default to standard threading in production for compatibility.
+# Eventlet can still be enabled explicitly via SOCKETIO_ASYNC_MODE=eventlet.
+_ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'threading').strip().lower()
 if _ASYNC_MODE == 'eventlet':
     import eventlet
     eventlet.monkey_patch(os=False)
