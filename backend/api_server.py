@@ -2,12 +2,10 @@ import sys as _sys
 import os
 import json
 
-# Default to standard threading in production for compatibility.
-# Eventlet can still be enabled explicitly via SOCKETIO_ASYNC_MODE=eventlet.
-_ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'threading').strip().lower()
-if _ASYNC_MODE == 'eventlet':
-    import eventlet
-    eventlet.monkey_patch(os=False)
+# Gunicorn runs this service with the gthread worker, so keep Socket.IO on
+# standard threading. Eventlet monkey-patching after Gunicorn/Flask imports can
+# corrupt Werkzeug context locals and thread locks during Render startup.
+_ASYNC_MODE = 'threading'
 
 import base64
 import secrets, hmac, hashlib, threading, time

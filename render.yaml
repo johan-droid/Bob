@@ -27,6 +27,8 @@ services:
         value: sqlalchemy
       - key: FLASK_ENV
         value: production
+      - key: SOCKETIO_ASYNC_MODE
+        value: threading
 
 databases:
   - name: bob-db
