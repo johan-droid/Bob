@@ -15,6 +15,7 @@ export type IssueItem = {
   run_id?: string;
   type?: 'merge_conflict' | 'ci_failure' | string;
   status?: IssueStatus;
+  author?: string;
   last_commented_at?: string | null;
   comment_count?: number;
   created_at?: string | null;

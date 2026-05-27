@@ -1,5 +1,6 @@
 import sys as _sys
 import os
+import json
 
 # Default to standard threading in production for compatibility.
 # Eventlet can still be enabled explicitly via SOCKETIO_ASYNC_MODE=eventlet.
@@ -13,6 +14,7 @@ import secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
 from urllib.parse import urlencode
+from urllib import error as urllib_error, request as urllib_request
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
@@ -22,7 +24,6 @@ from flask_session import Session
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet, InvalidToken
-import requests as http_req
 
 from database import init_db
 from models import db, User, UserRepo, PRIssue, UserSettings
@@ -160,16 +161,6 @@ def ensure_schema():
         finally:
             db.session.remove()
 
-def _run_schema_check_async():
-    # Keep worker boot fast; schema repair runs in background.
-    try:
-        ensure_schema()
-    except Exception as e:
-        logger.error(f"Async schema check failed: {e}")
-
-
-threading.Thread(target=_run_schema_check_async, daemon=True).start()
-
 def _start_bg_scan():
     while True:
         try:
@@ -177,12 +168,70 @@ def _start_bg_scan():
             break
         except NameError:
             time.sleep(1)
-threading.Thread(target=_start_bg_scan, daemon=True).start()
+
+
+_background_workers_started = False
+_background_workers_lock = threading.Lock()
+
+
+def _run_schema_check_async():
+    # Keep schema repair out of the request path.
+    try:
+        ensure_schema()
+    except Exception as e:
+        logger.error(f"Async schema check failed: {e}")
+
+
+def _start_background_workers():
+    global _background_workers_started
+    with _background_workers_lock:
+        if _background_workers_started:
+            return
+        _background_workers_started = True
+        threading.Thread(target=_run_schema_check_async, daemon=True).start()
+        threading.Thread(target=_start_bg_scan, daemon=True).start()
+
+
+@app.before_request
+def _boot_background_workers():
+    _start_background_workers()
 
 
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def gh(token): return {**GH_HEADERS, 'Authorization': f'token {token}'}
+
+
+class _HttpResponse:
+    def __init__(self, status_code, headers, body_text):
+        self.status_code = status_code
+        self.headers = headers
+        self._body_text = body_text
+
+    def json(self):
+        return json.loads(self._body_text or '{}')
+
+
+def _http_request_json(method, url, headers=None, json_body=None, form_body=None, timeout=10):
+    request_headers = dict(headers or {})
+    body = None
+
+    if json_body is not None:
+        body = json.dumps(json_body).encode('utf-8')
+        request_headers.setdefault('Content-Type', 'application/json')
+    elif form_body is not None:
+        body = urlencode(form_body).encode('utf-8')
+        request_headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
+
+    req = urllib_request.Request(url, data=body, headers=request_headers, method=method.upper())
+
+    try:
+        with urllib_request.urlopen(req, timeout=timeout) as resp:
+            raw_body = resp.read().decode('utf-8')
+            return _HttpResponse(getattr(resp, 'status', 200), dict(resp.headers.items()), raw_body)
+    except urllib_error.HTTPError as exc:
+        raw_body = exc.read().decode('utf-8', errors='replace')
+        return _HttpResponse(exc.code, dict(exc.headers.items()), raw_body)
 
 TOKEN_PREFIX = 'v1:'
 
@@ -399,10 +448,11 @@ def github_callback():
         token_resp = None
         for attempt in range(5):
             try:
-                token_resp = http_req.post(
+                token_resp = _http_request_json(
+                    'POST',
                     'https://github.com/login/oauth/access_token',
                     headers={'Accept': 'application/json'},
-                    data={
+                    form_body={
                         'client_id': GITHUB_CLIENT_ID,
                         'client_secret': GITHUB_CLIENT_SECRET,
                         'code': code,
@@ -426,7 +476,7 @@ def github_callback():
         user_resp = None
         for attempt in range(3):
             try:
-                user_resp = http_req.get('https://api.github.com/user', headers=gh(access_token), timeout=5)
+                user_resp = _http_request_json('GET', 'https://api.github.com/user', headers=gh(access_token), timeout=5)
                 break
             except Exception as e:
                 if attempt == 2: raise e
@@ -482,7 +532,7 @@ def verify_permissions():
     if not token:
         return jsonify({'error': 'Session expired, please re-login'}), 401
 
-    resp = http_req.get('https://api.github.com/user', headers=gh(token), timeout=10)
+    resp = _http_request_json('GET', 'https://api.github.com/user', headers=gh(token), timeout=10)
     if resp.status_code != 200:
         return jsonify({'error': 'Token validation failed'}), 401
 
@@ -513,9 +563,17 @@ def discover_repos():
         # Source 1: user/repos
         page = 1
         while True:
-            r = http_req.get('https://api.github.com/user/repos', headers=gh(token),
-                             params={'affiliation': 'owner,collaborator,organization_member',
-                                     'visibility': 'all', 'per_page': 100, 'page': page}, timeout=15)
+            r = _http_request_json(
+                'GET',
+                'https://api.github.com/user/repos?' + urlencode({
+                    'affiliation': 'owner,collaborator,organization_member',
+                    'visibility': 'all',
+                    'per_page': 100,
+                    'page': page,
+                }),
+                headers=gh(token),
+                timeout=15,
+            )
             _handle_rate_limit(r)
             if r.status_code != 200: break
             batch = r.json()
@@ -526,16 +584,19 @@ def discover_repos():
             page += 1
 
         # Source 2: org repos
-        orgs_r = http_req.get('https://api.github.com/user/orgs', headers=gh(token),
-                               params={'per_page': 100}, timeout=10)
+        orgs_r = _http_request_json('GET', 'https://api.github.com/user/orgs?' + urlencode({'per_page': 100}), headers=gh(token), timeout=10)
         orgs = orgs_r.json() if orgs_r.status_code == 200 else []
         for org in orgs:
             org_login = org.get('login')
             if not org_login: continue
             p = 1
             while True:
-                or_ = http_req.get(f'https://api.github.com/orgs/{org_login}/repos', headers=gh(token),
-                                   params={'type': 'all', 'per_page': 100, 'page': p}, timeout=15)
+                or_ = _http_request_json(
+                    'GET',
+                    f'https://api.github.com/orgs/{org_login}/repos?' + urlencode({'type': 'all', 'per_page': 100, 'page': p}),
+                    headers=gh(token),
+                    timeout=15,
+                )
                 _handle_rate_limit(or_)
                 if or_.status_code != 200: break
                 ob = or_.json()
@@ -551,8 +612,12 @@ def discover_repos():
         if GITHUB_TOKEN:
             ap = 1
             while True:
-                ar = http_req.get('https://api.github.com/user/repos', headers=gh(GITHUB_TOKEN),
-                                  params={'per_page': 100, 'page': ap}, timeout=15)
+                ar = _http_request_json(
+                    'GET',
+                    'https://api.github.com/user/repos?' + urlencode({'per_page': 100, 'page': ap}),
+                    headers=gh(GITHUB_TOKEN),
+                    timeout=15,
+                )
                 if ar.status_code != 200: break
                 abatch = ar.json()
                 if not abatch: break
@@ -646,7 +711,7 @@ def auto_provision():
 
 def _check_and_provision(full_repo, username, user_token, server_token):
     base = {'repo': full_repo, 'url': f'https://github.com/{full_repo}'}
-    resp = http_req.get(f'https://api.github.com/repos/{full_repo}', headers=gh(user_token), timeout=10)
+    resp = _http_request_json('GET', f'https://api.github.com/repos/{full_repo}', headers=gh(user_token), timeout=10)
     if resp.status_code == 404:
         return {**base, 'status': 'error', 'message': 'Not found or no access'}
     if resp.status_code != 200:
@@ -664,9 +729,13 @@ def _check_and_provision(full_repo, username, user_token, server_token):
         return {**base, 'status': 'push', 'message': 'Write access confirmed'}
     if perms.get('pull') and server_token:
         owner_name, repo_name = full_repo.split('/', 1)
-        r = http_req.put(
+        r = _http_request_json(
+            'PUT',
             f'https://api.github.com/repos/{owner_name}/{repo_name}/collaborators/{username}',
-            headers=gh(server_token), json={'permission': 'push'}, timeout=10)
+            headers=gh(server_token),
+            json_body={'permission': 'push'},
+            timeout=10,
+        )
         if r.status_code == 201:
             return {**base, 'status': 'invited', 'message': 'Invitation sent ✓'}
         if r.status_code in (204, 422):
