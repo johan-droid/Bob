@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDashboard, issueTypeLabels } from '@/lib/use-dashboard';
 import { MobileDashboard } from '@/components/mobile-dashboard';
 import type { IssueItem } from '@/lib/api';
@@ -27,8 +27,37 @@ function useIsMobile(breakpoint = 768) {
 
 // ── Desktop Dashboard ───────────────────────────────────────────────────────
 
-function DesktopDashboard() {
+function DesktopDashboard({ mode }: Props) {
   const db = useDashboard();
+  const [activeRepoTab, setActiveRepoTab] = useState('all');
+  const isUserMode = mode === 'user';
+  const currentUsername = (db.state.user?.username || '').toLowerCase();
+  const userScopedIssues = db.filteredIssues.filter((issue) => {
+    if (!isUserMode) return true;
+    return !!currentUsername && (issue.author || '').toLowerCase() === currentUsername;
+  });
+  const repoTabs = useMemo(() => {
+    const repoNames = new Set<string>();
+    db.repos.forEach((repo) => repo.full_name && repoNames.add(repo.full_name));
+    userScopedIssues.forEach((issue) => issue.repo && repoNames.add(issue.repo));
+
+    return [...repoNames].sort().map((repoName) => ({
+      key: repoName,
+      label: repoName.split('/').pop() || repoName,
+      fullName: repoName,
+      count: userScopedIssues.filter((issue) => issue.repo === repoName).length,
+    }));
+  }, [db.repos, userScopedIssues]);
+  const visibleFilteredIssues = userScopedIssues.filter((issue) => (
+    activeRepoTab === 'all' || issue.repo === activeRepoTab
+  ));
+
+  useEffect(() => {
+    if (activeRepoTab === 'all') return;
+    if (!repoTabs.some((repo) => repo.key === activeRepoTab)) {
+      setActiveRepoTab('all');
+    }
+  }, [activeRepoTab, repoTabs]);
 
   const getIssueTypeBadge = (type: string | undefined) => {
     const info = issueTypeLabels[type || ''];
@@ -58,19 +87,21 @@ function DesktopDashboard() {
                 B
               </div>
               <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                Bob Org
+                {isUserMode ? 'Bob Developer' : 'Bob Org'}
               </span>
             </a>
             <div className="hidden md:flex items-center gap-1">
               <a href="#pipeline-health" className="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">
-                Pipeline Health
+                {isUserMode ? 'My PR Health' : 'Pipeline Health'}
               </a>
               <a href="#team-velocity" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">
                 Activity Feed
               </a>
-              <a href="/org/settings" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">
-                Repo Settings
-              </a>
+              {!isUserMode && (
+                <a href="/org/settings" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">
+                  Repo Settings
+                </a>
+              )}
             </div>
           </div>
 
@@ -145,20 +176,32 @@ function DesktopDashboard() {
           <div>
             <span className="text-xs font-bold text-brand uppercase tracking-widest">Executive Summary</span>
             <h1 className="text-3xl font-black mt-1 tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
-              Pipeline Health
+              {isUserMode ? 'My PR Health' : 'Pipeline Health'}
             </h1>
             <p className="text-zinc-400 text-sm mt-1.5">
-              Organization-wide PR monitoring — conflicts, CI, reviews, staleness, and PR sizing.
+              {isUserMode
+                ? 'Personal PR monitoring for work assigned to your GitHub account.'
+                : 'Organization-wide PR monitoring — conflicts, CI, reviews, staleness, and PR sizing.'}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <a
-              href="/org/settings"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5"
-            >
-              <span className="material-symbols-outlined text-[18px]">settings</span>
-              Manage Settings
-            </a>
+            {isUserMode ? (
+              <a
+                href="/permissions"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5"
+              >
+                <span className="material-symbols-outlined text-[18px]">sync</span>
+                Refresh Setup
+              </a>
+            ) : (
+              <a
+                href="/org/settings"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5"
+              >
+                <span className="material-symbols-outlined text-[18px]">settings</span>
+                Manage Settings
+              </a>
+            )}
           </div>
         </header>
 
@@ -308,6 +351,41 @@ function DesktopDashboard() {
             </div>
           </div>
 
+          <div className="mb-5 overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max pb-1">
+              <button
+                type="button"
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                  activeRepoTab === 'all'
+                    ? 'bg-brand text-white border-brand'
+                    : 'bg-zinc-900 border-border text-zinc-400 hover:text-white hover:bg-zinc-800'
+                }`}
+                onClick={() => setActiveRepoTab('all')}
+              >
+                All repos
+                <span className="ml-2 text-[10px] opacity-75">{userScopedIssues.length}</span>
+              </button>
+              {repoTabs.map((repo) => (
+                <button
+                  key={repo.key}
+                  type="button"
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                    activeRepoTab === repo.key
+                      ? 'bg-brand text-white border-brand'
+                      : 'bg-zinc-900 border-border text-zinc-400 hover:text-white hover:bg-zinc-800'
+                  }`}
+                  title={repo.fullName}
+                  onClick={() => setActiveRepoTab(repo.key)}
+                >
+                  {repo.label}
+                  <span className={`ml-2 text-[10px] ${repo.count ? 'text-warning' : 'opacity-60'}`}>
+                    {repo.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Real Filter Dropdowns */}
           {db.showFilters && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 p-4 bg-zinc-900/50 rounded-xl border border-border">
@@ -385,8 +463,8 @@ function DesktopDashboard() {
                       </div>
                     </td>
                   </tr>
-                ) : db.filteredIssues.length ? (
-                  db.filteredIssues.map((issue) => (
+                ) : visibleFilteredIssues.length ? (
+                  visibleFilteredIssues.map((issue) => (
                     <tr key={issue.id || issue.issue_key} className="hover:bg-zinc-900/30 transition-colors">
                       <td className="py-4 px-4 font-semibold text-white">
                         <div className="flex flex-col">
@@ -470,7 +548,7 @@ function DesktopDashboard() {
                                     type="text"
                                     placeholder="user1,user2"
                                     className="bg-zinc-900 border border-border rounded px-2 py-1 text-xs text-white w-28 outline-none focus:border-brand"
-                                    value={db.reviewInput.value}
+                                    value={db.reviewInput?.value || ''}
                                     onChange={(e) => db.setReviewInput({ issueId: issue.id!, value: e.target.value })}
                                     onKeyDown={(e) => e.key === 'Enter' && void db.handleRequestReview(issue)}
                                   />
@@ -513,12 +591,14 @@ function DesktopDashboard() {
                           {db.activeFilterCount > 0 ? 'filter_list_off' : 'done_all'}
                         </span>
                         <p className="font-semibold text-white">
-                          {db.activeFilterCount > 0 ? 'No issues match your filters.' : 'No open PR risks detected.'}
+                          {db.activeFilterCount > 0 ? 'No issues match your filters.' : isUserMode ? 'No PR risks are assigned to you.' : 'No open PR risks detected.'}
                         </p>
                         <p className="text-zinc-400 text-xs mt-0.5">
                           {db.activeFilterCount > 0
                             ? 'Try adjusting your filter criteria or clear all filters.'
-                            : 'All repositories are healthy. Run discovery and a PR scan to refresh.'
+                            : isUserMode
+                              ? 'Your assigned pull requests are clear. Run a scan to refresh.'
+                              : 'All repositories are healthy. Run discovery and a PR scan to refresh.'
                           }
                         </p>
                       </div>
@@ -583,7 +663,7 @@ function DesktopDashboard() {
           <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between">
             <div className="mb-6">
               <span className="text-xs font-bold text-brand uppercase tracking-widest">Quick Stats</span>
-              <h2 className="text-xl font-extrabold mt-0.5">Organization Overview</h2>
+              <h2 className="text-xl font-extrabold mt-0.5">{isUserMode ? 'Personal Overview' : 'Organization Overview'}</h2>
             </div>
             <div className="flex flex-col gap-4 flex-grow">
               <div className="grid grid-cols-2 gap-3">
@@ -607,21 +687,25 @@ function DesktopDashboard() {
 
               <div className="flex justify-between items-center py-4 border-t border-zinc-800 mt-auto">
                 <div>
-                  <h3 className="font-bold text-white text-sm">Repository Settings</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Manage org-level configuration.</p>
+                  <h3 className="font-bold text-white text-sm">{isUserMode ? 'Repository Setup' : 'Repository Settings'}</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {isUserMode ? 'Refresh connected repositories and permissions.' : 'Manage org-level configuration.'}
+                  </p>
                 </div>
                 <a
-                  href="/org/settings"
+                  href={isUserMode ? '/permissions' : '/org/settings'}
                   className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors text-white"
                 >
-                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                  Settings
+                  <span className="material-symbols-outlined text-[16px]">{isUserMode ? 'sync' : 'open_in_new'}</span>
+                  {isUserMode ? 'Refresh' : 'Settings'}
                 </a>
               </div>
               <div className="flex justify-between items-center pt-2">
                 <div>
                   <h3 className="font-bold text-red-500 text-sm">Danger Zone</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Permanently delete organization.</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {isUserMode ? 'Permanently delete your workspace.' : 'Permanently delete organization.'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -630,7 +714,7 @@ function DesktopDashboard() {
                   onClick={() => void db.handleDeleteAccount()}
                 >
                   <span className="material-symbols-outlined text-[16px]">delete_forever</span>
-                  Delete Org
+                  {isUserMode ? 'Delete Workspace' : 'Delete Org'}
                 </button>
               </div>
             </div>
@@ -647,8 +731,8 @@ export function DashboardView({ mode }: Props) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
-    return <MobileDashboard />;
+    return <MobileDashboard mode={mode} />;
   }
 
-  return <DesktopDashboard />;
+  return <DesktopDashboard mode={mode} />;
 }

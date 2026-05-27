@@ -1237,6 +1237,8 @@ def _trigger_auto_comment(issue, scanner):
         logger.warning(f"Failed to auto-comment: {resp}")
 
 def _get_user_data(user_id):
+    user = db.session.get(User, user_id)
+    username = (user.username if user else '').lower()
     issues = PRIssue.query.filter_by(user_id=user_id).order_by(PRIssue.updated_at.desc()).all()
     by_status = {'pending': [], 'in_progress': [], 'failed': [], 'resolved': []}
     for i in issues:
@@ -1300,11 +1302,33 @@ def _get_user_data(user_id):
             'status': i.status
         })
 
+    active_my_issues = [
+        i for i in issues
+        if i.status != 'resolved' and username and (i.author or '').lower() == username
+    ]
+    my_prs = [
+        pr for pr in prs_list
+        if username and (pr.get('author') or '').lower() == username
+    ]
+    action_items = [
+        {
+            'id': i.id,
+            'kind': i.issue_type,
+            'title': i.title or f"{i.repo} needs attention",
+            'description': f"{i.repo} has a {i.issue_type.replace('_', ' ')} requiring follow-up.",
+            'url': i.url,
+            'repo': i.repo,
+        }
+        for i in active_my_issues
+    ]
+
     return {
         **by_status,
         'stats': stats,
         'repos': repos_list,
         'prs': prs_list,
+        'my_prs': my_prs,
+        'action_items': action_items,
     }
 
 def _get_app_state(user):

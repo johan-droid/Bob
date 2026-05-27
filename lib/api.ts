@@ -60,6 +60,15 @@ export type DashboardPayload = {
   failed?: IssueItem[];
   resolved?: IssueItem[];
   repos?: RepoItem[];
+  my_prs?: IssueItem[];
+  action_items?: Array<{
+    id?: number;
+    kind?: string;
+    title?: string;
+    description?: string;
+    url?: string;
+    repo?: string;
+  }>;
 };
 
 export type AppSettings = {

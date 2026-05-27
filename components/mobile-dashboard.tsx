@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useDashboard, issueTypeLabels } from '@/lib/use-dashboard';
 import { api, type IssueItem } from '@/lib/api';
 
@@ -292,8 +292,29 @@ function ReviewModal({
 
 // ── Main Mobile Dashboard ───────────────────────────────────────────────────
 
-export function MobileDashboard() {
+export function MobileDashboard({ mode = 'org' }: { mode?: 'org' | 'user' }) {
   const db = useDashboard();
+  const [activeRepoTab, setActiveRepoTab] = useState('all');
+  const isUserMode = mode === 'user';
+  const currentUsername = (db.state.user?.username || '').toLowerCase();
+  const userScopedIssues = db.filteredIssues.filter((issue) => {
+    if (!isUserMode) return true;
+    return !!currentUsername && (issue.author || '').toLowerCase() === currentUsername;
+  });
+  const repoTabs = useMemo(() => {
+    const repoNames = new Set<string>();
+    db.repos.forEach((repo) => repo.full_name && repoNames.add(repo.full_name));
+    userScopedIssues.forEach((issue) => issue.repo && repoNames.add(issue.repo));
+
+    return [...repoNames].sort().map((repoName) => ({
+      key: repoName,
+      label: repoName.split('/').pop() || repoName,
+      count: userScopedIssues.filter((issue) => issue.repo === repoName).length,
+    }));
+  }, [db.repos, userScopedIssues]);
+  const visibleFilteredIssues = userScopedIssues.filter((issue) => (
+    activeRepoTab === 'all' || issue.repo === activeRepoTab
+  ));
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<IssueItem | null>(null);
   const [reviewValue, setReviewValue] = useState('');
@@ -304,6 +325,13 @@ export function MobileDashboard() {
   const pullStartY = useRef(0);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
+
+  useEffect(() => {
+    if (activeRepoTab === 'all') return;
+    if (!repoTabs.some((repo) => repo.key === activeRepoTab)) {
+      setActiveRepoTab('all');
+    }
+  }, [activeRepoTab, repoTabs]);
 
   const handlePullStart = useCallback((e: React.TouchEvent) => {
     if (scrollRef.current && scrollRef.current.scrollTop <= 0) {
@@ -379,7 +407,7 @@ export function MobileDashboard() {
           <div className="mob-header__text">
             <h1 className="mob-header__title">PR Health</h1>
             <span className="mob-header__sub">
-              {db.openIssues.length} open · {db.repos.length} repos
+              {isUserMode ? `${visibleFilteredIssues.length} assigned` : `${db.openIssues.length} open`} · {db.repos.length} repos
             </span>
           </div>
         </div>
@@ -443,11 +471,36 @@ export function MobileDashboard() {
           ))}
         </div>
 
+        <div className="mob-kpi-scroll" aria-label="Repository tabs">
+          <button
+            type="button"
+            className={`mob-kpi ${activeRepoTab === 'all' ? 'mob-kpi--active' : ''}`}
+            onClick={() => setActiveRepoTab('all')}
+          >
+            <span className="material-symbols-outlined mob-kpi__icon">apps</span>
+            <span className="mob-kpi__value">{userScopedIssues.length}</span>
+            <span className="mob-kpi__label">All repos</span>
+          </button>
+          {repoTabs.map((repo) => (
+            <button
+              key={repo.key}
+              type="button"
+              className={`mob-kpi ${activeRepoTab === repo.key ? 'mob-kpi--active' : ''}`}
+              onClick={() => setActiveRepoTab(repo.key)}
+              title={repo.key}
+            >
+              <span className="material-symbols-outlined mob-kpi__icon">folder</span>
+              <span className="mob-kpi__value">{repo.count}</span>
+              <span className="mob-kpi__label">{repo.label}</span>
+            </button>
+          ))}
+        </div>
+
         {/* ── Active Filters ───────────────────────────────────────── */}
         {db.activeFilterCount > 0 && (
           <div className="mob-active-filters">
             <span className="mob-active-filters__text">
-              Filtered: {db.filteredIssues.length} issue{db.filteredIssues.length !== 1 ? 's' : ''}
+              Filtered: {visibleFilteredIssues.length} issue{visibleFilteredIssues.length !== 1 ? 's' : ''}
             </span>
             <button
               type="button"
@@ -466,8 +519,8 @@ export function MobileDashboard() {
               <span className="material-symbols-outlined mob-spin" style={{ fontSize: 32 }}>sync</span>
               <p>Connecting...</p>
             </div>
-          ) : db.filteredIssues.length > 0 ? (
-            db.filteredIssues.map((issue) => (
+          ) : visibleFilteredIssues.length > 0 ? (
+            visibleFilteredIssues.map((issue) => (
               <IssueCard
                 key={issue.id || issue.issue_key}
                 issue={issue}
@@ -497,7 +550,7 @@ export function MobileDashboard() {
               <p className="mob-empty__sub">
                 {db.activeFilterCount > 0
                   ? 'Adjust filters or clear them.'
-                  : 'No open PR risks detected.'}
+                  : isUserMode ? 'Your assigned pull requests are clear.' : 'No open PR risks detected.'}
               </p>
             </div>
           )}
@@ -552,9 +605,9 @@ export function MobileDashboard() {
           <span className="material-symbols-outlined">search</span>
           <span>Repos</span>
         </button>
-        <a href="/org/settings" className="mob-dock__btn">
-          <span className="material-symbols-outlined">settings</span>
-          <span>Config</span>
+        <a href={isUserMode ? '/permissions' : '/org/settings'} className="mob-dock__btn">
+          <span className="material-symbols-outlined">{isUserMode ? 'sync' : 'settings'}</span>
+          <span>{isUserMode ? 'Setup' : 'Config'}</span>
         </a>
         <button
           type="button"

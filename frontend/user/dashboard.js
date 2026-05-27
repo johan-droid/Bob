@@ -59,12 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleDeveloperPayload = (payload = {}) => {
-        const prs = Array.isArray(payload.prs) ? payload.prs : [];
+        const prs = Array.isArray(payload.my_prs) ? payload.my_prs : (Array.isArray(payload.prs) ? payload.prs : []);
         const actions = Array.isArray(payload.action_items) ? payload.action_items : [];
 
         if (actionItems) {
             if (!actions.length) {
-                renderEmptyActions('You have no blocking merge conflicts or failing CI checks assigned to you.');
+                renderEmptyActions('You have no assigned merge conflicts or failing checks right now.');
             } else {
                 actionItems.innerHTML = actions.map((item) => `
                     <article class="task-card ${escapeHtml(item.kind || '')}">
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tableBody) {
             if (!prs.length) {
-                renderEmptyPRs('Awaiting GitHub payload. Bob will list PRs authored by your connected account here.');
+                renderEmptyPRs('No active PR health blockers are assigned to your GitHub account.');
             } else {
                 tableBody.innerHTML = prs.map((pr) => `
                     <tr>
@@ -94,9 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    renderEmptyActions('You have no blocking merge conflicts or failing CI checks assigned to you.');
-    renderEmptyPRs('Awaiting GitHub payload. Bob will list PRs authored by your connected account here.');
-    updateConnectionStatus('connecting', 'Awaiting Auth...');
+    renderEmptyActions('Waiting for your workspace scan to finish...');
+    renderEmptyPRs('Waiting for repository scan results...');
+    updateConnectionStatus('connecting', 'Connecting...');
 
     if (window.io) {
         const socket = io(window.location.origin, { withCredentials: true, transports: ['websocket', 'polling'] });

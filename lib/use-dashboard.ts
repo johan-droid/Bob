@@ -105,7 +105,7 @@ export function useDashboard() {
   // ── Actions ──────────────────────────────────────────────────────────────
   const refreshState = useCallback(async (quiet = false) => {
     try {
-      if (!quiet && !state.dashboard) setAction('Refreshing workspace');
+      if (!quiet) setAction('Refreshing workspace');
       const payload = await api.appState();
       setState(payload);
       setError(null);
@@ -120,7 +120,7 @@ export function useDashboard() {
       setLoading(false);
       if (!quiet) setAction(null);
     }
-  }, [state.dashboard]);
+  }, []);
 
   const runScan = useCallback(async () => {
     try {
