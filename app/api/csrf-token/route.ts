@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
+import { issueCsrfToken } from '@/lib/csrf';
 
 export async function GET() {
-  return NextResponse.json({ csrf_token: 'bob-csrf-token-compat-value' });
+  const csrfToken = await issueCsrfToken();
+  const response = NextResponse.json({ csrf_token: csrfToken });
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
 }

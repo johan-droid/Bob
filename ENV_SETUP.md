@@ -50,7 +50,7 @@ python api_server.py
 
 ```bash
 # GitHub API Access
-GITHUB_TOKEN=ghp_your_token_here
+GITHUB_TOKEN=replace_with_github_pat
 
 # Repositories to Monitor
 TARGET_REPOS=org/repo1,org/repo2,org/repo3

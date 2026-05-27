@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth-helper';
 import { decryptToken } from '@/lib/auth';
+import { requireCsrf } from '@/lib/csrf';
 import { get, query } from '@/lib/db';
 
 async function checkAndProvision(
@@ -71,11 +72,13 @@ async function checkAndProvision(
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
 
   try {
     const user = await get('SELECT * FROM users WHERE id = $1', [sessionUser.db_id]);

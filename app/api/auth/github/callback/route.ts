@@ -17,7 +17,15 @@ export async function GET(request: Request) {
   }
   
   // Clean up state cookie
-  cookieStore.delete('oauth_state');
+  const expiredCookie = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 0,
+    path: '/'
+  };
+  cookieStore.set('oauth_state', '', expiredCookie);
+  cookieStore.set('oauth_portal', '', expiredCookie);
   
   if (!code) {
     return NextResponse.redirect(new URL('/?error=no_code', request.url));
@@ -61,7 +69,10 @@ export async function GET(request: Request) {
 
     const accessToken = tokenData?.access_token;
     if (!accessToken) {
-      console.error('No access token in response:', tokenData);
+      console.error('No access token in GitHub OAuth response:', {
+        error: tokenData?.error,
+        error_description: tokenData?.error_description
+      });
       return NextResponse.redirect(new URL('/?error=no_token', request.url));
     }
 
@@ -132,6 +143,7 @@ export async function GET(request: Request) {
     cookieStore.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/'
     });

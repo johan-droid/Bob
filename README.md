@@ -150,7 +150,7 @@ Create `backend/.env` from `backend/.env.example`:
 
 ```bash
 # Required: GitHub Personal Access Token
-GITHUB_TOKEN=ghp_your_token_here
+GITHUB_TOKEN=replace_with_github_pat
 
 # Required: Comma-separated list of repositories
 TARGET_REPOS=org/repo1,org/repo2,org/repo3

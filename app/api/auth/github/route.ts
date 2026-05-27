@@ -4,10 +4,13 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  let portal = searchParams.get('portal');
+  const requestedPortal = searchParams.get('portal');
+  let portal: 'user' | 'org';
   
   // Backwards compat checks
-  if (!portal) {
+  if (requestedPortal === 'user' || requestedPortal === 'org') {
+    portal = requestedPortal;
+  } else {
     if (searchParams.get('scope') === 'user') {
       portal = 'user';
     } else if (searchParams.get('install')) {
@@ -30,8 +33,21 @@ export async function GET(request: Request) {
   const response = NextResponse.redirect(githubUrl);
   
   const cookieStore = await cookies();
-  cookieStore.set('oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
-  cookieStore.set('oauth_portal', portal, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
+  const secureCookie = process.env.NODE_ENV === 'production';
+  cookieStore.set('oauth_state', state, {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/'
+  });
+  cookieStore.set('oauth_portal', portal, {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/'
+  });
 
   return response;
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth-helper';
+import { requireCsrf } from '@/lib/csrf';
 import { get, run } from '@/lib/db';
 import { getUserDashboardData } from '@/lib/scanner';
 
@@ -11,6 +12,8 @@ export async function POST(
   if (!sessionUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
 
   const { id } = await params;
   const issueId = parseInt(id, 10);

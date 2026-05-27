@@ -88,11 +88,17 @@ GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
 GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
 WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
 ALLOW_UNSIGNED_WEBHOOKS = os.getenv('ALLOW_UNSIGNED_WEBHOOKS', '0') == '1'
+ALLOW_LEGACY_PLAINTEXT_TOKENS = os.getenv('ALLOW_LEGACY_PLAINTEXT_TOKENS', '0') == '1'
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000,http://localhost:3000').split(',')]
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
+APP_ENV               = (os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or os.getenv('ENV') or os.getenv('ENVIRONMENT') or '').lower()
+IS_PRODUCTION         = APP_ENV == 'production' or os.getenv('RENDER') == 'true' or bool(os.getenv('RENDER_EXTERNAL_URL'))
+
+if IS_PRODUCTION and ALLOW_UNSIGNED_WEBHOOKS:
+    raise RuntimeError("ALLOW_UNSIGNED_WEBHOOKS must not be enabled in production")
 
 SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -112,7 +118,7 @@ app.config.update(
     SESSION_USE_SIGNER=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=(os.getenv('FLASK_ENV') == 'production'),
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
     WTF_CSRF_TIME_LIMIT=None,
     SQLALCHEMY_DATABASE_URI=DATABASE_URL,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -252,7 +258,8 @@ def _http_request_json(method, url, headers=None, json_body=None, form_body=None
 TOKEN_PREFIX = 'v1:'
 
 def _token_cipher() -> Fernet:
-    key = base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest())
+    token_secret = os.getenv('TOKEN_ENCRYPTION_KEY') or SECRET_KEY
+    key = base64.urlsafe_b64encode(hashlib.sha256(token_secret.encode()).digest())
     return Fernet(key)
 
 
@@ -264,7 +271,11 @@ def _decrypt_token(token: str | None) -> str | None:
     if not token:
         return None
     if not token.startswith(TOKEN_PREFIX):
-        return token
+        if ALLOW_LEGACY_PLAINTEXT_TOKENS:
+            logger.warning('Using legacy plaintext GitHub token from database; re-authenticate user to encrypt it')
+            return token
+        logger.warning('Refusing legacy plaintext GitHub token from database')
+        return None
     try:
         return _token_cipher().decrypt(token[len(TOKEN_PREFIX):].encode()).decode()
     except InvalidToken:
@@ -487,7 +498,11 @@ def github_callback():
         token_data = token_resp.json()
         access_token = token_data.get('access_token')
         if not access_token:
-            logger.error(f"No access token in response: {token_data}")
+            logger.error(
+                "No access token in GitHub OAuth response: "
+                f"error={token_data.get('error')}, "
+                f"error_description={token_data.get('error_description')}"
+            )
             return redirect(url_for('landing', error='no_token'))
 
         # Fetch user profile with retries

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth-helper';
+import { requireCsrf } from '@/lib/csrf';
 import { get, run } from '@/lib/db';
 
 export async function GET() {
@@ -40,6 +41,8 @@ export async function POST(request: Request) {
   if (!sessionUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
 
   try {
     const data = await request.json();

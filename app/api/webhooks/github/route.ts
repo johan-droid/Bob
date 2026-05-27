@@ -3,6 +3,12 @@ import crypto from 'crypto';
 import { get, query, run } from '@/lib/db';
 import { getUserDashboardData } from '@/lib/scanner';
 
+function safeCompare(left: string, right: string) {
+  const leftBytes = Buffer.from(left);
+  const rightBytes = Buffer.from(right);
+  return leftBytes.length === rightBytes.length && crypto.timingSafeEqual(leftBytes, rightBytes);
+}
+
 async function emitToRepoOwners(repoFullName: string) {
   try {
     const userRepos = await query('SELECT user_id FROM user_repos WHERE full_name = $1', [repoFullName]);
@@ -31,6 +37,10 @@ async function webhookResolvePr(repoFullName: string, prNumber: number) {
 export async function POST(request: Request) {
   const webhookSecret = process.env.WEBHOOK_SECRET || '';
   const allowUnsigned = process.env.ALLOW_UNSIGNED_WEBHOOKS === '1';
+  if (allowUnsigned && process.env.NODE_ENV === 'production') {
+    console.error('ALLOW_UNSIGNED_WEBHOOKS must not be enabled in production');
+    return NextResponse.json({ error: 'Unsigned webhooks disabled in production' }, { status: 403 });
+  }
   
   const signature = request.headers.get('X-Hub-Signature-256') || '';
   const event = request.headers.get('X-GitHub-Event') || '';
@@ -43,7 +53,7 @@ export async function POST(request: Request) {
       .update(bodyText)
       .digest('hex');
       
-    if (signature !== expected) {
+    if (!safeCompare(signature, expected)) {
       console.warn('Webhook signature mismatch');
       return NextResponse.json({ error: 'Signature mismatch' }, { status: 403 });
     }

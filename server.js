@@ -9,8 +9,16 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-const SECRET_KEY = process.env.SECRET_KEY || 'default-secret-key-change-me-in-production';
+const SECRET_KEY = process.env.SECRET_KEY;
+if ((!SECRET_KEY || SECRET_KEY === 'default-secret-key-change-me-in-production') && process.env.NODE_ENV === 'production') {
+  throw new Error('SECRET_KEY is required in production');
+}
+const EFFECTIVE_SECRET_KEY = SECRET_KEY || 'dev-only-secret-key-not-for-production';
 const SCAN_INTERVAL = parseInt(process.env.SCAN_INTERVAL || '300', 10);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5000')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 // Helper to parse cookies from header
 function parseCookies(cookieHeader) {
@@ -21,6 +29,16 @@ function parseCookies(cookieHeader) {
     list[parts.shift().trim()] = decodeURI(parts.join('='));
   });
   return list;
+}
+
+function isAllowedOrigin(origin, host) {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    return parsed.host === host || ALLOWED_ORIGINS.includes(parsed.origin);
+  } catch (err) {
+    return false;
+  }
 }
 
 // Delayed dynamic import of db and scanner
@@ -54,7 +72,14 @@ app.prepare().then(async () => {
 
   const io = new Server(server, {
     path: '/socket.io',
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    cors: {
+      origin: ALLOWED_ORIGINS,
+      credentials: true
+    },
+    allowRequest: (req, callback) => {
+      callback(null, isAllowedOrigin(req.headers.origin, req.headers.host));
+    }
   });
 
   // Attach socket emitter to global object so API routes can emit updates
@@ -74,7 +99,7 @@ app.prepare().then(async () => {
 
     let user;
     try {
-      user = jwt.verify(sessionToken, SECRET_KEY);
+      user = jwt.verify(sessionToken, EFFECTIVE_SECRET_KEY);
     } catch (err) {
       socket.disconnect();
       return;

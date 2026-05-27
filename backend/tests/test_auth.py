@@ -144,3 +144,22 @@ def test_github_token_is_encrypted_at_rest(client):
         except ImportError:
             from api_server import get_user_token
         assert get_user_token(user_id) == 'plain-token'
+
+
+def test_plaintext_github_token_is_rejected_by_default(client):
+    try:
+        from backend.models import db, User
+    except ImportError:
+        from models import db, User
+
+    with flask_app.app_context():
+        user = User(username='plaintext_user', github_id=424243, access_token='plain-token')
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+        try:
+            from backend.api_server import get_user_token
+        except ImportError:
+            from api_server import get_user_token
+        assert get_user_token(user_id) is None

@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth-helper';
 import { runScanForUser } from '@/lib/scanner';
+import { requireCsrf } from '@/lib/csrf';
 
-export async function POST() {
+export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
 
   try {
     // Run the scan asynchronously in the event loop (background execution)
