@@ -2,10 +2,18 @@ import sys as _sys
 import os
 import json
 
-# Gunicorn runs this service with the gthread worker, so keep Socket.IO on
-# standard threading. Eventlet monkey-patching after Gunicorn/Flask imports can
-# corrupt Werkzeug context locals and thread locks during Render startup.
-_ASYNC_MODE = 'threading'
+def _resolve_async_mode():
+    """Choose a Socket.IO async backend without late monkey-patching."""
+    requested = os.getenv('SOCKETIO_ASYNC_MODE', 'threading').strip().lower()
+    if requested == 'eventlet':
+        try:
+            import eventlet  # noqa: F401
+        except ImportError:
+            return 'threading'
+    return requested or 'threading'
+
+
+_ASYNC_MODE = _resolve_async_mode()
 
 import base64
 import secrets, hmac, hashlib, threading, time
@@ -23,10 +31,16 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet, InvalidToken
 
-from database import init_db
-from models import db, User, UserRepo, PRIssue, UserSettings
-from logger import get_logger
-from pr_health_scanner import PRHealthScanner
+try:
+    from .database import init_db
+    from .models import db, User, UserRepo, PRIssue, UserSettings
+    from .logger import get_logger
+    from .pr_health_scanner import PRHealthScanner
+except ImportError:
+    from database import init_db
+    from models import db, User, UserRepo, PRIssue, UserSettings
+    from logger import get_logger
+    from pr_health_scanner import PRHealthScanner
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
@@ -39,6 +53,7 @@ if os.path.exists(_root_env):
 else:
     load_dotenv()
 logger = get_logger(__name__)
+logger.info(f"Socket.IO async mode selected: {_ASYNC_MODE}")
 
 # ── Required env vars ─────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -392,6 +407,7 @@ def github_login():
     state = secrets.token_urlsafe(32)
     session['oauth_state'] = state
     session['oauth_portal'] = 'user' if request.args.get('portal') == 'user' else 'org'
+    session.modified = True
     scopes = 'repo read:org write:discussion workflow user:email'
     params = urlencode({
         'client_id': GITHUB_CLIENT_ID,
@@ -432,10 +448,11 @@ def api_auth_github_install():
 @app.route('/auth/github/callback')
 def github_callback():
     returned_state = request.args.get('state')
-    stored_state   = session.pop('oauth_state', None)
+    stored_state = session.get('oauth_state')
     if not returned_state or returned_state != stored_state:
         logger.warning('OAuth state mismatch — possible CSRF')
         return redirect('/?error=invalid_state')
+    session.pop('oauth_state', None)
 
     code = request.args.get('code')
     if not code:
@@ -510,6 +527,7 @@ def github_callback():
             'email':    ud.get('email'),
             'db_id':    user.id,
         }
+        session.modified = True
 
         logger.info(f"Auth OK: {username}")
         return redirect('/permissions')

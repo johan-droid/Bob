@@ -1,7 +1,10 @@
 """tests/test_scanner.py — PRHealthScanner unit tests with mocked GitHub API."""
 import pytest
 from unittest.mock import patch, MagicMock
-from pr_health_scanner import PRHealthScanner
+try:
+    from backend.pr_health_scanner import PRHealthScanner
+except ImportError:
+    from pr_health_scanner import PRHealthScanner
 
 
 def make_resp(json_data, status=200, headers=None):

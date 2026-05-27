@@ -9,8 +9,12 @@ os.environ.setdefault('WEBHOOK_SECRET', '')
 os.environ.setdefault('ALLOW_UNSIGNED_WEBHOOKS', '0')
 
 import pytest
-from api_server import app as flask_app
-from api_server import _encrypt_token
+try:
+    from backend.api_server import app as flask_app
+    from backend.api_server import _encrypt_token
+except ImportError:
+    from api_server import app as flask_app
+    from api_server import _encrypt_token
 
 @pytest.fixture
 def client():
@@ -51,6 +55,14 @@ def test_oauth_state_mismatch_rejected(client):
     assert r.status_code == 302
     assert 'invalid_state' in r.headers['Location']
 
+
+def test_oauth_state_retained_after_mismatch(client):
+    with client.session_transaction() as s:
+        s['oauth_state'] = 'correct_state'
+    client.get('/callback/github?code=abc&state=wrong_state')
+    with client.session_transaction() as s:
+        assert s['oauth_state'] == 'correct_state'
+
 def test_csrf_token_endpoint(client):
     r = client.get('/api/csrf-token')
     assert r.status_code == 200
@@ -73,7 +85,10 @@ def test_delete_account_requires_auth(client):
     assert r.status_code == 401
 
 def test_delete_account_success(client):
-    from models import db, User
+    try:
+        from backend.models import db, User
+    except ImportError:
+        from models import db, User
     with flask_app.app_context():
         # Create a test user in DB
         u = User(username='delete_me', github_id='999999')
@@ -109,7 +124,10 @@ def test_delete_account_success(client):
 
 
 def test_github_token_is_encrypted_at_rest(client):
-    from models import db, User
+    try:
+        from backend.models import db, User
+    except ImportError:
+        from models import db, User
 
     with flask_app.app_context():
         user = User(username='token_user', github_id=424242, access_token=_encrypt_token('plain-token'))
@@ -121,6 +139,8 @@ def test_github_token_is_encrypted_at_rest(client):
         assert stored is not None
         assert stored.access_token != 'plain-token'
 
-        from api_server import get_user_token
+        try:
+            from backend.api_server import get_user_token
+        except ImportError:
+            from api_server import get_user_token
         assert get_user_token(user_id) == 'plain-token'
-

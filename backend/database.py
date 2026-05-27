@@ -1,5 +1,9 @@
 """database.py — DB engine initialization for Bob."""
-from models import db
+
+try:
+    from .models import db
+except ImportError:
+    from models import db
 
 
 def init_db(app):

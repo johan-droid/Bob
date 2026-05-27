@@ -3,7 +3,7 @@ services:
     name: bob-pr-monitor
     runtime: python
     buildCommand: npm ci && NEXT_OUTPUT_EXPORT=1 npm run build && pip install -r requirements.txt
-    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --worker-class gthread --threads 8 -w 1 api_server:app
+    startCommand: gunicorn -c backend/gunicorn.conf.py backend.api_server:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11
