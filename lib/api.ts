@@ -75,9 +75,34 @@ export type AppState = {
 
 let csrfToken: string | null = null;
 
+export function apiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/$/, '');
+  }
+
+  return '';
+}
+
+export function realtimeBaseUrl() {
+  const configuredBaseUrl = apiBaseUrl();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '3000') {
+    return 'http://localhost:5000';
+  }
+
+  return '';
+}
+
+function apiUrl(path: string) {
+  return `${apiBaseUrl()}${path}`;
+}
+
 async function getCsrfToken() {
   if (csrfToken) return csrfToken;
-  const response = await fetch('/api/csrf-token', { credentials: 'include' });
+  const response = await fetch(apiUrl('/api/csrf-token'), { credentials: 'include' });
   if (!response.ok) return null;
   const payload = await response.json() as { csrf_token?: string };
   csrfToken = payload.csrf_token || null;
@@ -106,7 +131,7 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
     if (token) headers.set('X-CSRFToken', token);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     method,
     credentials: 'include',

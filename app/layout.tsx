@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './dashboard-refresh.css';
 
 export const metadata: Metadata = {
   title: 'Bob | PR Health Monitor',

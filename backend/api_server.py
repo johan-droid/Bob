@@ -40,7 +40,7 @@ WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
-ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')]
+ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5000,http://localhost:3000').split(',')]
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
 
 SESSION_DIR  = os.getenv('SESSION_DIR', os.path.join(os.path.dirname(__file__), 'flask_sessions'))

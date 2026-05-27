@@ -2,17 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { io } from 'socket.io-client';
-import { api, type AppSettings, type AppState, type DashboardPayload, type IssueItem, type IssueStatus, type RepoItem } from '@/lib/api';
+import { api, realtimeBaseUrl, type AppSettings, type AppState, type DashboardPayload, type IssueItem, type IssueStatus, type RepoItem } from '@/lib/api';
 
 type Props = {
   mode: 'org' | 'user';
-  demo?: boolean;
-  demoData?: DashboardPayload;
 };
 
 type LiveStatus = 'connecting' | 'connected' | 'disconnected';
 
-const socketBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 const issueStatuses: IssueStatus[] = ['pending', 'in_progress', 'failed', 'resolved'];
 
 function combineIssues(data: DashboardPayload) {
@@ -42,8 +39,8 @@ function uniqueRepos(issues: IssueItem[]) {
   return new Set(issues.map((issue) => issue.repo).filter(Boolean)).size;
 }
 
-export function DashboardView({ mode, demo = false, demoData }: Props) {
-  const [state, setState] = useState<AppState>(() => (demo ? { dashboard: demoData } : {}));
+export function DashboardView({ mode }: Props) {
+  const [state, setState] = useState<AppState>({});
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,13 +88,6 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
   }, []);
 
   useEffect(() => {
-    if (demo) {
-      setState((current) => ({ ...current, dashboard: demoData }));
-      setLoading(false);
-      setLiveStatus('connected');
-      return;
-    }
-
     let socket: ReturnType<typeof io> | null = null;
     let mounted = true;
 
@@ -107,7 +97,7 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
 
     void load();
 
-    socket = io(socketBaseUrl || window.location.origin, {
+    socket = io(realtimeBaseUrl() || window.location.origin, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       withCredentials: true
@@ -141,7 +131,7 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
       mounted = false;
       socket?.disconnect();
     };
-  }, [demo, demoData]);
+  }, []);
 
   const runScan = async () => {
     try {
@@ -276,6 +266,22 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
       </nav>
 
       <section className="ops-main">
+        <div className="ops-command-bar" aria-label="Dashboard command summary">
+          <div>
+            <span className="ops-command-eyebrow">Live workspace</span>
+            <strong>{openIssues.length ? `${openIssues.length} active risks` : 'All clear right now'}</strong>
+          </div>
+          <div className="ops-command-search" aria-hidden="true">
+            <span>Search repos, PRs, blockers</span>
+            <kbd>/</kbd>
+          </div>
+          <div className="ops-command-agents" aria-label="Available routing agents">
+            <span>Copilot</span>
+            <span>Jules</span>
+            <span>Codex</span>
+          </div>
+        </div>
+
         <header className="ops-hero" id="overview">
           <div className="ops-hero-copy">
             <div className="ops-hero-badges">
@@ -320,6 +326,13 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
             <p className="ops-hero-note">
               Use discovery to populate new repos, then run a scan to refresh live GitHub risk signals.
             </p>
+            <div className="ops-system-strip" aria-label="Risk pipeline">
+              <span>Discover</span>
+              <i />
+              <span>Scan</span>
+              <i />
+              <span>Route</span>
+            </div>
           </aside>
         </header>
 
@@ -530,6 +543,19 @@ export function DashboardView({ mode, demo = false, demoData }: Props) {
           )}
         </section>
       </section>
+
+      <nav className="ops-mobile-dock" aria-label="Mobile dashboard navigation">
+        <a href="#overview">Pulse</a>
+        <a href="#queue">Queue</a>
+        <a href="#repos">Repos</a>
+        <button
+          type="button"
+          onClick={() => setShowSettings((s) => !s)}
+          aria-expanded={showSettings}
+        >
+          Settings
+        </button>
+      </nav>
     </main>
   );
 }
