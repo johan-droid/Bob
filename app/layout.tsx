@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './dashboard-refresh.css';
+import './mobile-dashboard.css';
+
 
 export const metadata: Metadata = {
   title: 'Bob | PR Health Monitor',
-  description: 'Bob monitors pull request health with real-time GitHub signals, CI failure detection, and merge conflict alerts.',
-  metadataBase: new URL('http://localhost:3000'),
+  description: 'Bob monitors pull request health with real-time GitHub signals, CI failure detection, merge conflict alerts, review tracking, and staleness analysis.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://bob-7ae2.onrender.com'),
   icons: {
     icon: '/icon.svg'
   },
@@ -20,8 +22,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+        {/*
+          NOTE: Tailwind CSS is loaded via CDN for rapid prototyping.
+          For production, install tailwindcss as a build dependency:
+            npm install -D tailwindcss @tailwindcss/forms postcss autoprefixer
+          Then configure postcss.config.js and tailwind.config.ts.
+        */}
         <script
           src="https://cdn.tailwindcss.com?plugins=forms,container-queries"
           crossOrigin="anonymous"

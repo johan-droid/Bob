@@ -4,6 +4,8 @@ type ApiInit = RequestInit & {
 
 export type IssueStatus = 'pending' | 'in_progress' | 'failed' | 'resolved';
 
+export type IssueType = 'merge_conflict' | 'ci_failure' | 'review_issue' | 'stale_pr' | 'oversized_pr';
+
 export type IssueItem = {
   id?: number;
   repo?: string;
@@ -13,7 +15,7 @@ export type IssueItem = {
   branch?: string;
   pr_number?: number;
   run_id?: string;
-  type?: 'merge_conflict' | 'ci_failure' | string;
+  type?: IssueType | string;
   status?: IssueStatus;
   author?: string;
   last_commented_at?: string | null;
@@ -37,8 +39,22 @@ export type RepoItem = {
   last_synced?: string | null;
 };
 
+export type DashboardStats = {
+  total?: number;
+  pending?: number;
+  in_progress?: number;
+  failed?: number;
+  resolved?: number;
+  conflicts?: number;
+  failing?: number;
+  review_issues?: number;
+  stale?: number;
+  oversized?: number;
+  ready?: number;
+};
+
 export type DashboardPayload = {
-  stats?: { total?: number; pending?: number; in_progress?: number; failed?: number; resolved?: number };
+  stats?: DashboardStats;
   pending?: IssueItem[];
   in_progress?: IssueItem[];
   failed?: IssueItem[];
@@ -170,5 +186,15 @@ export const api = {
     `/api/issues/${issueId}/status`,
     { method: 'POST', body: JSON.stringify({ status }) }
   ),
-  deleteAccount: () => apiFetch<{ success: boolean }>('/api/account/delete', { method: 'POST' })
+  deleteAccount: () => apiFetch<{ success: boolean }>('/api/account/delete', { method: 'POST' }),
+
+  // ── Real GitHub Actions (replaces fake "Route to Agent") ──────────────────
+  rerunCi: (issueId: number) => apiFetch<{ success: boolean; message?: string }>(
+    `/api/issues/${issueId}/rerun-ci`,
+    { method: 'POST' }
+  ),
+  requestReview: (issueId: number, reviewers: string[]) => apiFetch<{ success: boolean; message?: string }>(
+    `/api/issues/${issueId}/request-review`,
+    { method: 'POST', body: JSON.stringify({ reviewers }) }
+  ),
 };

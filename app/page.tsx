@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import './landing.css';
 import { LandingClientLogic } from './landing-client-logic';
+import { UpdateNote } from '@/components/update-note';
+
 
 export default function LandingPage() {
   return (
@@ -85,7 +87,7 @@ export default function LandingPage() {
               </h1>
 
               <p className="hero-sub">
-                Bob connects to GitHub via OAuth, pulls live repository data, and surfaces PR status, merge conflicts, and failing CI checks — all in one authenticated workspace.
+                Bob connects to GitHub via OAuth to monitor repository health in real time. Effortlessly track PR states, merge conflicts, failing CI suites, and review bottlenecks—all on a speed-optimized, mobile-ready unified dashboard.
               </p>
 
               <div className="hero-actions">
@@ -383,6 +385,7 @@ export default function LandingPage() {
         </div>
       </footer>
       <LandingClientLogic />
+      <UpdateNote />
     </div>
   );
 }

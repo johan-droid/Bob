@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, type AppSettings, type AppState, type RepoItem } from '@/lib/api';
+import { AppNav } from '@/components/app-nav';
 
 export function SettingsForm() {
   const [state, setState] = useState<AppState>({});
@@ -98,38 +99,20 @@ export function SettingsForm() {
 
   return (
     <div className="flex-grow flex flex-col w-full">
-      {/* Top Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md w-full">
-        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
-            <a href="/org/dashboard" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20 group-hover:scale-105 transition-transform">
-                B
-              </div>
-              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Bob Org</span>
-            </a>
-            <div className="hidden md:flex items-center gap-1">
-              <a href="/org/dashboard" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Pipeline Health</a>
-              <a href="/org/dashboard#team-velocity" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Team Velocity</a>
-              <a href="/org/settings" className="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">Repo Settings</a>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="px-5 py-2 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 disabled:opacity-50 transition-colors"
-              disabled={!canSave}
-              onClick={() => void save()}
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-brand" title={state.user?.name || state.user?.username || ''}>
-              {(state.user?.name || state.user?.username || 'U')[0].toUpperCase()}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNav
+        activeTab="settings"
+        userName={state.user?.name || state.user?.username || ''}
+        rightSlot={
+          <button
+            type="button"
+            className="px-5 py-2 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+            disabled={!canSave}
+            onClick={() => void save()}
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        }
+      />
 
       {/* Main Content */}
       <main className="max-w-[1000px] w-full mx-auto px-6 py-8 flex flex-col gap-8">

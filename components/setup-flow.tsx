@@ -30,11 +30,22 @@ export function SetupFlow({ portal = 'org' }: Props) {
   const runSetup = async () => {
     try {
       setError(null);
+      
+      // Fast path: check if user already has synced repos to avoid redundant setup delay
+      setStatus('Checking workspace state...');
+      const appState = await apiFetch<any>('/api/app-state').catch(() => null);
+      if (appState?.dashboard?.repos?.length > 0) {
+        setStep(5);
+        setStatus('Redirecting to your dashboard...');
+        router.push(dashboardUrl);
+        return;
+      }
+
       setStep(1);
       setStatus('Verifying identity & scopes...');
 
-      // Fake slight delay for the smooth animation feeling
-      await new Promise(r => setTimeout(r, 1200));
+      // Small transition delay for smooth UX
+      await new Promise(r => setTimeout(r, 150));
 
       const verify = await apiFetch<VerifyPermissionsResponse>('/api/verify-permissions').catch(() => ({ all_granted: true }));
       
@@ -46,17 +57,17 @@ export function SetupFlow({ portal = 'org' }: Props) {
 
       setStep(2);
       setStatus('Discovering & syncing repositories...');
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 200));
       await apiFetch('/api/discover-repos', { method: 'POST' }).catch(() => {});
 
       setStep(3);
       setStatus('Provisioning workspace...');
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 150));
       await apiFetch('/api/auto-provision', { method: 'POST' }).catch(() => {});
 
       setStep(4);
       setStatus('Finalizing PR intelligence...');
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 200));
       await apiFetch('/api/scan', { method: 'POST' }).catch(() => {});
 
       setStep(5);
@@ -64,7 +75,7 @@ export function SetupFlow({ portal = 'org' }: Props) {
       
       setTimeout(() => {
         router.push(dashboardUrl);
-      }, 1500);
+      }, 300);
 
     } catch (err) {
       setStatus('Setup failed');

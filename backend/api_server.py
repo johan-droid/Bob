@@ -57,11 +57,13 @@ try:
     from .models import db, User, UserRepo, PRIssue, UserSettings
     from .logger import get_logger
     from .pr_health_scanner import PRHealthScanner
+    from .notifications import dispatch_notifications
 except ImportError:
     from database import init_db
     from models import db, User, UserRepo, PRIssue, UserSettings
     from logger import get_logger
     from pr_health_scanner import PRHealthScanner
+    from notifications import dispatch_notifications
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
@@ -124,7 +126,7 @@ CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
 socketio = SocketIO(app,
-                    cors_allowed_origins="*",
+                    cors_allowed_origins=ALLOWED_ORIGINS,
                     manage_session=False,
                     ping_timeout=30,
                     ping_interval=10,
@@ -808,7 +810,12 @@ def trigger_scan():
     def execute_manual_scan():
         with app.app_context():
             try:
-                scanner = PRHealthScanner(token, scan_repos, assignee=ASSIGNEE_USERNAME)
+                settings_obj = UserSettings.query.filter_by(user_id=user_id).first()
+                scanner = PRHealthScanner(
+                    token, scan_repos, assignee=ASSIGNEE_USERNAME,
+                    auto_label_conflict=settings_obj.auto_label_conflict if settings_obj else True,
+                    tag_author_on_fail=settings_obj.tag_author_on_fail if settings_obj else False,
+                )
                 results = scanner.scan_all_repos()
                 _ingest_scan_results(results, user_id, scanner=scanner)
                 socketio.emit('update', _get_user_data(user_id), to=username)
@@ -838,8 +845,26 @@ def list_repos():
 
 @app.route('/api/health')
 def health_check():
-    return jsonify({'status': 'ok', 'service': 'Bob PR Health Scanner',
-                    'timestamp': datetime.utcnow().isoformat()})
+    """Deep health check: verifies DB connectivity and returns operational stats."""
+    health = {
+        'status': 'ok',
+        'service': 'Bob PR Health Scanner',
+        'timestamp': datetime.utcnow().isoformat(),
+        'database': 'unknown',
+        'users': 0,
+        'tracked_repos': 0,
+    }
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text('SELECT 1'))
+        health['database'] = 'connected'
+        health['users'] = User.query.count()
+        health['tracked_repos'] = UserRepo.query.count()
+    except Exception as e:
+        health['status'] = 'degraded'
+        health['database'] = f'error: {str(e)[:100]}'
+    return jsonify(health)
 
 @app.route('/api/issues')
 @login_required
@@ -918,6 +943,51 @@ def update_issue_status(issue_id):
     db.session.commit()
     socketio.emit('update', _get_user_data(user.id), to=session['user']['username'])
     return jsonify({'saved': True, 'issue': issue.to_dict()})
+
+# ── API: Re-run Failed CI ─────────────────────────────────────────────────────
+@app.route('/api/issues/<int:issue_id>/rerun-ci', methods=['POST'])
+@login_required
+def rerun_ci(issue_id):
+    """Re-run a failed GitHub Actions workflow."""
+    user = current_user()
+    issue = PRIssue.query.filter_by(id=issue_id, user_id=user.id).first_or_404()
+    if not issue.run_id:
+        return jsonify({'error': 'No CI run ID associated with this issue'}), 400
+    token = get_user_token(user.id)
+    if not token:
+        return jsonify({'error': 'Session expired, please re-login'}), 401
+    scanner = PRHealthScanner(token, [], assignee=ASSIGNEE_USERNAME)
+    result = scanner.rerun_workflow(issue.repo, int(issue.run_id))
+    if result.get('success'):
+        issue.status = 'in_progress'
+        issue.updated_at = datetime.utcnow()
+        db.session.commit()
+        socketio.emit('update', _get_user_data(user.id), to=session['user']['username'])
+        return jsonify({'success': True, 'message': 'CI re-run triggered'})
+    return jsonify({'error': result.get('error', 'Failed to re-run CI')}), 500
+
+# ── API: Request Review ───────────────────────────────────────────────────────
+@app.route('/api/issues/<int:issue_id>/request-review', methods=['POST'])
+@login_required
+def request_review(issue_id):
+    """Request a review for a PR from specified GitHub users."""
+    user = current_user()
+    issue = PRIssue.query.filter_by(id=issue_id, user_id=user.id).first_or_404()
+    if not issue.pr_number:
+        return jsonify({'error': 'No PR number associated with this issue'}), 400
+    data = request.get_json() or {}
+    reviewers = data.get('reviewers', [])
+    if not reviewers:
+        return jsonify({'error': 'No reviewers specified'}), 400
+    token = get_user_token(user.id)
+    if not token:
+        return jsonify({'error': 'Session expired, please re-login'}), 401
+    scanner = PRHealthScanner(token, [], assignee=ASSIGNEE_USERNAME)
+    result = scanner.request_review(issue.repo, issue.pr_number, reviewers)
+    if 'error' not in result:
+        return jsonify({'success': True, 'message': f'Review requested from {", ".join(reviewers)}'})
+    return jsonify({'error': result.get('error', 'Failed to request review')}), 500
+
 
 # ── API: GitHub Webhook ───────────────────────────────────────────────────────
 @csrf.exempt
@@ -1026,8 +1096,13 @@ def _emit_to_repo_owners(repo_full_name):
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 def _ingest_scan_results(results, user_id, scanner=None):
+    settings = UserSettings.query.filter_by(user_id=user_id).first()
+    new_issues = []  # Track new issues for notification dispatch
+
     for result in results:
         repo = result['repo']
+
+        # 1. Merge conflicts
         for pr in result.get('conflicting_prs', []):
             key = f"{repo}#{pr['pr']}"
             issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
@@ -1040,10 +1115,12 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     author=pr.get('author'),
                 )
                 db.session.add(issue)
-            
+                new_issues.append(issue)
+
             if scanner and issue.status == 'pending':
                 _trigger_auto_comment(issue, scanner)
-        
+
+        # 2. CI failures
         for f in result.get('workflow_failures', []):
             key = f"{repo}#run{f['id']}"
             issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
@@ -1056,8 +1133,70 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     author=f.get('author'),
                 )
                 db.session.add(issue)
-    
+                new_issues.append(issue)
+
+        # 3. Review issues (NEW)
+        for ri in result.get('review_issues', []):
+            key = f"{repo}#review{ri['pr']}"
+            issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not issue:
+                issue = PRIssue(
+                    user_id=user_id, repo=repo, issue_key=key,
+                    title=f"Changes requested on PR #{ri['pr']}: {ri['title']}",
+                    url=ri['url'], pr_number=ri['pr'], branch=ri.get('head_branch'),
+                    issue_type='review_issue', status='pending',
+                    author=ri.get('author'),
+                )
+                db.session.add(issue)
+                new_issues.append(issue)
+
+        # 4. Stale PRs (NEW)
+        for sp in result.get('stale_prs', []):
+            key = f"{repo}#stale{sp['pr']}"
+            issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not issue:
+                issue = PRIssue(
+                    user_id=user_id, repo=repo, issue_key=key,
+                    title=f"Stale PR #{sp['pr']} ({sp['days_since_update']}d idle): {sp['title']}",
+                    url=sp['url'], pr_number=sp['pr'], branch=sp.get('head_branch'),
+                    issue_type='stale_pr', status='pending',
+                    author=sp.get('author'),
+                )
+                db.session.add(issue)
+                new_issues.append(issue)
+
+        # 5. Oversized PRs (NEW)
+        for op in result.get('oversized_prs', []):
+            key = f"{repo}#size{op['pr']}"
+            issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
+            if not issue:
+                issue = PRIssue(
+                    user_id=user_id, repo=repo, issue_key=key,
+                    title=f"Large PR #{op['pr']} ({op['total_changes']} lines): {op['title']}",
+                    url=op['url'], pr_number=op['pr'], branch=op.get('head_branch'),
+                    issue_type='oversized_pr', status='pending',
+                    author=op.get('author'),
+                )
+                db.session.add(issue)
+                new_issues.append(issue)
+
     db.session.commit()
+
+    # Dispatch real notifications for new issues
+    if new_issues and settings:
+        for issue in new_issues:
+            try:
+                dispatch_notifications(
+                    slack_webhook=settings.slack_webhook,
+                    discord_webhook=settings.discord_webhook,
+                    issue_type=issue.issue_type,
+                    title=issue.title or '',
+                    repo=issue.repo,
+                    url=issue.url or '',
+                    author=issue.author or 'Unknown',
+                )
+            except Exception as e:
+                logger.error(f"Notification dispatch error: {e}")
 
 def _trigger_auto_comment(issue, scanner):
     if not issue.pr_number:
@@ -1124,10 +1263,13 @@ def _get_user_data(user_id):
             'language': ur.language,
         })
 
-    # Compute additional stats expected by the legacy frontend
+    # Compute additional stats expected by the frontend
     open_issues = [i for i in issues if i.status != 'resolved']
     conflicts_count = len([i for i in open_issues if i.issue_type == 'merge_conflict'])
     failing_count = len([i for i in open_issues if i.issue_type == 'ci_failure'])
+    review_issues_count = len([i for i in open_issues if i.issue_type == 'review_issue'])
+    stale_count = len([i for i in open_issues if i.issue_type == 'stale_pr'])
+    oversized_count = len([i for i in open_issues if i.issue_type == 'oversized_pr'])
     ready_count = len([r for r in repos_list if r['is_active'] and r['issue_count'] == 0])
 
     stats = {
@@ -1138,6 +1280,9 @@ def _get_user_data(user_id):
         'total': len(issues),
         'conflicts': conflicts_count,
         'failing': failing_count,
+        'review_issues': review_issues_count,
+        'stale': stale_count,
+        'oversized': oversized_count,
         'ready': ready_count
     }
 
@@ -1261,7 +1406,11 @@ def background_scan():
                         continue
 
                     logger.info(f"BG scan: {user.username} → {len(repos)} repos")
-                    scanner = PRHealthScanner(token, repos, assignee=ASSIGNEE_USERNAME)
+                    scanner = PRHealthScanner(
+                        token, repos, assignee=ASSIGNEE_USERNAME,
+                        auto_label_conflict=settings.auto_label_conflict if settings else True,
+                        tag_author_on_fail=settings.tag_author_on_fail if settings else False,
+                    )
                     results = scanner.scan_all_repos()
                     _ingest_scan_results(results, user.id)
                     socketio.emit('update', _get_user_data(user.id), to=user.username)

@@ -3,24 +3,29 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev",
-    "dev:frontend": "next dev -p 3000",
-    "dev:backend": ".\\.venv\\Scripts\\python.exe backend\\api_server.py",
-    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "lint": "next lint"
   },
   "dependencies": {
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "socket.io-client": "4.8.3"
+    "socket.io-client": "4.8.3",
+    "socket.io": "^4.8.1",
+    "pg": "^8.11.3",
+    "better-sqlite3": "^9.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "25.9.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/pg": "^8.11.10",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/better-sqlite3": "^7.6.9",
     "eslint": "10.4.0",
     "eslint-config-next": "16.2.6",
     "typescript": "6.0.3"
