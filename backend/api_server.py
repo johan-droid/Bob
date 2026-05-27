@@ -1,9 +1,30 @@
 import sys as _sys
 import os
+
+
+def _eventlet_runtime_requested():
+    cmdline = ' '.join(_sys.argv).lower()
+    gunicorn_args = os.getenv('GUNICORN_CMD_ARGS', '').lower()
+    socketio_mode = os.getenv('SOCKETIO_ASYNC_MODE', '').strip().lower()
+    return (
+        '--worker-class eventlet' in cmdline
+        or '-k eventlet' in cmdline
+        or 'worker-class eventlet' in gunicorn_args
+        or 'worker_class=eventlet' in gunicorn_args
+        or socketio_mode == 'eventlet'
+    )
+
+
+if _eventlet_runtime_requested():
+    import eventlet
+    eventlet.monkey_patch()
+
 import json
 
 def _resolve_async_mode():
     """Choose a Socket.IO async backend without late monkey-patching."""
+    if _eventlet_runtime_requested():
+        return 'eventlet'
     requested = os.getenv('SOCKETIO_ASYNC_MODE', 'threading').strip().lower()
     if requested == 'eventlet':
         try:
