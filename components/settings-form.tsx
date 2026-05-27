@@ -35,14 +35,32 @@ export function SettingsForm() {
   const save = async (nextDraft = draft) => {
     try {
       setSaving(true);
+      setError(null);
+      setSavedAt(null);
       await api.saveSettings(nextDraft);
-      setSavedAt(new Date().toLocaleTimeString());
+      setSavedAt(`Saved at ${new Date().toLocaleTimeString()}`);
       const payload = await api.appState();
       setState(payload);
       setDraft(payload.settings || nextDraft);
-      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const forceSync = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      setSavedAt(null);
+      await api.scan();
+      setSavedAt("Sync initiated successfully.");
+      setTimeout(() => {
+        void load();
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to initiate sync.');
     } finally {
       setSaving(false);
     }
@@ -61,74 +79,266 @@ export function SettingsForm() {
     await save(nextDraft);
   };
 
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete your account and all associated repository metadata? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.deleteAccount();
+      window.location.href = '/';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete account.');
+      setSaving(false);
+    }
+  };
+
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(state.settings || {});
+  const canSave = hasChanges && !saving;
+
   return (
-    <div className="settings-grid">
-      <section className="settings-card">
-        <div className="kicker">Backend settings</div>
-        <h1 className="auth-title" style={{ marginTop: 10 }}>PR management controls</h1>
-        <p>These settings are loaded from and saved to Bob's Flask API, so every control persists on the backend.</p>
+    <div className="flex-grow flex flex-col w-full">
+      {/* Top Navigation */}
+      <nav className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md w-full">
+        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-8">
+            <a href="/org/dashboard" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20 group-hover:scale-105 transition-transform">
+                B
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Bob Org</span>
+            </a>
+            <div className="hidden md:flex items-center gap-1">
+              <a href="/org/dashboard" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Pipeline Health</a>
+              <a href="/org/dashboard#team-velocity" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Team Velocity</a>
+              <a href="/org/settings" className="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">Repo Settings</a>
+            </div>
+          </div>
 
-        {error ? <div className="error-banner" style={{ marginTop: 18 }}>{error}</div> : null}
-        {savedAt ? <div className="success-banner" style={{ marginTop: 18 }}>Saved at {savedAt}</div> : null}
-
-        <div className="stack" style={{ marginTop: 22 }}>
-          <label className="field">
-            <span>Scan interval seconds</span>
-            <input
-              type="number"
-              min={60}
-              value={draft.scan_interval ?? 300}
-              disabled={loading || saving}
-              onChange={(event) => setDraft((current) => ({ ...current, scan_interval: Number(event.target.value) }))}
-            />
-          </label>
-
-          <label className="toggle-row feature-card">
-            <span>
-              <strong>In-app notifications</strong>
-              <p>Use the stored backend notification preference.</p>
-            </span>
-            <input
-              type="checkbox"
-              checked={draft.notify_in_app ?? true}
-              disabled={loading || saving}
-              onChange={(event) => setDraft((current) => ({ ...current, notify_in_app: event.target.checked }))}
-            />
-          </label>
-
-          <div className="auth__actions">
-            <button type="button" className="button" disabled={loading || saving} onClick={() => void save()}>
-              {saving ? 'Saving...' : 'Save settings'}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              className="px-5 py-2 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+              disabled={!canSave}
+              onClick={() => void save()}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
             </button>
-            <button type="button" className="button-secondary" disabled={loading || saving} onClick={() => void load()}>
-              Reload from API
-            </button>
+            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-brand" title={state.user?.name || state.user?.username || ''}>
+              {(state.user?.name || state.user?.username || 'U')[0].toUpperCase()}
+            </div>
           </div>
         </div>
-      </section>
+      </nav>
 
-      <aside className="settings-card">
-        <div className="kicker">Repository monitoring</div>
-        <div className="stack" style={{ marginTop: 18 }}>
-          {loading ? <div className="empty-state">Loading repositories from backend...</div> : null}
-          {!loading && repos.length ? repos.map((repo) => (
-            <div className="repo-card" key={repo.full_name}>
-              <div className="toggle-row">
-                <div>
-                  <h3>{repo.full_name}</h3>
-                  <p>{repo.language || 'Unknown language'} · {repo.issue_count ?? 0} linked risk(s)</p>
-                </div>
-                <button type="button" className="button-ghost" disabled={saving} onClick={() => void toggleRepo(repo)}>
-                  {excluded.has(repo.full_name || '') ? 'Resume' : 'Pause'}
-                </button>
+      {/* Main Content */}
+      <main className="max-w-[1000px] w-full mx-auto px-6 py-8 flex flex-col gap-8">
+        
+        {/* Header Section */}
+        <header className="pb-6 border-b border-border">
+          <span className="text-xs font-bold text-brand uppercase tracking-widest">Configuration</span>
+          <h1 className="text-3xl font-black mt-1 tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">Organization Settings</h1>
+          <p className="text-zinc-400 text-sm mt-1.5">Manage repository integrations, alerting channels, and automated triage rules.</p>
+        </header>
+
+        {/* Message banners */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-red-500 text-[18px]">error</span>
+            {error}
+          </div>
+        )}
+        {savedAt && (
+          <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-success text-[18px]">check_circle</span>
+            {savedAt}
+          </div>
+        )}
+
+        {/* Monitored Repositories Card */}
+        <section className="bg-surface-card border border-border rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-extrabold text-white">Monitored Repositories</h2>
+              <p className="text-zinc-400 text-sm mt-0.5">Manage which GitHub repositories Bob tracks for CI failures and merge conflicts.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-zinc-900 border border-border rounded-xl mb-6">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-zinc-400 text-2xl">sync</span>
+              <div className="flex flex-col">
+                <strong className="text-sm font-bold text-white">Synchronized</strong>
+                <span className="text-zinc-400 text-xs mt-0.5">Real-time status syncing active.</span>
               </div>
             </div>
-          )) : null}
-          {!loading && !repos.length ? (
-            <div className="empty-state">No repositories are connected yet. Return to setup or dashboard discovery first.</div>
-          ) : null}
-        </div>
-      </aside>
+            <button
+              type="button"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-800 border border-border hover:bg-zinc-700 transition-colors text-white"
+              onClick={() => void forceSync()}
+            >
+              Force Sync
+            </button>
+          </div>
+
+          {/* Bento Grid of Connected Repositories */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? (
+              <div className="col-span-full py-8 text-center text-zinc-500">
+                <div className="flex flex-col items-center gap-2">
+                  <span className="material-symbols-outlined text-2xl animate-spin text-zinc-600">sync</span>
+                  <p className="text-xs font-medium">Loading repositories from backend...</p>
+                </div>
+              </div>
+            ) : repos.length ? (
+              repos.map((repo) => {
+                const isActive = !excluded.has(repo.full_name || '');
+                return (
+                  <div className="bg-zinc-900 border border-border rounded-xl p-4 flex flex-col justify-between hover:border-zinc-800 transition-colors" key={repo.full_name}>
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm font-bold text-white truncate">{repo.full_name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${repo.private ? 'bg-zinc-800 text-zinc-400' : 'bg-brand/10 text-brand'}`}>
+                          {repo.private ? 'Private' : 'Public'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 mb-4">{repo.language || 'Unknown language'} · {repo.issue_count ?? 0} active issues</p>
+                    </div>
+                    <div className="flex items-center justify-between mt-auto">
+                      <span className={`text-xs font-bold ${isActive ? 'text-success' : 'text-zinc-500'}`}>
+                        {isActive ? 'Monitoring active' : 'Paused'}
+                      </span>
+                      <button
+                        type="button"
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 border border-border hover:bg-zinc-750 transition-colors text-white"
+                        onClick={() => void toggleRepo(repo)}
+                      >
+                        {isActive ? 'Pause' : 'Resume'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="col-span-full py-8 text-center text-zinc-500">
+                <p className="text-xs font-medium">No repositories discovered yet. Go to dashboard and click Discover.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Notification Channels Card */}
+        <section className="bg-surface-card border border-border rounded-2xl p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-extrabold text-white">Notification Channels</h2>
+            <p className="text-zinc-400 text-sm mt-0.5">Configure where Bob routes high-priority pipeline blockers.</p>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="slack-webhook" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Slack Webhook URL</label>
+              <input
+                type="url"
+                id="slack-webhook"
+                className="w-full bg-zinc-900 border border-border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-650 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                placeholder="https://hooks.slack.com/services/..."
+                value={draft.slack_webhook ?? ''}
+                onChange={(event) => setDraft((current) => ({ ...current, slack_webhook: event.target.value }))}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="discord-webhook" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Discord Webhook URL</label>
+              <input
+                type="url"
+                id="discord-webhook"
+                className="w-full bg-zinc-900 border border-border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-650 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                placeholder="https://discord.com/api/webhooks/..."
+                value={draft.discord_webhook ?? ''}
+                onChange={(event) => setDraft((current) => ({ ...current, discord_webhook: event.target.value }))}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Auto-Triage Rules Card */}
+        <section className="bg-surface-card border border-border rounded-2xl p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-extrabold text-white">Auto-Triage Rules</h2>
+            <p className="text-zinc-400 text-sm mt-0.5">Set up automated labeling and developer tagging for broken pipelines.</p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {/* Scan cadence input */}
+            <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-border rounded-xl">
+              <div>
+                <h3 className="font-bold text-white text-sm">Scan cadence (seconds)</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Interval between automatic repository checks.</p>
+              </div>
+              <input
+                type="number"
+                min={60}
+                className="w-24 bg-zinc-900 border border-border rounded-lg px-3 py-1.5 text-sm text-white focus:border-brand outline-none text-center"
+                value={draft.scan_interval ?? 300}
+                onChange={(event) => setDraft((current) => ({ ...current, scan_interval: Number(event.target.value) }))}
+              />
+            </div>
+
+            {/* Rule Item 1 */}
+            <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-border rounded-xl">
+              <div>
+                <h3 className="font-bold text-white text-sm">Auto-label Merge Conflicts</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Apply 'conflict-detected' label immediately upon detection.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer font-bold select-none">
+                <input
+                  type="checkbox"
+                  id="rule-label-conflict"
+                  className="sr-only peer"
+                  checked={draft.auto_label_conflict ?? true}
+                  onChange={(event) => setDraft((current) => ({ ...current, auto_label_conflict: event.target.checked }))}
+                />
+                <div className="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+              </label>
+            </div>
+
+            {/* Rule Item 2 */}
+            <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-border rounded-xl">
+              <div>
+                <h3 className="font-bold text-white text-sm">Tag PR Author on CI Failure</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Automatically mention the author in a PR comment if checks fail.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer font-bold select-none">
+                <input
+                  type="checkbox"
+                  id="rule-tag-author"
+                  className="sr-only peer"
+                  checked={draft.tag_author_on_fail ?? false}
+                  onChange={(event) => setDraft((current) => ({ ...current, tag_author_on_fail: event.target.checked }))}
+                />
+                <div className="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        {/* Danger Zone Section */}
+        <section className="bg-surface-card border border-red-500/20 rounded-2xl p-6">
+          <div>
+            <h2 className="text-xl font-extrabold text-red-500">Danger Zone</h2>
+            <p className="text-zinc-400 text-sm mt-0.5">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>
+          </div>
+          <div className="mt-6">
+            <button
+              type="button"
+              className="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors"
+              onClick={() => void handleDeleteAccount()}
+            >
+              Delete Account
+            </button>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

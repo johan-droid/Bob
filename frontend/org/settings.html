@@ -1,130 +1,176 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bob | Organization Settings</title>
-    <link rel="stylesheet" href="dashboard.css">
-    <link rel="stylesheet" href="settings.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#7c3aed',
+                        'brand-glow': 'rgba(124, 58, 237, 0.15)',
+                        surface: '#09090b',
+                        'surface-card': '#18181b',
+                        border: 'rgba(255, 255, 255, 0.08)',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent 30%),
+                        radial-gradient(circle at top right, rgba(16, 185, 129, 0.04), transparent 25%),
+                        #09090b;
+        }
+        /* Custom styles for switch component */
+        .switch-input:checked ~ .switch-dot {
+            transform: translateX(100%);
+            background-color: #7c3aed;
+        }
+    </style>
 </head>
-<body>
-    <div class="app-container">
-        <aside id="nav-drawer" class="md3-drawer">
-            <div class="drawer-header">
-                <span class="material-icons-outlined logo-icon">merge_type</span>
-                <span class="brand-name">Bob Org</span>
-            </div>
-            <nav class="drawer-nav">
-                <a href="/org/dashboard" class="nav-item">
-                    <span class="material-icons-outlined">dashboard</span>
-                    Pipeline Health
-                </a>
-                <a href="/org/settings" class="nav-item active" aria-current="page">
-                    <span class="material-icons-outlined">settings_applications</span>
-                    Org Settings
-                </a>
-                <a href="/logout" class="nav-item logout-link" style="color: var(--red, #ef4444); margin-top: auto;">
-                    <span class="material-icons-outlined">logout</span>
-                    Logout
-                </a>
-            </nav>
-        </aside>
+<body class="text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-purple-500/30">
+    <div class="flex-1 flex flex-col">
+        <!-- Top Navigation -->
+        <nav class="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
+            <div class="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-8">
+                    <a href="/org/dashboard" class="flex items-center gap-3 group">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20 group-hover:scale-105 transition-transform">
+                            B
+                        </div>
+                        <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Bob Org</span>
+                    </a>
+                    <div class="hidden md:flex items-center gap-1">
+                        <a href="/org/dashboard" class="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Pipeline Health</a>
+                        <a href="/org/dashboard#team-velocity" class="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Team Velocity</a>
+                        <a href="/org/settings" class="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">Repo Settings</a>
+                    </div>
+                </div>
 
-        <main class="main-content">
-            <header class="md3-top-app-bar">
-                <div class="app-bar-left">
-                    <button id="menu-toggle" class="icon-btn" aria-label="Toggle Menu" type="button">
-                        <span class="material-icons-outlined">menu</span>
-                    </button>
-                    <h1 class="page-title">Organization Settings</h1>
+                <div class="flex items-center gap-4">
+                    <button id="global-save-btn" class="px-5 py-2 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:hover:bg-white transition-colors" type="button" disabled>Save Changes</button>
+                    <div class="w-8 h-8 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-brand" title="{{ user.name }}">
+                        {{ user.name[:1] if user.name else user.username[:1] }}
+                    </div>
                 </div>
-                <div class="app-bar-right">
-                    <button id="global-save-btn" class="md3-btn md3-btn-filled" type="button" disabled>Save Changes</button>
-                    <div class="avatar-circle">M</div>
-                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-[1000px] w-full mx-auto px-6 py-8 flex flex-col gap-8">
+            <!-- Header Section -->
+            <header class="pb-6 border-b border-border">
+                <span class="text-xs font-bold text-brand uppercase tracking-widest">Configuration</span>
+                <h1 class="text-3xl font-black mt-1 tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">Organization Settings</h1>
+                <p class="text-zinc-400 text-sm mt-1.5">Manage repository integrations, alerting channels, and automated triage rules.</p>
             </header>
 
-            <div class="settings-content">
-                <section class="settings-section md3-card">
-                    <div class="section-header">
-                        <h2>Monitored Repositories</h2>
-                        <p class="section-desc">Manage which GitHub repositories Bob tracks for CI failures and merge conflicts.</p>
+            <!-- Monitored Repositories Card -->
+            <section class="bg-surface-card border border-border rounded-2xl p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-white">Monitored Repositories</h2>
+                        <p class="text-zinc-400 text-sm mt-0.5">Manage which GitHub repositories Bob tracks for CI failures and merge conflicts.</p>
                     </div>
+                </div>
 
-                    <div class="sync-panel">
-                        <div class="sync-info">
-                            <span class="material-icons-outlined">sync_problem</span>
-                            <div class="sync-text">
-                                <strong>Not Synchronized</strong>
-                                <span>Awaiting GitHub App installation token payload.</span>
-                            </div>
-                        </div>
-                        <button class="md3-btn md3-btn-outlined" id="force-sync-btn" type="button">Force Sync</button>
-                    </div>
-                </section>
-
-                <section class="settings-section md3-card">
-                    <div class="section-header">
-                        <h2>Notification Channels</h2>
-                        <p class="section-desc">Configure where Bob routes high-priority pipeline blockers.</p>
-                    </div>
-
-                    <form class="settings-form" id="notifications-form">
-                        <div class="form-group">
-                            <label for="slack-webhook" class="md3-label">Slack Webhook URL</label>
-                            <input type="url" id="slack-webhook" class="md3-input" placeholder="https://hooks.slack.com/services/...">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="discord-webhook" class="md3-label">Discord Webhook URL</label>
-                            <input type="url" id="discord-webhook" class="md3-input" placeholder="https://discord.com/api/webhooks/...">
-                        </div>
-                    </form>
-                </section>
-
-                <section class="settings-section md3-card">
-                    <div class="section-header">
-                        <h2>Auto-Triage Rules</h2>
-                        <p class="section-desc">Set up automated labeling and developer tagging for broken pipelines.</p>
-                    </div>
-
-                    <div class="toggle-list">
-                        <div class="toggle-item">
-                            <div class="toggle-text">
-                                <strong>Auto-label Merge Conflicts</strong>
-                                <span>Apply 'conflict-detected' label immediately upon detection.</span>
-                            </div>
-                            <label class="md3-switch">
-                                <input type="checkbox" id="rule-label-conflict" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-
-                        <div class="toggle-item">
-                            <div class="toggle-text">
-                                <strong>Tag PR Author on CI Failure</strong>
-                                <span>Automatically mention the author in a PR comment if checks fail.</span>
-                            </div>
-                            <label class="md3-switch">
-                                <input type="checkbox" id="rule-tag-author">
-                                <span class="slider"></span>
-                            </label>
+                <div class="flex items-center justify-between p-4 bg-zinc-900 border border-border rounded-xl mb-6" id="sync-panel-container">
+                    <div class="flex items-center gap-3" id="sync-info-box">
+                        <span class="material-symbols-outlined text-red-500 text-2xl">sync_problem</span>
+                        <div class="sync-text flex flex-col">
+                            <strong class="text-sm font-bold text-white">Not Synchronized</strong>
+                            <span class="text-zinc-400 text-xs mt-0.5">Awaiting GitHub App installation token payload.</span>
                         </div>
                     </div>
-                </section>
+                    <button class="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-800 border border-border hover:bg-zinc-700 transition-colors" id="force-sync-btn" type="button">Force Sync</button>
+                </div>
 
-                <section class="settings-section md3-card danger-zone-section" style="border-top: 2px solid var(--red, #ef4444); margin-top: 24px;">
-                    <div class="section-header">
-                        <h2 style="color: var(--red, #ef4444);">Danger Zone</h2>
-                        <p class="section-desc">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>
+                <!-- Bento Grid of Connected Repositories -->
+                <div id="repos-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="col-span-full py-8 text-center text-zinc-500">
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="material-symbols-outlined text-2xl animate-spin text-zinc-600">sync</span>
+                            <p class="text-xs font-medium">Loading repositories from backend...</p>
+                        </div>
                     </div>
-                    <div style="margin-top: 16px;">
-                        <button class="md3-btn" id="delete-account-btn" type="button" style="background-color: var(--red, #ef4444); color: white; border: none; padding: 10px 20px; border-radius: 999px; font-weight: bold; cursor: pointer;">Delete Account</button>
+                </div>
+            </section>
+
+            <!-- Notification Channels Card -->
+            <section class="bg-surface-card border border-border rounded-2xl p-6">
+                <div class="mb-6">
+                    <h2 class="text-xl font-extrabold text-white">Notification Channels</h2>
+                    <p class="text-zinc-400 text-sm mt-0.5">Configure where Bob routes high-priority pipeline blockers.</p>
+                </div>
+
+                <form class="flex flex-col gap-6" id="notifications-form">
+                    <div class="flex flex-col gap-2">
+                        <label for="slack-webhook" class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Slack Webhook URL</label>
+                        <input type="url" id="slack-webhook" class="w-full bg-zinc-900 border border-border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors" placeholder="https://hooks.slack.com/services/...">
                     </div>
-                </section>
-            </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label for="discord-webhook" class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Discord Webhook URL</label>
+                        <input type="url" id="discord-webhook" class="w-full bg-zinc-900 border border-border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </form>
+            </section>
+
+            <!-- Auto-Triage Rules Card -->
+            <section class="bg-surface-card border border-border rounded-2xl p-6">
+                <div class="mb-6">
+                    <h2 class="text-xl font-extrabold text-white">Auto-Triage Rules</h2>
+                    <p class="text-zinc-400 text-sm mt-0.5">Set up automated labeling and developer tagging for broken pipelines.</p>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <!-- Rule Item 1 -->
+                    <div class="flex items-center justify-between p-4 bg-zinc-900/50 border border-border rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-white text-sm">Auto-label Merge Conflicts</h3>
+                            <p class="text-xs text-zinc-400 mt-0.5">Apply 'conflict-detected' label immediately upon detection.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="rule-label-conflict" class="sr-only peer">
+                            <div class="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+                        </label>
+                    </div>
+
+                    <!-- Rule Item 2 -->
+                    <div class="flex items-center justify-between p-4 bg-zinc-900/50 border border-border rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-white text-sm">Tag PR Author on CI Failure</h3>
+                            <p class="text-xs text-zinc-400 mt-0.5">Automatically mention the author in a PR comment if checks fail.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="rule-tag-author" class="sr-only peer">
+                            <div class="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Danger Zone Section -->
+            <section class="bg-surface-card border border-red-500/20 rounded-2xl p-6">
+                <div>
+                    <h2 class="text-xl font-extrabold text-red-500">Danger Zone</h2>
+                    <p class="text-zinc-400 text-sm mt-0.5">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>
+                </div>
+                <div class="mt-6">
+                    <button class="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors" id="delete-account-btn" type="button">Delete Account</button>
+                </div>
+            </section>
         </main>
     </div>
 

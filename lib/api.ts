@@ -49,6 +49,10 @@ export type AppSettings = {
   scan_interval?: number;
   excluded_repos?: string[];
   notify_in_app?: boolean;
+  slack_webhook?: string;
+  discord_webhook?: string;
+  auto_label_conflict?: boolean;
+  tag_author_on_fail?: boolean;
   updated_at?: string | null;
 };
 
@@ -89,7 +93,9 @@ export function realtimeBaseUrl() {
     return configuredBaseUrl;
   }
 
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '3000') {
+  if (typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
+      window.location.port === '3000') {
     return 'http://localhost:5000';
   }
 

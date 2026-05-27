@@ -34,7 +34,7 @@
     },
     "WEBHOOK_SECRET": {
       "description": "Secret for GitHub Webhook HMAC-SHA256 verification. Set this in your GitHub Webhook config.",
-      "required": false
+      "required": true
     },
     "ASSIGNEE_USERNAME": {
       "description": "GitHub username to @mention in auto-created issues (e.g. jules).",

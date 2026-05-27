@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateConnectionStatus = (status, text) => {
         if (wsStatusDot) {
-            wsStatusDot.className = `status-dot ${status}`;
+            wsStatusDot.className = `status-dot w-2 h-2 rounded-full ${status}`;
         }
         if (wsStatusText) {
             wsStatusText.textContent = text;
@@ -37,10 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tableBody.innerHTML = `
             <tr class="empty-state-row">
-                <td colspan="5">
-                    <div class="empty-state">
-                        <span class="material-icons-outlined empty-icon">sync</span>
-                        <p>${message}</p>
+                <td colspan="5" class="py-16 text-center text-zinc-500">
+                    <div class="flex flex-col items-center gap-3">
+                        <span class="material-symbols-outlined text-3xl animate-spin text-zinc-600">sync</span>
+                        <p class="font-medium">${message}</p>
                     </div>
                 </td>
             </tr>
@@ -59,28 +59,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prs = Array.isArray(payload.prs) ? payload.prs : [];
         if (!prs.length) {
-            ensureEmptyState('Awaiting WebSocket payload from connected repositories...');
+            ensureEmptyState('No active PR health blockers detected across repositories.');
             return;
         }
 
-        tableBody.innerHTML = prs.map((pr) => `
-            <tr>
-                <td>${escapeHtml(pr.repo || '')}</td>
-                <td>
-                    <div class="pr-title">${escapeHtml(pr.title || 'Untitled PR')}</div>
-                    <div class="pr-meta">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
-                </td>
-                <td>${escapeHtml(pr.author || 'Pending event')}</td>
-                <td>${escapeHtml(pr.ci_status || 'Awaiting payload')}</td>
-                <td>${escapeHtml(pr.merge_health || 'Awaiting payload')}</td>
-            </tr>
-        `).join('');
+        tableBody.innerHTML = prs.map((pr) => {
+            const isFailing = pr.ci_status === 'Failed' || pr.ci_status === 'Failing';
+            const hasConflict = pr.merge_health === 'Conflict' || pr.merge_health === 'Conflicting';
+
+            const ciBadge = isFailing
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20"><span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>Failed</span>`
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Passing</span>`;
+
+            const mergeBadge = hasConflict
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">Conflict</span>`
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 border border-border text-zinc-400">Healthy</span>`;
+
+            return `
+                <tr class="hover:bg-zinc-900/40 transition-colors">
+                    <td class="py-4 px-4 font-mono text-zinc-300 font-medium">${escapeHtml(pr.repo || '')}</td>
+                    <td class="py-4 px-4">
+                        <div class="font-bold text-white">${escapeHtml(pr.title || 'Untitled PR')}</div>
+                        <div class="text-xs text-zinc-500 mt-1 font-mono">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
+                    </td>
+                    <td class="py-4 px-4 font-semibold text-zinc-400">${escapeHtml(pr.author || 'Pending event')}</td>
+                    <td class="py-4 px-4">${ciBadge}</td>
+                    <td class="py-4 px-4">${mergeBadge}</td>
+                </tr>
+            `;
+        }).join('');
     };
 
     ensureEmptyState('Awaiting WebSocket payload from connected repositories...');
     updateConnectionStatus('connecting', 'Connecting...');
 
-    const wsUrl = window.location.hostname === 'localhost'
+    // Resolve localhost / 127.0.0.1 connection to Flask backend on port 5000
+    const wsUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:5000'
         : window.location.origin;
 

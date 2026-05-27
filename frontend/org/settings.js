@@ -3,7 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const navDrawer = document.getElementById('nav-drawer');
     const saveButton = document.getElementById('global-save-btn');
     const syncButton = document.getElementById('force-sync-btn');
-    const syncStatus = document.querySelector('.sync-text');
+    const syncStatusBox = document.getElementById('sync-info-box');
+    const reposGrid = document.getElementById('repos-grid');
+
     const inputs = [
         document.getElementById('slack-webhook'),
         document.getElementById('discord-webhook'),
@@ -19,11 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     let initialState = snapshotState();
+    let currentSettings = {};
 
     const setSaveState = () => {
         const isDirty = JSON.stringify(snapshotState()) !== JSON.stringify(initialState);
-        saveButton.disabled = !isDirty;
-        saveButton.textContent = isDirty ? 'Save Changes' : 'Save Changes';
+        if (saveButton) {
+            saveButton.disabled = !isDirty;
+        }
     };
 
     if (menuToggle && navDrawer) {
@@ -43,38 +47,270 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('change', setSaveState);
     });
 
-    saveButton.addEventListener('click', () => {
+    const loadSettings = async () => {
+        try {
+            const resp = await fetch('/api/app-state');
+            if (!resp.ok) {
+                if (resp.status === 401) { window.location.href = '/'; return; }
+                throw new Error(`HTTP ${resp.status}`);
+            }
+            const appState = await resp.json();
+            const data = appState.settings || {};
+            const meta = appState.meta || {};
+            const dashboard = appState.dashboard || {};
+            const repos = dashboard.repos || [];
+
+            currentSettings = data;
+
+            const slackInput = document.getElementById('slack-webhook');
+            const discordInput = document.getElementById('discord-webhook');
+            const conflictCheckbox = document.getElementById('rule-label-conflict');
+            const authorCheckbox = document.getElementById('rule-tag-author');
+
+            if (slackInput) slackInput.value = data.slack_webhook || '';
+            if (discordInput) discordInput.value = data.discord_webhook || '';
+            if (conflictCheckbox) conflictCheckbox.checked = data.auto_label_conflict ?? true;
+            if (authorCheckbox) authorCheckbox.checked = data.tag_author_on_fail ?? false;
+
+            // Sync Status UI update
+            if (syncStatusBox) {
+                const statusLine = syncStatusBox.querySelector('strong');
+                const detailLine = syncStatusBox.querySelector('span');
+                const syncIcon = syncStatusBox.querySelector('.material-symbols-outlined');
+                if (meta.active_repo_count > 0) {
+                    if (statusLine) statusLine.textContent = 'Synchronized';
+                    if (detailLine) detailLine.textContent = `${meta.active_repo_count} repositories actively monitored.`;
+                    if (syncIcon) {
+                        syncIcon.textContent = 'sync';
+                        syncIcon.className = 'material-symbols-outlined text-success text-2xl';
+                    }
+                } else {
+                    if (statusLine) statusLine.textContent = 'Not Synchronized';
+                    if (detailLine) detailLine.textContent = 'Awaiting GitHub App installation token payload.';
+                    if (syncIcon) {
+                        syncIcon.textContent = 'sync_problem';
+                        syncIcon.className = 'material-symbols-outlined text-danger text-2xl';
+                    }
+                }
+            }
+
+            // Render Repos Grid
+            renderReposGrid(repos);
+
+            initialState = snapshotState();
+            setSaveState();
+        } catch (err) {
+            console.error('Failed to load settings:', err);
+            if (reposGrid) {
+                reposGrid.innerHTML = `
+                    <div class="col-span-full py-8 text-center text-red-500 font-medium">
+                        Failed to load repository status.
+                    </div>
+                `;
+            }
+        }
+    };
+
+    const renderReposGrid = (repos) => {
+        if (!reposGrid) return;
+        if (!repos.length) {
+            reposGrid.innerHTML = `
+                <div class="col-span-full py-8 text-center text-zinc-500">
+                    No repositories connected yet. Discovered repositories will show up here.
+                </div>
+            `;
+            return;
+        }
+
+        reposGrid.innerHTML = repos.map((repo) => {
+            const isActive = repo.is_active;
+            const statusBadge = isActive
+                ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Active</span>`
+                : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400 border border-border">Paused</span>`;
+
+            return `
+                <div class="bg-zinc-900 border border-border rounded-xl p-5 hover:border-zinc-800 transition-colors flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start gap-4">
+                            <div>
+                                <h3 class="font-bold text-white text-sm break-all">${escapeHtml(repo.full_name || '')}</h3>
+                                <p class="text-zinc-500 text-xs mt-1">${escapeHtml(repo.language || 'Unknown language')}</p>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                        <div class="flex justify-between items-center text-xs text-zinc-400 mt-4">
+                            <span>Open Risks: <strong class="text-white">${repo.issue_count ?? 0}</strong></span>
+                            <span class="bg-zinc-800/40 px-2 py-0.5 border border-border rounded text-[10px] uppercase font-bold text-zinc-400">${escapeHtml(repo.permission || 'read')}</span>
+                        </div>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-zinc-800/60 flex justify-between items-center gap-4">
+                        <span class="text-[10px] text-zinc-500 font-medium">Synced ${repo.last_synced ? 'recently' : 'never'}</span>
+                        <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors toggle-monitor-btn" data-repo="${escapeHtml(repo.full_name || '')}" data-active="${isActive}">
+                            ${isActive ? 'Pause' : 'Resume'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Wire up Pause/Resume buttons
+        document.querySelectorAll('.toggle-monitor-btn').forEach((btn) => {
+            btn.addEventListener('click', async (e) => {
+                const repoName = btn.getAttribute('data-repo');
+                const isActive = btn.getAttribute('data-active') === 'true';
+                btn.disabled = true;
+                btn.textContent = isActive ? 'Pausing...' : 'Resuming...';
+                await toggleRepoMonitoring(repoName, isActive);
+            });
+        });
+    };
+
+    const toggleRepoMonitoring = async (repoName, currentlyActive) => {
+        try {
+            const excluded = new Set(currentSettings.excluded_repos || []);
+            if (currentlyActive) {
+                excluded.add(repoName);
+            } else {
+                excluded.delete(repoName);
+            }
+
+            const csrfRes = await fetch('/api/csrf-token');
+            const csrfData = await csrfRes.json();
+            const csrfToken = csrfData.csrf_token;
+
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    excluded_repos: Array.from(excluded)
+                })
+            });
+
+            if (response.ok) {
+                await loadSettings();
+            } else {
+                alert('Failed to update repository monitoring status.');
+                await loadSettings();
+            }
+        } catch (err) {
+            console.error(err);
+            alert('An error occurred during state toggle.');
+            await loadSettings();
+        }
+    };
+
+    saveButton.addEventListener('click', async () => {
         saveButton.disabled = true;
         saveButton.textContent = 'Saving...';
 
-        const payload = snapshotState();
-        console.info('Saving org settings payload', payload);
+        const state = snapshotState();
+        const payload = {
+            slack_webhook: state.slackWebhook,
+            discord_webhook: state.discordWebhook,
+            auto_label_conflict: state.autoLabelConflict,
+            tag_author_on_fail: state.tagAuthorOnFail
+        };
 
-        window.setTimeout(() => {
-            initialState = snapshotState();
-            saveButton.textContent = 'Saved';
-            window.setTimeout(() => {
+        try {
+            const csrfRes = await fetch('/api/csrf-token');
+            const csrfData = await csrfRes.json();
+            const csrfToken = csrfData.csrf_token;
+
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                initialState = snapshotState();
+                saveButton.textContent = 'Saved';
+                window.setTimeout(() => {
+                    setSaveState();
+                }, 1200);
+            } else {
+                const data = await response.json();
+                alert(data.error || 'Failed to save settings.');
                 setSaveState();
-            }, 1200);
-        }, 800);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('An error occurred while saving settings.');
+            setSaveState();
+        }
     });
 
-    syncButton.addEventListener('click', () => {
+    syncButton.addEventListener('click', async () => {
         const original = syncButton.textContent;
         syncButton.disabled = true;
         syncButton.textContent = 'Syncing...';
 
-        if (syncStatus) {
-            const statusLine = syncStatus.querySelector('strong');
-            const detailLine = syncStatus.querySelector('span');
+        if (syncStatusBox) {
+            const statusLine = syncStatusBox.querySelector('strong');
+            const detailLine = syncStatusBox.querySelector('span');
             if (statusLine) statusLine.textContent = 'Sync Requested';
-            if (detailLine) detailLine.textContent = 'Awaiting the GitHub App sync worker.';
+            if (detailLine) detailLine.textContent = 'Scanning repositories...';
         }
 
-        window.setTimeout(() => {
-            syncButton.disabled = false;
-            syncButton.textContent = original;
-        }, 1200);
+        try {
+            const csrfRes = await fetch('/api/csrf-token');
+            const csrfData = await csrfRes.json();
+            const csrfToken = csrfData.csrf_token;
+
+            // Step 1: Discover Repos (triggers sync of repository catalog)
+            const discoverRes = await fetch('/api/discover-repos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            // Step 2: Trigger PR scan
+            const scanRes = await fetch('/api/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            if (discoverRes.ok && scanRes.ok) {
+                await loadSettings();
+                if (syncStatusBox) {
+                    const statusLine = syncStatusBox.querySelector('strong');
+                    const detailLine = syncStatusBox.querySelector('span');
+                    if (statusLine) statusLine.textContent = 'Synchronized';
+                    if (detailLine) detailLine.textContent = 'Repository and PR scan complete.';
+                }
+            } else {
+                if (syncStatusBox) {
+                    const statusLine = syncStatusBox.querySelector('strong');
+                    const detailLine = syncStatusBox.querySelector('span');
+                    if (statusLine) statusLine.textContent = 'Sync Failed';
+                    if (detailLine) detailLine.textContent = 'Discovery or Scan request failed.';
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            if (syncStatusBox) {
+                const statusLine = syncStatusBox.querySelector('strong');
+                const detailLine = syncStatusBox.querySelector('span');
+                if (statusLine) statusLine.textContent = 'Sync Error';
+                if (detailLine) detailLine.textContent = 'An error occurred during sync.';
+            }
+        } finally {
+            window.setTimeout(() => {
+                syncButton.disabled = false;
+                syncButton.textContent = original;
+            }, 2000);
+        }
     });
 
     const deleteBtn = document.getElementById('delete-account-btn');
@@ -87,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteBtn.disabled = true;
                 deleteBtn.textContent = 'Deleting...';
                 
-                // Get CSRF Token
                 const csrfRes = await fetch('/api/csrf-token');
                 const csrfData = await csrfRes.json();
                 const csrfToken = csrfData.csrf_token;
@@ -117,5 +352,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    setSaveState();
+    // Initial load
+    loadSettings();
 });
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

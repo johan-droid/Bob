@@ -1,8 +1,16 @@
-import eventlet
-eventlet.monkey_patch(os=False)
-
 import sys as _sys
-import os, secrets, hmac, hashlib, threading, time
+import os
+
+_ASYNC_MODE = 'eventlet'
+if _sys.platform == 'win32':
+    _ASYNC_MODE = 'threading'
+
+if _ASYNC_MODE == 'eventlet':
+    import eventlet
+    eventlet.monkey_patch(os=False)
+
+import base64
+import secrets, hmac, hashlib, threading, time
 from datetime import datetime
 from functools import wraps
 from urllib.parse import urlencode
@@ -14,6 +22,7 @@ from flask_socketio import SocketIO, emit, join_room
 from flask_session import Session
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet, InvalidToken
 import requests as http_req
 
 from database import init_db
@@ -25,7 +34,12 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
 REACT_DIST_DIR = os.path.join(PROJECT_ROOT, 'out')
 
-load_dotenv()
+# Load root .env explicitly if it exists to avoid missing credentials when run from backend/
+_root_env = os.path.join(PROJECT_ROOT, '.env')
+if os.path.exists(_root_env):
+    load_dotenv(_root_env)
+else:
+    load_dotenv()
 logger = get_logger(__name__)
 
 # ── Required env vars ─────────────────────────────────────────────────────────
@@ -37,6 +51,7 @@ GITHUB_CLIENT_ID      = os.getenv('GITHUB_CLIENT_ID')
 GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
 GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
 WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
+ALLOW_UNSIGNED_WEBHOOKS = os.getenv('ALLOW_UNSIGNED_WEBHOOKS', '0') == '1'
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 SCAN_INTERVAL         = int(os.getenv('SCAN_INTERVAL', 300))
 TARGET_REPOS_OVERRIDE = [r.strip() for r in os.getenv('TARGET_REPOS', '').split(',') if r.strip()]
@@ -74,7 +89,6 @@ app.config.update(
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 Session(app)
 csrf = CSRFProtect(app)
-_ASYNC_MODE = 'eventlet'
 socketio = SocketIO(app,
                     cors_allowed_origins="*",
                     manage_session=False,
@@ -119,6 +133,26 @@ def ensure_schema():
             if not column_exists('pr_issues', 'comment_count'):
                 db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"))
 
+            # Add author to pr_issues
+            if not column_exists('pr_issues', 'author'):
+                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN author VARCHAR(255)"))
+
+            # Add slack_webhook to user_settings
+            if not column_exists('user_settings', 'slack_webhook'):
+                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN slack_webhook VARCHAR(500)"))
+
+            # Add discord_webhook to user_settings
+            if not column_exists('user_settings', 'discord_webhook'):
+                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN discord_webhook VARCHAR(500)"))
+
+            # Add auto_label_conflict to user_settings
+            if not column_exists('user_settings', 'auto_label_conflict'):
+                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN auto_label_conflict BOOLEAN DEFAULT 1"))
+
+            # Add tag_author_on_fail to user_settings
+            if not column_exists('user_settings', 'tag_author_on_fail'):
+                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN tag_author_on_fail BOOLEAN DEFAULT 0"))
+
             db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:
@@ -142,6 +176,28 @@ threading.Thread(target=_start_bg_scan, daemon=True).start()
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def gh(token): return {**GH_HEADERS, 'Authorization': f'token {token}'}
+
+TOKEN_PREFIX = 'v1:'
+
+def _token_cipher() -> Fernet:
+    key = base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest())
+    return Fernet(key)
+
+
+def _encrypt_token(token: str) -> str:
+    return TOKEN_PREFIX + _token_cipher().encrypt(token.encode()).decode()
+
+
+def _decrypt_token(token: str | None) -> str | None:
+    if not token:
+        return None
+    if not token.startswith(TOKEN_PREFIX):
+        return token
+    try:
+        return _token_cipher().decrypt(token[len(TOKEN_PREFIX):].encode()).decode()
+    except InvalidToken:
+        logger.warning('Stored GitHub token could not be decrypted')
+        return None
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 def login_required(f):
@@ -382,7 +438,7 @@ def github_callback():
         user.name       = ud.get('name') or username
         user.email      = ud.get('email')
         user.last_login = datetime.utcnow()
-        user.access_token = access_token
+        user.access_token = _encrypt_token(access_token)
         db.session.commit()
 
         # Ensure user has settings row
@@ -409,7 +465,7 @@ def github_callback():
 def get_user_token(user_id: int) -> str | None:
     """Retrieve the stored OAuth token for a user (server-side only)."""
     user = User.query.get(user_id)
-    return user.access_token if user else None
+    return _decrypt_token(user.access_token) if user else None
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
@@ -715,6 +771,10 @@ def user_settings():
             'scan_interval':  s.scan_interval,
             'excluded_repos': s.get_excluded_list(),
             'notify_in_app':  s.notify_in_app,
+            'slack_webhook': s.slack_webhook,
+            'discord_webhook': s.discord_webhook,
+            'auto_label_conflict': s.auto_label_conflict,
+            'tag_author_on_fail': s.tag_author_on_fail,
         })
 
     data = request.get_json() or {}
@@ -723,6 +783,10 @@ def user_settings():
     if 'excluded_repos' in data: s.excluded_repos     = ','.join(data['excluded_repos'])
     if 'notify_in_app'  in data: s.notify_in_app      = bool(data['notify_in_app'])
     if 'push_subscription' in data: s.push_subscription = data['push_subscription']
+    if 'slack_webhook' in data: s.slack_webhook = data['slack_webhook']
+    if 'discord_webhook' in data: s.discord_webhook = data['discord_webhook']
+    if 'auto_label_conflict' in data: s.auto_label_conflict = bool(data['auto_label_conflict'])
+    if 'tag_author_on_fail' in data: s.tag_author_on_fail = bool(data['tag_author_on_fail'])
     s.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({'saved': True})
@@ -766,6 +830,10 @@ def update_issue_status(issue_id):
 @csrf.exempt
 @app.route('/api/webhooks/github', methods=['POST'])
 def github_webhook():
+    if not WEBHOOK_SECRET and not ALLOW_UNSIGNED_WEBHOOKS:
+        logger.warning('Rejected unsigned GitHub webhook because WEBHOOK_SECRET is not configured')
+        abort(403)
+
     if WEBHOOK_SECRET:
         sig = request.headers.get('X-Hub-Signature-256', '')
         expected = 'sha256=' + hmac.new(
@@ -876,6 +944,7 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     title=pr['title'], url=pr['url'],
                     pr_number=pr['pr'], branch=pr.get('head_branch'),
                     issue_type='merge_conflict', status='pending',
+                    author=pr.get('author'),
                 )
                 db.session.add(issue)
             
@@ -891,6 +960,7 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     title=f"CI: {f['name']} failed on {f['branch']}",
                     url=f['html_url'], run_id=str(f['id']), branch=f['branch'],
                     issue_type='ci_failure', status='pending',
+                    author=f.get('author'),
                 )
                 db.session.add(issue)
     
@@ -946,7 +1016,7 @@ def _get_user_data(user_id):
     
     repos_list = []
     for ur in user_repos:
-        repo_issues = [i for i in issues if i.repo == ur.full_name]
+        repo_issues = [i for i in issues if i.repo == ur.full_name and i.status != 'resolved']
         repos_list.append({
             'full_name': ur.full_name,
             'private': ur.private,
@@ -961,10 +1031,42 @@ def _get_user_data(user_id):
             'language': ur.language,
         })
 
+    # Compute additional stats expected by the legacy frontend
+    open_issues = [i for i in issues if i.status != 'resolved']
+    conflicts_count = len([i for i in open_issues if i.issue_type == 'merge_conflict'])
+    failing_count = len([i for i in open_issues if i.issue_type == 'ci_failure'])
+    ready_count = len([r for r in repos_list if r['is_active'] and r['issue_count'] == 0])
+
+    stats = {
+        'pending': len(by_status['pending']),
+        'in_progress': len(by_status['in_progress']),
+        'failed': len(by_status['failed']),
+        'resolved': len(by_status['resolved']),
+        'total': len(issues),
+        'conflicts': conflicts_count,
+        'failing': failing_count,
+        'ready': ready_count
+    }
+
+    # Construct the combined list of PRs expected by the legacy frontend
+    prs_list = []
+    for i in issues:
+        prs_list.append({
+            'id': i.id,
+            'repo': i.repo,
+            'title': i.title,
+            'number': i.pr_number or (i.run_id if i.run_id else 'N/A'),
+            'author': i.author or 'Unknown',
+            'ci_status': 'Failed' if i.issue_type == 'ci_failure' and i.status != 'resolved' else 'Passing',
+            'merge_health': 'Conflict' if i.issue_type == 'merge_conflict' and i.status != 'resolved' else 'Healthy',
+            'status': i.status
+        })
+
     return {
         **by_status,
-        'stats': {k: len(v) for k, v in by_status.items()} | {'total': len(issues)},
+        'stats': stats,
         'repos': repos_list,
+        'prs': prs_list,
     }
 
 def _get_app_state(user):
@@ -985,6 +1087,10 @@ def _get_app_state(user):
             'scan_interval': settings.scan_interval,
             'excluded_repos': settings.get_excluded_list(),
             'notify_in_app': settings.notify_in_app,
+            'slack_webhook': settings.slack_webhook,
+            'discord_webhook': settings.discord_webhook,
+            'auto_label_conflict': settings.auto_label_conflict,
+            'tag_author_on_fail': settings.tag_author_on_fail,
             'updated_at': settings.updated_at.isoformat() if settings.updated_at else None,
         },
         'meta': {

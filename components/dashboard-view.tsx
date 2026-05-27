@@ -18,23 +18,6 @@ function combineIssues(data: DashboardPayload) {
   ));
 }
 
-function formatStatus(status?: string) {
-  return (status || 'pending').replace(/_/g, ' ');
-}
-
-function issueTone(issue: IssueItem) {
-  if (issue.status === 'resolved') return 'success';
-  if (issue.status === 'in_progress') return 'warning';
-  if (issue.type === 'ci_failure' || issue.status === 'failed') return 'danger';
-  return 'attention';
-}
-
-function issueLabel(issue: IssueItem) {
-  if (issue.type === 'merge_conflict') return 'Merge conflict';
-  if (issue.type === 'ci_failure') return 'CI failure';
-  return 'PR risk';
-}
-
 function uniqueRepos(issues: IssueItem[]) {
   return new Set(issues.map((issue) => issue.repo).filter(Boolean)).size;
 }
@@ -174,36 +157,6 @@ export function DashboardView({ mode }: Props) {
     }
   };
 
-  const saveSettings = async (nextSettings: AppSettings) => {
-    try {
-      setAction('Saving settings');
-      await api.saveSettings(nextSettings);
-      await refreshState(true);
-      setNotice('Monitoring settings saved.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save settings.');
-    } finally {
-      setAction(null);
-    }
-  };
-
-  const toggleRepo = async (repo: RepoItem) => {
-    if (!repo.full_name) return;
-    const excluded = new Set(settings.excluded_repos || []);
-    if (excluded.has(repo.full_name)) {
-      excluded.delete(repo.full_name);
-    } else {
-      excluded.add(repo.full_name);
-    }
-    await saveSettings({ ...settings, excluded_repos: Array.from(excluded) });
-  };
-
-  const updateScanInterval = async (value: string) => {
-    const scanInterval = Number(value);
-    if (!Number.isFinite(scanInterval)) return;
-    await saveSettings({ ...settings, scan_interval: Math.max(60, scanInterval) });
-  };
-
   const routeIssueToAgent = (issue: IssueItem, agentName: string) => {
     setAction(`Routing ${issue.repo || 'issue'} to ${agentName}`);
     window.setTimeout(() => {
@@ -225,337 +178,404 @@ export function DashboardView({ mode }: Props) {
     }
   };
 
-  const title = mode === 'org' ? 'PR command center' : 'My PR command center';
-  const subtitle = mode === 'org'
-    ? 'Bob monitors authenticated GitHub repositories, groups delivery risks, and keeps repo controls close to the work.'
-    : 'Bob tracks your authenticated pull request risks and turns them into a focused action queue.';
-  const modeLabel = mode === 'org' ? 'Org workspace' : 'Personal workspace';
-  const activeRepoCount = state.meta?.active_repo_count ?? activeRepos.length;
-
   return (
-    <main className="ops-shell bento-theme">
-      <nav className="ops-topbar">
-        <div className="ops-topbar-main">
-          <a href="/" className="ops-brand" aria-label="Bob home">
-            <span>B</span>
-            Bob
-          </a>
-          <div className="ops-topbar-center">
-            <a href="#overview" className="active">Overview</a>
-            <a href="#queue">Risk queue</a>
-            <a href="#repos">Repositories</a>
-            <a href="#settings">Settings</a>
+    <div className="flex-grow flex flex-col">
+      <nav className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
+        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-8">
+            <a href="/org/dashboard" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20 group-hover:scale-105 transition-transform">
+                B
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
+                Bob Org
+              </span>
+            </a>
+            <div className="hidden md:flex items-center gap-1">
+              <a href="#pipeline-health" className="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">
+                Pipeline Health
+              </a>
+              <a href="#team-velocity" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">
+                Team Velocity
+              </a>
+              <a href="/org/settings" className="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">
+                Repo Settings
+              </a>
+            </div>
           </div>
-        </div>
-        <div className="ops-topbar-right">
-          <div className="ops-live-status" aria-live="polite">
-            <span className={`ops-dot ${liveStatus}`} />
-            <small>{formatStatus(liveStatus)}</small>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-border" id="ws-status">
+              <span className={`w-2 h-2 rounded-full ${
+                liveStatus === 'connected' ? 'bg-success shadow-[0_0_10px_#10b981]' :
+                liveStatus === 'disconnected' ? 'bg-danger shadow-[0_0_10px_#ef4444]' :
+                'bg-warning shadow-[0_0_10px_#f59e0b] animate-pulse'
+              }`} />
+              <span className="text-xs font-bold text-zinc-400">
+                {liveStatus === 'connected' ? 'Connected' : liveStatus === 'disconnected' ? 'Disconnected' : 'Connecting...'}
+              </span>
+            </div>
+
+            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-brand" title={state.user?.name || state.user?.username || ''}>
+              {(state.user?.name || state.user?.username || 'U')[0].toUpperCase()}
+            </div>
+
+            <a href="/logout" className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold border border-border hover:bg-zinc-800 transition-colors">
+              Logout
+            </a>
           </div>
-          <button
-            type="button"
-            className="ops-button settings-toggle"
-            aria-expanded={showSettings}
-            onClick={() => setShowSettings((s) => !s)}
-            title="Toggle settings"
-          >
-            {showSettings ? 'Close' : 'Settings'}
-          </button>
-          <a href="/logout" className="logout-link ops-button outline">Logout</a>
         </div>
       </nav>
 
-      <section className="ops-main">
-        <div className="ops-command-bar" aria-label="Dashboard command summary">
+      <main className="flex-grow max-w-[1400px] w-full mx-auto px-6 py-8 flex flex-col gap-8">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-border">
           <div>
-            <span className="ops-command-eyebrow">Live workspace</span>
-            <strong>{openIssues.length ? `${openIssues.length} active risks` : 'All clear right now'}</strong>
-          </div>
-          <div className="ops-command-search" aria-hidden="true">
-            <span>Search repos, PRs, blockers</span>
-            <kbd>/</kbd>
-          </div>
-          <div className="ops-command-agents" aria-label="Available routing agents">
-            <span>Copilot</span>
-            <span>Jules</span>
-            <span>Codex</span>
-          </div>
-        </div>
-
-        <header className="ops-hero" id="overview">
-          <div className="ops-hero-copy">
-            <div className="ops-hero-badges">
-              <p className="ops-kicker">GitHub authenticated workspace</p>
-              <span className="ops-mode-pill">{modeLabel}</span>
-            </div>
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
-            <div className="ops-actions">
-              <button type="button" className="ops-button secondary" onClick={() => void discoverRepos()} disabled={!!action}>
-                Discover repos
-              </button>
-              <button type="button" className="ops-button secondary" onClick={() => void refreshState()} disabled={!!action}>
-                Refresh
-              </button>
-              <button type="button" className="ops-button primary" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
-                Run PR scan
-              </button>
-            </div>
-          </div>
-
-          <aside className="ops-hero-card bento-box" aria-label="Workspace summary">
-            <p className="ops-card-label">Workspace pulse</p>
-            <div className="ops-hero-score">
-              <strong>{openIssues.length}</strong>
-              <span>open risks across {affectedRepoCount} repositories</span>
-            </div>
-            <div className="ops-hero-stats">
-              <div>
-                <strong>{activeRepoCount}</strong>
-                <span>active repos</span>
-              </div>
-              <div>
-                <strong>{settings.scan_interval ?? 300}s</strong>
-                <span>scan cadence</span>
-              </div>
-              <div>
-                <strong>{ciFailures.length + mergeConflicts.length}</strong>
-                <span>critical blockers</span>
-              </div>
-            </div>
-            <p className="ops-hero-note">
-              Use discovery to populate new repos, then run a scan to refresh live GitHub risk signals.
+            <span className="text-xs font-bold text-brand uppercase tracking-widest">Executive Summary</span>
+            <h1 className="text-3xl font-black mt-1 tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
+              Pipeline Health
+            </h1>
+            <p className="text-zinc-400 text-sm mt-1.5">
+              Organization-wide pull request monitoring and CI analysis.
             </p>
-            <div className="ops-system-strip" aria-label="Risk pipeline">
-              <span>Discover</span>
-              <i />
-              <span>Scan</span>
-              <i />
-              <span>Route</span>
-            </div>
-          </aside>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors"
+              aria-label="Notifications"
+            >
+              <span className="material-symbols-outlined text-[18px]">notifications</span>
+              Alerts
+            </button>
+            <a
+              href="/org/settings"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5"
+            >
+              <span className="material-symbols-outlined text-[18px]">settings</span>
+              Manage Settings
+            </a>
+          </div>
         </header>
 
-        <div className="ops-alert-stack">
-          {error ? <div className="ops-alert danger">{error}</div> : null}
-          {notice ? <div className="ops-alert success">{notice}</div> : null}
-          {action ? <div className="ops-alert neutral">{action}...</div> : null}
-        </div>
-
-        <div className="ops-metrics">
-          <article className="bento-box ops-metric-card">
-            <span>Open risks</span>
-            <strong>{openIssues.length}</strong>
-            <p>{affectedRepoCount} repositories currently need attention.</p>
-          </article>
-          <article className="bento-box ops-metric-card">
-            <span>Merge conflicts</span>
-            <strong>{mergeConflicts.length}</strong>
-            <p>Branch collisions that need intervention before merge.</p>
-          </article>
-          <article className="bento-box ops-metric-card">
-            <span>CI failures</span>
-            <strong>{ciFailures.length}</strong>
-            <p>Workflow runs that are red and blocking confidence.</p>
-          </article>
-          <article className="bento-box ops-metric-card">
-            <span>Clean active repos</span>
-            <strong>{cleanRepos.length}</strong>
-            <p>{activeRepos.length} active repositories are currently being watched.</p>
-          </article>
-        </div>
-
-        <section className="ops-grid">
-          <div className="ops-panel bento-box large" id="queue">
-            <div className="ops-panel-head">
-              <div>
-                <p className="ops-kicker">Management queue</p>
-                <h2>Pull request risks</h2>
-              </div>
-              <span className="ops-badge">{loading ? 'Loading' : `${openIssues.length} open`}</span>
+        <div className="flex flex-col gap-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-red-500 text-[18px]">error</span>
+              {error}
             </div>
+          )}
 
-            {loading ? (
-              <div className="ops-empty">Loading real GitHub data from the backend...</div>
-            ) : openIssues.length ? (
-              <div className="ops-issue-list">
-                {openIssues.map((issue) => (
-                  <article className="ops-issue bento-inner" key={issue.id || issue.issue_key}>
-                    <div className={`ops-issue-mark ${issueTone(issue)}`} />
-                    <div className="ops-issue-content">
-                      <div className="ops-issue-head">
-                        <div className="ops-issue-meta">
-                          <span className="issue-label">{issueLabel(issue)}</span>
-                          <span className="ops-meta-pill">{issue.repo || 'Unknown repository'}</span>
-                          {issue.pr_number ? <span className="ops-meta-pill">PR #{issue.pr_number}</span> : null}
-                        </div>
-                        <span className={`ops-status-pill ${issueTone(issue)}`}>{formatStatus(issue.status)}</span>
-                      </div>
-                      <h3>{issue.title || 'Untitled GitHub issue'}</h3>
-                      <p className="issue-desc">{issue.branch ? `Branch: ${issue.branch}` : 'Branch data unavailable'} · Status: {formatStatus(issue.status)}</p>
+          {notice && (
+            <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-success text-[18px]">check_circle</span>
+              {notice}
+            </div>
+          )}
 
-                      <div className="ops-row-actions ai-triggers">
-                        <div className="ops-primary-actions">
-                          {issue.url ? <a href={issue.url} target="_blank" rel="noreferrer" className="ops-button outline sm">Open GitHub</a> : null}
-                          <button type="button" className="ops-button outline sm resolve-btn" onClick={() => void changeIssueStatus(issue, 'resolved')}>
-                            Resolve
-                          </button>
-                        </div>
+          {action && (
+            <div className="bg-purple-500/10 border border-purple-500/20 text-purple-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2 animate-pulse">
+              <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+              {action}...
+            </div>
+          )}
+        </div>
 
-                        <div className="ai-group">
-                          <span className="ai-group-label">Route to</span>
-                          <button type="button" className="ops-button ai-action copilot" onClick={() => routeIssueToAgent(issue, 'Copilot')}>
-                            Copilot
-                          </button>
-                          <button type="button" className="ops-button ai-action jules" onClick={() => routeIssueToAgent(issue, 'Jules')}>
-                            Jules
-                          </button>
-                          <button type="button" className="ops-button ai-action codex" onClick={() => routeIssueToAgent(issue, 'Codex')}>
-                            Codex
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="ops-empty">
-                <strong>No open PR risks in the database.</strong>
-                <p>Run discovery and a PR scan to populate this queue from GitHub.</p>
-                <button type="button" className="ops-button primary mt-4" onClick={() => void runScan()} disabled={!!action || !activeRepos.length}>
-                  Run PR scan
-                </button>
-              </div>
-            )}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6" aria-label="Executive summary metrics">
+          <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-warning/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center gap-3 text-zinc-400">
+              <span className="material-symbols-outlined text-warning">warning</span>
+              <h3 className="text-sm font-bold uppercase tracking-wider">Merge Conflicts</h3>
+            </div>
+            <strong className="text-4xl font-black mt-4 text-white" id="kpi-conflicts">
+              {mergeConflicts.length}
+            </strong>
           </div>
 
-          <aside
-            id="settings"
-            className={`ops-panel bento-box sidebar-settings ${showSettings ? 'show' : ''}`}
+          <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-danger/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center gap-3 text-zinc-400">
+              <span className="material-symbols-outlined text-danger">error_outline</span>
+              <h3 className="text-sm font-bold uppercase tracking-wider">Failing CI Checks</h3>
+            </div>
+            <strong className="text-4xl font-black mt-4 text-white" id="kpi-failing">
+              {ciFailures.length}
+            </strong>
+          </div>
+
+          <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-success/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center gap-3 text-zinc-400">
+              <span className="material-symbols-outlined text-success">check_circle_outline</span>
+              <h3 className="text-sm font-bold uppercase tracking-wider">Ready to Merge</h3>
+            </div>
+            <strong className="text-4xl font-black mt-4 text-white" id="kpi-ready">
+              {cleanRepos.length}
+            </strong>
+          </div>
+        </section>
+
+        <section className="flex flex-wrap items-center gap-3 bg-surface-card border border-border rounded-2xl p-4">
+          <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest pl-2">PR Actions:</span>
+          <button
+            type="button"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            onClick={() => void discoverRepos()}
+            disabled={!!action}
           >
-            <div className="ops-panel-head">
+            <span className="material-symbols-outlined text-[16px]">search</span>
+            Discover Repositories
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            onClick={() => void refreshState()}
+            disabled={!!action}
+          >
+            <span className="material-symbols-outlined text-[16px]">refresh</span>
+            Refresh State
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand hover:bg-brand/90 transition-colors disabled:opacity-50 text-white"
+            onClick={() => void runScan()}
+            disabled={!!action || !activeRepos.length}
+          >
+            <span className="material-symbols-outlined text-[16px]">run_circle</span>
+            Run PR Scan
+          </button>
+        </section>
+
+        <section id="pipeline-health" className="bg-surface-card border border-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <span className="text-xs font-bold text-brand uppercase tracking-widest">Live Tracking</span>
+              <h2 className="text-xl font-extrabold mt-0.5">Pull Request Status</h2>
+            </div>
+            <button
+              type="button"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors"
+              aria-label="Filter"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_list</span>
+              Filter
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-400 text-xs font-semibold uppercase">
+                  <th className="py-3 px-4">Repository</th>
+                  <th className="py-3 px-4">PR Details</th>
+                  <th className="py-3 px-4">Developer</th>
+                  <th className="py-3 px-4">CI Status</th>
+                  <th className="py-3 px-4">Merge Health</th>
+                </tr>
+              </thead>
+              <tbody id="pr-table-body" className="divide-y divide-zinc-800 text-sm">
+                {loading ? (
+                  <tr className="empty-state-row">
+                    <td colSpan={5} className="py-16 text-center text-zinc-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <span className="material-symbols-outlined text-3xl animate-spin text-zinc-600">sync</span>
+                        <p className="font-medium">Connecting and fetching real-time dashboard data...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : openIssues.length ? (
+                  openIssues.map((issue) => (
+                    <tr key={issue.id || issue.issue_key} className="hover:bg-zinc-900/30 transition-colors">
+                      <td className="py-4 px-4 font-semibold text-white">
+                        <div className="flex flex-col">
+                          <span className="text-zinc-200">{issue.repo}</span>
+                          <span className="text-xs text-zinc-500 font-normal">GitHub Repository</span>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-bold text-white">{issue.title || 'Untitled Issue'}</span>
+                          <div className="flex items-center gap-2 text-xs text-zinc-400">
+                            {issue.pr_number ? (
+                              <span className="bg-zinc-800 px-2 py-0.5 rounded text-zinc-300 font-mono">
+                                PR #{issue.pr_number}
+                              </span>
+                            ) : null}
+                            {issue.branch ? (
+                              <span className="text-zinc-500 font-mono">branch: {issue.branch}</span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            {issue.url && (
+                              <a
+                                href={issue.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-bold text-brand hover:underline flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                Open GitHub
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              className="text-xs font-bold text-zinc-400 hover:text-white flex items-center gap-1"
+                              onClick={() => void changeIssueStatus(issue, 'resolved')}
+                            >
+                              <span className="material-symbols-outlined text-[14px]">check</span>
+                              Resolve
+                            </button>
+                            
+                            <div className="flex items-center gap-1.5 ml-2 border-l border-zinc-850 pl-3">
+                              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Route to:</span>
+                              <button
+                                type="button"
+                                className="text-xs font-bold text-purple-400 hover:text-purple-300 hover:underline"
+                                onClick={() => routeIssueToAgent(issue, 'Copilot')}
+                              >
+                                Copilot
+                              </button>
+                              <button
+                                type="button"
+                                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:underline"
+                                onClick={() => routeIssueToAgent(issue, 'Jules')}
+                              >
+                                Jules
+                              </button>
+                              <button
+                                type="button"
+                                className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:underline"
+                                onClick={() => routeIssueToAgent(issue, 'Codex')}
+                              >
+                                Codex
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-zinc-800 border border-border flex items-center justify-center text-[10px] font-mono text-brand font-bold uppercase">
+                            {issue.author ? issue.author[0] : 'U'}
+                          </div>
+                          <span className="text-zinc-300 text-sm font-medium">@{issue.author || 'unknown'}</span>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4">
+                        {issue.type === 'ci_failure' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-danger/10 text-danger border border-danger/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse"></span>
+                            CI Failure
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/10 text-success border border-success/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+                            Passing
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-4 px-4">
+                        {issue.type === 'merge_conflict' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/10 text-warning border border-warning/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+                            Conflict
+                          </span>
+                        ) : issue.status === 'in_progress' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                            Resolving
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/10 text-success border border-success/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+                            Clean
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="empty-state-row">
+                    <td colSpan={5} className="py-16 text-center text-zinc-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <span className="material-symbols-outlined text-3xl text-zinc-600">done_all</span>
+                        <p className="font-semibold text-white">No open PR risks detected.</p>
+                        <p className="text-zinc-400 text-xs mt-0.5">
+                          All repositories are healthy and checked. Run discovery and a PR scan to refresh.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="team-velocity" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="ops-kicker">Automation settings</p>
-                <h2>Controls</h2>
+                <span className="text-xs font-bold text-brand uppercase tracking-widest">Analytics</span>
+                <h2 className="text-xl font-extrabold mt-0.5">Team Velocity</h2>
               </div>
               <button
                 type="button"
-                className="ops-button settings-close"
-                onClick={() => setShowSettings(false)}
-                aria-label="Close settings"
+                className="w-8 h-8 rounded-xl bg-zinc-900 border border-border flex items-center justify-center hover:bg-zinc-800 transition-colors"
+                onClick={() => void refreshState()}
+                aria-label="Refresh velocity feed"
               >
-                Close
+                <span className="material-symbols-outlined text-[16px] text-zinc-400">refresh</span>
               </button>
             </div>
+            <div id="velocity-feed" className="flex-grow flex flex-col items-center justify-center py-12 px-6 border border-dashed border-border rounded-xl text-center">
+              <span className="material-symbols-outlined text-zinc-600 text-3xl mb-2">timeline</span>
+              <p className="text-zinc-400 text-sm font-medium">Waiting for team activity events to populate this feed.</p>
+            </div>
+          </div>
 
-            <div className="ops-settings-stack">
-              <label className="ops-field">
-                <span>Scan interval seconds</span>
-                <input
-                  type="number"
-                  min={60}
-                  className="bento-input"
-                  value={settings.scan_interval ?? 300}
-                  onChange={(event) => setState((current) => ({
-                    ...current,
-                    settings: { ...(current.settings || {}), scan_interval: Number(event.target.value) }
-                  }))}
-                  onBlur={(event) => void updateScanInterval(event.target.value)}
-                />
-              </label>
-
-              <label className="ops-switch">
-                <span>
-                  <strong>In-app notifications</strong>
-                  <small>Stored in backend settings.</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={settings.notify_in_app ?? true}
-                  onChange={(event) => void saveSettings({ ...settings, notify_in_app: event.target.checked })}
-                />
-              </label>
-
-              <div className="ops-settings-note bento-inner">
-                <strong>{activeRepoCount}</strong>
+          <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between">
+            <div className="mb-6">
+              <span className="text-xs font-bold text-brand uppercase tracking-widest">Configuration</span>
+              <h2 className="text-xl font-extrabold mt-0.5">Organization Settings</h2>
+            </div>
+            <div className="flex flex-col gap-6 flex-grow justify-between">
+              <div className="flex justify-between items-center py-4 border-b border-zinc-800">
                 <div>
-                  <span>active repos</span>
-                  <small>{repos.length} repositories discovered</small>
+                  <h3 className="font-bold text-white text-sm">Repository Settings</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">Manage org-level configuration.</p>
                 </div>
+                <a
+                  href="/org/settings"
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors text-white"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  Settings
+                </a>
               </div>
-
-              <div className="ops-danger-zone bento-inner danger">
-                <h3>Danger Zone</h3>
-                <p>Permanently delete your account and all associated repository metadata from Bob. This cannot be undone.</p>
+              <div className="flex justify-between items-center pt-4">
+                <div>
+                  <h3 className="font-bold text-red-500 text-sm">Danger Zone</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">Permanently delete organization.</p>
+                </div>
                 <button
                   type="button"
-                  className="ops-button danger"
+                  id="delete-org-btn"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
                   onClick={() => void handleDeleteAccount()}
-                  disabled={!!action}
                 >
-                  Delete Account
+                  <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                  Delete Org
                 </button>
               </div>
             </div>
-          </aside>
-        </section>
-
-        <section className="ops-panel bento-box" id="repos">
-          <div className="ops-panel-head">
-            <div>
-              <p className="ops-kicker">Repository management</p>
-              <h2>Connected repositories</h2>
-            </div>
-            <span className="ops-badge">{repos.length} discovered</span>
           </div>
-
-          {repos.length ? (
-            <div className="ops-repo-grid">
-              {repos.map((repo) => (
-                <article className="ops-repo bento-inner" key={repo.full_name}>
-                  <div className="ops-repo-head">
-                    <div>
-                      <h3>{repo.full_name}</h3>
-                      <p>{repo.language || 'Unknown language'} · {repo.permission || repo.permissions_level || 'unknown'} access</p>
-                    </div>
-                    <span className={`ops-status-pill ${repo.is_active ? 'success' : 'neutral'}`}>
-                      {repo.is_active ? 'Monitoring on' : 'Paused'}
-                    </span>
-                  </div>
-                  <div className="ops-repo-foot">
-                    <span className="repo-risks">{repo.issue_count ?? 0} linked risks</span>
-                    <button type="button" className="ops-button outline sm" onClick={() => void toggleRepo(repo)} disabled={!!action}>
-                      {repo.is_active ? 'Pause' : 'Resume'} monitoring
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="ops-empty">
-              <strong>No repositories have been discovered yet.</strong>
-              <p>Use GitHub discovery after sign-in to load repositories from the backend.</p>
-              <button type="button" className="ops-button primary mt-4" onClick={() => void discoverRepos()} disabled={!!action}>
-                Discover repositories
-              </button>
-            </div>
-          )}
         </section>
-      </section>
-
-      <nav className="ops-mobile-dock" aria-label="Mobile dashboard navigation">
-        <a href="#overview">Pulse</a>
-        <a href="#queue">Queue</a>
-        <a href="#repos">Repos</a>
-        <button
-          type="button"
-          onClick={() => setShowSettings((s) => !s)}
-          aria-expanded={showSettings}
-        >
-          Settings
-        </button>
-      </nav>
-    </main>
+      </main>
+    </div>
   );
 }

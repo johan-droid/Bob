@@ -1,6 +1,16 @@
 """tests/test_auth.py — OAuth and security tests."""
+import os
+
+os.environ.setdefault('SECRET_KEY', 'test-secret-key')
+os.environ.setdefault('DATABASE_URL', 'sqlite:///:memory:')
+os.environ.setdefault('SESSION_TYPE', 'filesystem')
+os.environ.setdefault('SCAN_INTERVAL', '999999')
+os.environ.setdefault('WEBHOOK_SECRET', '')
+os.environ.setdefault('ALLOW_UNSIGNED_WEBHOOKS', '0')
+
 import pytest
 from api_server import app as flask_app
+from api_server import _encrypt_token
 
 @pytest.fixture
 def client():
@@ -48,6 +58,10 @@ def test_csrf_token_endpoint(client):
     assert 'csrf_token' in data
     assert len(data['csrf_token']) > 10
 
+def test_webhook_requires_signature_when_secret_missing(client):
+    r = client.post('/api/webhooks/github', json={'repository': {'full_name': 'acme/demo'}})
+    assert r.status_code == 403
+
 def test_health_check(client):
     r = client.get('/api/health')
     assert r.status_code == 200
@@ -92,4 +106,21 @@ def test_delete_account_success(client):
     with flask_app.app_context():
         u_db = db.session.get(User, user_id)
         assert u_db is None
+
+
+def test_github_token_is_encrypted_at_rest(client):
+    from models import db, User
+
+    with flask_app.app_context():
+        user = User(username='token_user', github_id=424242, access_token=_encrypt_token('plain-token'))
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+        stored = db.session.get(User, user_id)
+        assert stored is not None
+        assert stored.access_token != 'plain-token'
+
+        from api_server import get_user_token
+        assert get_user_token(user_id) == 'plain-token'
 

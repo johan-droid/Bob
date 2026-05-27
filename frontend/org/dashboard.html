@@ -1,181 +1,249 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Bob executive dashboard for organization-wide PR health monitoring.">
     <title>Bob | Executive Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#7c3aed',
+                        'brand-glow': 'rgba(124, 58, 237, 0.15)',
+                        surface: '#09090b',
+                        'surface-card': '#18181b',
+                        border: 'rgba(255, 255, 255, 0.08)',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent 30%),
+                        radial-gradient(circle at top right, rgba(16, 185, 129, 0.04), transparent 25%),
+                        #09090b;
+        }
+        .status-dot.connecting {
+            background-color: #f59e0b;
+            box-shadow: 0 0 10px #f59e0b;
+            animation: pulse 1.5s infinite;
+        }
+        .status-dot.connected {
+            background-color: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+        .status-dot.disconnected {
+            background-color: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
 </head>
-<body>
-    <div class="ops-shell bento-theme">
-        <nav class="ops-topbar">
-            <div class="ops-topbar-left">
-                <a href="/org/dashboard" class="ops-brand">
-                    <span>B</span>
-                    Bob Org
-                </a>
-            </div>
-            <div class="ops-topbar-center">
-                <a href="#pipeline-health" class="active">Pipeline Health</a>
-                <a href="#team-velocity">Team Velocity</a>
-                <a href="/org/settings">Repo Settings</a>
-            </div>
-            <div class="ops-topbar-right">
-                <div class="connection-status" id="ws-status" aria-live="polite">
-                    <span class="status-dot connecting"></span>
-                    <span class="status-text" style="font-size: 0.85rem; font-weight: 600; color: #a1a1aa;">Connecting...</span>
+<body class="text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-purple-500/30">
+    <div class="flex-1 flex flex-col">
+        <!-- Top Navigation -->
+        <nav class="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
+            <div class="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-8">
+                    <a href="/org/dashboard" class="flex items-center gap-3 group">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20 group-hover:scale-105 transition-transform">
+                            B
+                        </div>
+                        <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Bob Org</span>
+                    </a>
+                    <div class="hidden md:flex items-center gap-1">
+                        <a href="#pipeline-health" class="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 text-white transition-all">Pipeline Health</a>
+                        <a href="#team-velocity" class="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Team Velocity</a>
+                        <a href="/org/settings" class="px-4 py-2 rounded-full text-sm font-semibold text-zinc-400 hover:text-white transition-all">Repo Settings</a>
+                    </div>
                 </div>
-                <div class="avatar-circle" title="{{ user.name }}">{{ user.name[:1] if user.name else user.username[:1] }}</div>
-                <a href="/logout" class="logout-link ops-button outline">Logout</a>
+
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-border" id="ws-status">
+                        <span class="status-dot w-2 h-2 rounded-full connecting"></span>
+                        <span class="status-text text-xs font-bold text-zinc-400">Connecting...</span>
+                    </div>
+                    
+                    <div class="w-8 h-8 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-brand" title="{{ user.name }}">
+                        {{ user.name[:1] if user.name else user.username[:1] }}
+                    </div>
+                    
+                    <a href="/logout" class="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold border border-border hover:bg-zinc-800 transition-colors">Logout</a>
+                </div>
             </div>
         </nav>
 
-        <main class="ops-main">
-            <header class="ops-header">
+        <!-- Main Workspace -->
+        <main class="flex-grow max-w-[1400px] w-full mx-auto px-6 py-8 flex flex-col gap-8">
+            <!-- Header Section -->
+            <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-border">
                 <div>
-                    <span class="ops-kicker">Executive Summary</span>
-                    <h1>Pipeline Health</h1>
-                    <p>Organization-wide pull request monitoring and CI analysis.</p>
+                    <span class="text-xs font-bold text-brand uppercase tracking-widest">Executive Summary</span>
+                    <h1 class="text-3xl font-black mt-1 tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">Pipeline Health</h1>
+                    <p class="text-zinc-400 text-sm mt-1.5">Organization-wide pull request monitoring and CI analysis.</p>
                 </div>
-                <div class="ops-actions">
-                    <button class="ops-button secondary" aria-label="Notifications">
-                        <span class="material-icons-outlined">notifications</span>
+                <div class="flex items-center gap-3">
+                    <button class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors" aria-label="Notifications">
+                        <span class="material-symbols-outlined text-[18px]">notifications</span>
                         Alerts
                     </button>
-                    <a href="/org/settings" class="ops-button primary">Manage Settings</a>
+                    <a href="/org/settings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5">
+                        <span class="material-symbols-outlined text-[18px]">settings</span>
+                        Manage Settings
+                    </a>
                 </div>
             </header>
 
-            <section class="ops-metrics" aria-label="Executive summary metrics">
-                <div class="bento-box alert-card">
-                    <div class="kpi-header">
-                        <span class="material-icons-outlined">warning</span>
-                        <h3>Merge Conflicts</h3>
+            <!-- KPI Metric Cards -->
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-6" aria-label="Executive summary metrics">
+                <!-- Merge Conflicts Card -->
+                <div class="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-warning/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+                    <div class="flex items-center gap-3 text-zinc-400">
+                        <span class="material-symbols-outlined text-warning">warning</span>
+                        <h3 class="text-sm font-bold uppercase tracking-wider">Merge Conflicts</h3>
                     </div>
-                    <strong class="kpi-value" id="kpi-conflicts">0</strong>
+                    <strong class="text-4xl font-black mt-4 text-white" id="kpi-conflicts">0</strong>
                 </div>
-                <div class="bento-box danger-card">
-                    <div class="kpi-header">
-                        <span class="material-icons-outlined">error_outline</span>
-                        <h3>Failing CI Checks</h3>
+
+                <!-- Failing CI Checks Card -->
+                <div class="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-danger/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+                    <div class="flex items-center gap-3 text-zinc-400">
+                        <span class="material-symbols-outlined text-danger">error_outline</span>
+                        <h3 class="text-sm font-bold uppercase tracking-wider">Failing CI Checks</h3>
                     </div>
-                    <strong class="kpi-value" id="kpi-failing">0</strong>
+                    <strong class="text-4xl font-black mt-4 text-white" id="kpi-failing">0</strong>
                 </div>
-                <div class="bento-box success-card">
-                    <div class="kpi-header">
-                        <span class="material-icons-outlined">check_circle_outline</span>
-                        <h3>Ready to Merge</h3>
+
+                <!-- Ready to Merge Card -->
+                <div class="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-colors relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-success/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+                    <div class="flex items-center gap-3 text-zinc-400">
+                        <span class="material-symbols-outlined text-success">check_circle_outline</span>
+                        <h3 class="text-sm font-bold uppercase tracking-wider">Ready to Merge</h3>
                     </div>
-                    <strong class="kpi-value" id="kpi-ready">0</strong>
+                    <strong class="text-4xl font-black mt-4 text-white" id="kpi-ready">0</strong>
                 </div>
             </section>
 
-            <section id="pipeline-health" class="ops-grid">
-                <div class="bento-box large" style="grid-column: span 2;">
-                    <div class="ops-panel-head">
-                        <div>
-                            <span class="ops-kicker">Live Tracking</span>
-                            <h2>Pull Request Status</h2>
-                        </div>
-                        <button class="ops-button outline sm" aria-label="Filter">
-                            <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">filter_list</span>
-                            Filter
-                        </button>
+            <!-- Pull Request Live Tracking -->
+            <section id="pipeline-health" class="bg-surface-card border border-border rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <span class="text-xs font-bold text-brand uppercase tracking-widest">Live Tracking</span>
+                        <h2 class="text-xl font-extrabold mt-0.5">Pull Request Status</h2>
                     </div>
-                    <div class="table-responsive">
-                        <table class="md3-table" style="width: 100%; text-align: left; border-collapse: separate; border-spacing: 0 8px;">
-                            <thead>
-                                <tr>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">Repository</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">PR Details</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">Developer</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">CI Status</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">Merge Health</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pr-table-body">
-                                <tr class="empty-state-row">
-                                    <td colspan="5">
-                                        <div class="ops-empty" style="min-height: 200px; display: grid; place-items: center; text-align: center; color: #a1a1aa;">
-                                            <span class="material-icons-outlined" style="font-size: 48px; margin-bottom: 16px;">sync</span>
-                                            <p>Awaiting WebSocket payload from connected repositories...</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <button class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors" aria-label="Filter">
+                        <span class="material-symbols-outlined text-[16px]">filter_list</span>
+                        Filter
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-800 text-zinc-400 text-xs font-semibold uppercase">
+                                <th class="py-3 px-4">Repository</th>
+                                <th class="py-3 px-4">PR Details</th>
+                                <th class="py-3 px-4">Developer</th>
+                                <th class="py-3 px-4">CI Status</th>
+                                <th class="py-3 px-4">Merge Health</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pr-table-body" class="divide-y divide-zinc-800 text-sm">
+                            <tr class="empty-state-row">
+                                <td colspan="5" class="py-16 text-center text-zinc-500">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <span class="material-symbols-outlined text-3xl animate-spin text-zinc-600">sync</span>
+                                        <p class="font-medium">Awaiting WebSocket payload from connected repositories...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
-            <section id="team-velocity" class="ops-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
-                <div class="bento-box feed-card">
-                    <div class="ops-panel-head">
+            <!-- Bottom Sections: Team Velocity & Org Settings -->
+            <section id="team-velocity" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Team Velocity Card -->
+                <div class="bg-surface-card border border-border rounded-2xl p-6 flex flex-col">
+                    <div class="flex items-center justify-between mb-6">
                         <div>
-                            <span class="ops-kicker">Analytics</span>
-                            <h2>Team Velocity</h2>
+                            <span class="text-xs font-bold text-brand uppercase tracking-widest">Analytics</span>
+                            <h2 class="text-xl font-extrabold mt-0.5">Team Velocity</h2>
                         </div>
-                        <button class="ops-button outline sm" aria-label="Refresh velocity feed">
-                            <span class="material-icons-outlined" style="font-size: 16px;">refresh</span>
+                        <button class="w-8 h-8 rounded-xl bg-zinc-900 border border-border flex items-center justify-center hover:bg-zinc-800 transition-colors" aria-label="Refresh velocity feed">
+                            <span class="material-symbols-outlined text-[16px]">refresh</span>
                         </button>
                     </div>
-                    <div id="velocity-feed" class="ops-empty bento-inner">
-                        <span class="material-icons-outlined" style="font-size: 32px; margin-bottom: 8px;">timeline</span>
-                        <p style="color: #a1a1aa; font-size: 0.9rem; text-align: center;">Waiting for team activity events to populate this feed.</p>
+                    <div id="velocity-feed" class="flex-grow flex flex-col items-center justify-center py-12 px-6 border border-dashed border-border rounded-xl text-center">
+                        <span class="material-symbols-outlined text-zinc-600 text-3xl mb-2">timeline</span>
+                        <p class="text-zinc-400 text-sm font-medium">Waiting for team activity events to populate this feed.</p>
                     </div>
                 </div>
 
-                <div id="repo-settings" class="bento-box feed-card" style="display: flex; flex-direction: column;">
-                    <div class="ops-panel-head">
-                        <div>
-                            <span class="ops-kicker">Configuration</span>
-                            <h2>Organization Settings</h2>
-                        </div>
+                <!-- Organization settings -->
+                <div class="bg-surface-card border border-border rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="mb-6">
+                        <span class="text-xs font-bold text-brand uppercase tracking-widest">Configuration</span>
+                        <h2 class="text-xl font-extrabold mt-0.5">Organization Settings</h2>
                     </div>
-                    <div class="bento-inner" style="display: flex; flex-direction: column; gap: 16px; flex: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div class="flex flex-col gap-6 flex-grow justify-between">
+                        <div class="flex justify-between items-center py-4 border-b border-zinc-800">
                             <div>
-                                <h3 style="margin: 0 0 4px; font-size: 1rem; color: #fff;">Repository Settings</h3>
-                                <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Manage org-level configuration.</p>
+                                <h3 class="font-bold text-white text-sm">Repository Settings</h3>
+                                <p class="text-xs text-zinc-400 mt-0.5">Manage org-level configuration.</p>
                             </div>
-                            <a class="ops-button outline sm" href="/org/settings" aria-label="Open settings">
-                                <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">open_in_new</span>
+                            <a href="/org/settings" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-border hover:bg-zinc-800 transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                                 Settings
                             </a>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; margin-top: auto;">
+                        <div class="flex justify-between items-center pt-4">
                             <div>
-                                <h3 style="margin: 0 0 4px; font-size: 1rem; color: #ef4444;">Danger Zone</h3>
-                                <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Permanently delete organization.</p>
+                                <h3 class="font-bold text-red-500 text-sm">Danger Zone</h3>
+                                <p class="text-xs text-zinc-400 mt-0.5">Permanently delete organization.</p>
                             </div>
-                            <button id="delete-org-btn" class="ops-button" style="background: transparent; border: 1px solid #ef4444; color: #ef4444;">
-                                <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">delete_forever</span>
+                            <button id="delete-org-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">delete_forever</span>
                                 Delete Org
                             </button>
                         </div>
                     </div>
                 </div>
             </section>
-            
-            <!-- Deletion Modal -->
-            <div id="delete-modal" class="ops-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; place-items: center;">
-                <div class="bento-box" style="max-width: 400px; width: 90%; background: #18181b; border: 1px solid rgba(239, 68, 68, 0.2);">
-                    <h2 style="color: #ef4444; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                        <span class="material-icons-outlined">warning</span> Confirm Deletion
-                    </h2>
-                    <p style="color: #a1a1aa; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">
-                        Are you absolutely sure? This action cannot be undone. The organization and all repository connections will be permanently removed.
-                    </p>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button id="cancel-delete-btn" class="ops-button outline">Cancel</button>
-                        <button id="confirm-delete-btn" class="ops-button" style="background: #ef4444; color: #fff; border: none;">Yes, Delete Organization</button>
-                    </div>
-                </div>
-            </div>
         </main>
+    </div>
+
+    <!-- Deletion Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 place-items-center p-6">
+        <div class="bg-zinc-900 border border-red-500/20 max-w-md w-full rounded-2xl p-6 shadow-2xl">
+            <h2 class="text-red-500 text-xl font-bold flex items-center gap-2">
+                <span class="material-symbols-outlined">warning</span> Confirm Deletion
+            </h2>
+            <p class="text-zinc-400 text-sm leading-relaxed mt-3">
+                Are you absolutely sure? This action cannot be undone. The organization and all repository connections will be permanently removed.
+            </p>
+            <div class="flex gap-3 justify-end mt-6">
+                <button id="cancel-delete-btn" class="px-4 py-2.5 rounded-xl text-sm font-bold border border-border hover:bg-zinc-800 transition-colors">Cancel</button>
+                <button id="confirm-delete-btn" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors">Yes, Delete Organization</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
@@ -189,11 +257,13 @@
 
             if(deleteBtn && modal) {
                 deleteBtn.addEventListener('click', () => {
-                    modal.style.display = 'grid';
+                    modal.classList.remove('hidden');
+                    modal.classList.add('grid');
                 });
 
                 cancelBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
+                    modal.classList.remove('grid');
+                    modal.classList.add('hidden');
                 });
 
                 confirmBtn.addEventListener('click', async () => {
@@ -209,12 +279,14 @@
                             window.location.href = '/login?deleted=true';
                         } else {
                             alert('Failed to delete organization. Please try again.');
-                            modal.style.display = 'none';
+                            modal.classList.remove('grid');
+                            modal.classList.add('hidden');
                         }
                     } catch (err) {
                         console.error('Deletion error:', err);
                         alert('An error occurred while deleting the organization.');
-                        modal.style.display = 'none';
+                        modal.classList.remove('grid');
+                        modal.classList.add('hidden');
                     }
                 });
             }

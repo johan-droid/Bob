@@ -69,7 +69,8 @@ class PRHealthScanner:
         return [
             {'id': r.get('id'), 'name': r.get('name'), 'conclusion': r.get('conclusion'),
              'branch': r.get('head_branch'), 'html_url': r.get('html_url'),
-             'created_at': r.get('created_at')}
+             'created_at': r.get('created_at'),
+             'author': r.get('triggering_actor', {}).get('login') or r.get('head_commit', {}).get('author', {}).get('name') or 'github-actions'}
             for r in result.get('workflow_runs', [])
         ]
 
@@ -98,6 +99,7 @@ class PRHealthScanner:
                 results['conflicting_prs'].append({
                     'pr': pr_num, 'title': pr.get('title'),
                     'url': pr.get('html_url'), 'head_branch': pr.get('head', {}).get('ref'),
+                    'author': pr.get('user', {}).get('login') or 'Unknown'
                 })
         results['workflow_failures'] = self.scan_workflow_failures(repo)
         return results
