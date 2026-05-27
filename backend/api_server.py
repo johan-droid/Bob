@@ -160,7 +160,15 @@ def ensure_schema():
         finally:
             db.session.remove()
 
-ensure_schema()
+def _run_schema_check_async():
+    # Keep worker boot fast; schema repair runs in background.
+    try:
+        ensure_schema()
+    except Exception as e:
+        logger.error(f"Async schema check failed: {e}")
+
+
+threading.Thread(target=_run_schema_check_async, daemon=True).start()
 
 def _start_bg_scan():
     while True:
