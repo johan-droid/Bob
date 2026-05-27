@@ -147,53 +147,42 @@ def ensure_schema():
         try:
             from sqlalchemy import inspect, text
 
-            def column_exists(table_name, column_name):
-                inspector = inspect(db.engine)
-                return any(col['name'] == column_name for col in inspector.get_columns(table_name))
+            migrations = {
+                'users': [
+                    ('access_token', "ALTER TABLE users ADD COLUMN access_token VARCHAR(255)"),
+                ],
+                'user_repos': [
+                    ('agent_permission', "ALTER TABLE user_repos ADD COLUMN agent_permission VARCHAR(50) DEFAULT 'none'"),
+                ],
+                'pr_issues': [
+                    ('last_commented_at', "ALTER TABLE pr_issues ADD COLUMN last_commented_at TIMESTAMP"),
+                    ('comment_count', "ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"),
+                    ('author', "ALTER TABLE pr_issues ADD COLUMN author VARCHAR(255)"),
+                ],
+                'user_settings': [
+                    ('slack_webhook', "ALTER TABLE user_settings ADD COLUMN slack_webhook VARCHAR(500)"),
+                    ('discord_webhook', "ALTER TABLE user_settings ADD COLUMN discord_webhook VARCHAR(500)"),
+                    ('auto_label_conflict', "ALTER TABLE user_settings ADD COLUMN auto_label_conflict BOOLEAN DEFAULT TRUE"),
+                    ('tag_author_on_fail', "ALTER TABLE user_settings ADD COLUMN tag_author_on_fail BOOLEAN DEFAULT FALSE"),
+                ],
+            }
 
-            # Add access_token to users
-            if not column_exists('users', 'access_token'):
-                db.session.execute(text("ALTER TABLE users ADD COLUMN access_token VARCHAR(255)"))
+            with db.engine.begin() as connection:
+                inspector = inspect(connection)
+                for table_name, table_migrations in migrations.items():
+                    existing_columns = {col['name'] for col in inspector.get_columns(table_name)}
+                    for column_name, sql in table_migrations:
+                        if column_name not in existing_columns:
+                            connection.execute(text(sql))
+                            existing_columns.add(column_name)
 
-            # Add agent_permission to user_repos
-            if not column_exists('user_repos', 'agent_permission'):
-                db.session.execute(text("ALTER TABLE user_repos ADD COLUMN agent_permission VARCHAR(50) DEFAULT 'none'"))
-
-            # Add last_commented_at to pr_issues
-            if not column_exists('pr_issues', 'last_commented_at'):
-                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN last_commented_at TIMESTAMP"))
-
-            # Add comment_count to pr_issues
-            if not column_exists('pr_issues', 'comment_count'):
-                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN comment_count INTEGER DEFAULT 0"))
-
-            # Add author to pr_issues
-            if not column_exists('pr_issues', 'author'):
-                db.session.execute(text("ALTER TABLE pr_issues ADD COLUMN author VARCHAR(255)"))
-
-            # Add slack_webhook to user_settings
-            if not column_exists('user_settings', 'slack_webhook'):
-                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN slack_webhook VARCHAR(500)"))
-
-            # Add discord_webhook to user_settings
-            if not column_exists('user_settings', 'discord_webhook'):
-                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN discord_webhook VARCHAR(500)"))
-
-            # Add auto_label_conflict to user_settings
-            if not column_exists('user_settings', 'auto_label_conflict'):
-                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN auto_label_conflict BOOLEAN DEFAULT 1"))
-
-            # Add tag_author_on_fail to user_settings
-            if not column_exists('user_settings', 'tag_author_on_fail'):
-                db.session.execute(text("ALTER TABLE user_settings ADD COLUMN tag_author_on_fail BOOLEAN DEFAULT 0"))
-
-            db.session.commit()
             logger.info("Database schema check: OK (Auto-repaired if needed)")
         except Exception as e:
-            db.session.rollback()
             logger.error(f"Schema auto-repair failed: {e}")
         finally:
             db.session.remove()
+
+ensure_schema()
 
 def _start_bg_scan():
     while True:
@@ -208,21 +197,12 @@ _background_workers_started = False
 _background_workers_lock = threading.Lock()
 
 
-def _run_schema_check_async():
-    # Keep schema repair out of the request path.
-    try:
-        ensure_schema()
-    except Exception as e:
-        logger.error(f"Async schema check failed: {e}")
-
-
 def _start_background_workers():
     global _background_workers_started
     with _background_workers_lock:
         if _background_workers_started:
             return
         _background_workers_started = True
-        threading.Thread(target=_run_schema_check_async, daemon=True).start()
         threading.Thread(target=_start_bg_scan, daemon=True).start()
 
 
