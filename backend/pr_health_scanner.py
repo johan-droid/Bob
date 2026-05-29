@@ -378,7 +378,7 @@ def main():
     
     if not token:
         logger.error('Set GITHUB_TOKEN in environment')
-        return
+        raise SystemExit(1)
 
     if not repos:
         logger.info('TARGET_REPOS is not set in environment. Querying GitHub API for repositories...')
@@ -400,7 +400,7 @@ def main():
 
     if not repos:
         logger.error('No repositories to scan. Please set TARGET_REPOS or grant access to repositories.')
-        return
+        raise SystemExit(1)
 
     scanner = PRHealthScanner(token, repos, assignee=assignee)
     results = scanner.scan_all_repos()
