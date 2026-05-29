@@ -953,10 +953,18 @@ def update_issue_status(issue_id):
     status = data.get('status')
     if status not in ('pending', 'in_progress', 'failed', 'resolved'):
         return jsonify({'error': 'Invalid status'}), 400
-    issue.status     = status
-    issue.updated_at = datetime.utcnow()
+
+    issues = PRIssue.query.filter_by(issue_key=issue.issue_key).all()
+    for i in issues:
+        i.status = status
+        i.updated_at = datetime.utcnow()
     db.session.commit()
-    socketio.emit('update', _get_user_data(user.id), to=session['user']['username'])
+
+    for i in issues:
+        user_to_update = db.session.get(User, i.user_id)
+        if user_to_update:
+            socketio.emit('update', _get_user_data(user_to_update.id), to=user_to_update.username)
+
     return jsonify({'saved': True, 'issue': issue.to_dict()})
 
 # ── API: Re-run Failed CI ─────────────────────────────────────────────────────
