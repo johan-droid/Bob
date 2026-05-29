@@ -251,9 +251,12 @@ document.getElementById('search-input')?.addEventListener('input', (e) => {
 });
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-function escHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = String(s || '');
-    return d.innerHTML;
+function escHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 function capitalize(s) { return s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
