@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 """pr_health_scanner.py — Industry-grade PR health scanner with review tracking,
 PR age/staleness analysis, settings-aware behavior, and dedup/rate-limit awareness."""
 import os, time
@@ -15,15 +16,28 @@ except ImportError:
             return logging.getLogger(name)
 
 logger = get_logger(__name__)
+=======
+"""pr_health_scanner.py — PR scanner with rate-limit awareness and PR comment updates."""
+import os, time, requests
+from typing import List, Dict, Any
+>>>>>>> Stashed changes
 
 GITHUB_API = "https://api.github.com"
 
 
 class PRHealthScanner:
+<<<<<<< Updated upstream
     def __init__(self, token: str, repos: List[str], assignee: str = 'jules',
                  auto_label_conflict: bool = True, tag_author_on_fail: bool = False):
         self.token = token
         self.repos = repos
+=======
+    STATUS_COMMENT_MARKER = '<!-- bob-pr-health -->'
+
+    def __init__(self, token: str, repos: List[str], assignee: str = 'jules'):
+        self.token    = token
+        self.repos    = repos
+>>>>>>> Stashed changes
         self.assignee = assignee
         self.auto_label_conflict = auto_label_conflict
         self.tag_author_on_fail = tag_author_on_fail
@@ -65,13 +79,12 @@ class PRHealthScanner:
         except Exception as e:
             return {'error': str(e)}
 
-    # ── Dedup: check if open issue with same title prefix exists ───────────────
-    def _issue_exists(self, repo: str, title_prefix: str) -> bool:
-        result = self._get(f'{GITHUB_API}/repos/{repo}/issues',
-                           params={'state': 'open', 'labels': 'needs-fix', 'per_page': 50})
-        if isinstance(result, list):
-            return any(i.get('title', '').startswith(title_prefix) for i in result)
-        return False
+    def _patch(self, url: str, json_data: dict) -> Any:
+        try:
+            r = self.session.patch(url, json=json_data, timeout=10)
+            return r.json()
+        except Exception as e:
+            return {'error': str(e)}
 
     def get_open_prs(self, repo: str) -> List[Dict]:
         result = self._get(f'{GITHUB_API}/repos/{repo}/pulls',
@@ -217,21 +230,11 @@ class PRHealthScanner:
             for r in result.get('workflow_runs', [])
         ]
 
-    def create_issue(self, repo: str, title: str, body: str, labels: List[str]) -> Dict:
-        # Dedup: don't create if similar open issue exists
-        if self._issue_exists(repo, title[:60]):
-            return {'skipped': True, 'reason': 'duplicate'}
-        return self._post(f'{GITHUB_API}/repos/{repo}/issues',
-                          {'title': title, 'body': body, 'labels': labels})
-
-    def add_label(self, repo: str, pr_number: int, label: str) -> Dict:
-        return self._post(f'{GITHUB_API}/repos/{repo}/issues/{pr_number}/labels',
-                          {'labels': [label]})
-
     def create_comment(self, repo: str, pr_number: int, body: str) -> Dict:
         return self._post(f'{GITHUB_API}/repos/{repo}/issues/{pr_number}/comments',
                           {'body': body})
 
+<<<<<<< Updated upstream
     # ── NEW: Re-run CI workflow ───────────────────────────────────────────────
     def rerun_workflow(self, repo: str, run_id: int) -> Dict:
         """Trigger a re-run of a failed GitHub Actions workflow."""
@@ -253,6 +256,24 @@ class PRHealthScanner:
             f'{GITHUB_API}/repos/{repo}/pulls/{pr_number}/requested_reviewers',
             {'reviewers': reviewers}
         )
+=======
+    def update_comment(self, repo: str, comment_id: int, body: str) -> Dict:
+        return self._patch(f'{GITHUB_API}/repos/{repo}/issues/comments/{comment_id}',
+                           {'body': body})
+
+    def upsert_status_comment(self, repo: str, pr_number: int, body: str) -> Dict:
+        marker_body = f"{self.STATUS_COMMENT_MARKER}\n{body}"
+        comments = self._get(f'{GITHUB_API}/repos/{repo}/issues/{pr_number}/comments',
+                             params={'per_page': 100})
+        if isinstance(comments, list):
+            for c in comments:
+                existing = c.get('body') or ''
+                if self.STATUS_COMMENT_MARKER in existing:
+                    if existing.strip() == marker_body.strip():
+                        return {'unchanged': True, 'id': c.get('id')}
+                    return self.update_comment(repo, c.get('id'), marker_body)
+        return self.create_comment(repo, pr_number, marker_body)
+>>>>>>> Stashed changes
 
     def scan_repository(self, repo: str) -> Dict:
         """Full repository scan with reviews, age tracking, and settings-aware labeling."""
@@ -269,6 +290,7 @@ class PRHealthScanner:
 
         prs = self.get_open_prs(repo)
         results['total_prs'] = len(prs)
+<<<<<<< Updated upstream
 
         for pr in prs:
             pr_num = pr.get('number')
@@ -336,6 +358,23 @@ class PRHealthScanner:
         # 5. CI failure scanning
         results['workflow_failures'] = self.scan_workflow_failures(repo)
 
+=======
+        branch_to_pr = {}
+        for pr in prs:
+            pr_num = pr.get('number')
+            head_branch = pr.get('head', {}).get('ref')
+            if head_branch:
+                branch_to_pr[head_branch] = pr_num
+            if self.check_merge_conflict(repo, pr_num):
+                results['conflicting_prs'].append({
+                    'pr': pr_num, 'title': pr.get('title'),
+                    'url': pr.get('html_url'), 'head_branch': head_branch,
+                })
+        failures = self.scan_workflow_failures(repo)
+        for f in failures:
+            f['pr'] = branch_to_pr.get(f.get('branch'))
+        results['workflow_failures'] = failures
+>>>>>>> Stashed changes
         return results
 
     def scan_all_repos(self) -> List[Dict]:
@@ -345,6 +384,7 @@ class PRHealthScanner:
             result = self.scan_repository(repo)
             all_results.append(result)
 
+<<<<<<< Updated upstream
             for cp in result['conflicting_prs']:
                 title = f"🚨 Merge conflict in PR #{cp['pr']}"
                 body  = (f"@{self.assignee} merge conflict detected.\n\n"
@@ -365,6 +405,8 @@ class PRHealthScanner:
 
                 self.create_issue(repo, title, body, ['needs-fix', 'ci-failure'])
 
+=======
+>>>>>>> Stashed changes
         return all_results
 
 

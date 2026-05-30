@@ -5,7 +5,10 @@
   "keywords": ["github", "pr", "monitoring", "websocket", "flask", "python"],
   "success_url": "/",
   "stack": "heroku-24",
-  "buildpacks": [{ "url": "heroku/python" }],
+  "buildpacks": [
+    { "url": "heroku/nodejs" },
+    { "url": "heroku/python" }
+  ],
   "env": {
     "SECRET_KEY": {
       "description": "Flask secret key for sessions. Generate: python -c \"import secrets; print(secrets.token_hex(32))\"",
@@ -13,8 +16,8 @@
       "required": true
     },
     "GITHUB_TOKEN": {
-      "description": "Server PAT with repo + admin:org scopes (used for auto-provisioning and background scan).",
-      "required": true
+      "description": "Optional server PAT for elevated automation in org repos.",
+      "required": false
     },
     "GITHUB_CLIENT_ID": {
       "description": "GitHub OAuth App Client ID (create at https://github.com/settings/developers).",
@@ -28,6 +31,10 @@
       "description": "Comma-separated list of allowed origins for CORS. Example: https://your-app.heroku.com",
       "required": true
     },
+    "PUBLIC_BASE_URL": {
+      "description": "Public base URL for your deployed app. Example: https://your-app-name.herokuapp.com",
+      "required": true
+    },
     "DATABASE_URL": {
       "description": "PostgreSQL connection string (Heroku provides this automatically with Postgres add-on).",
       "required": false
@@ -35,9 +42,25 @@
     "WEBHOOK_SECRET": {
       "description": "Secret for GitHub Webhook HMAC-SHA256 verification. Set this in your GitHub Webhook config.",
       "required": true
+<<<<<<< Updated upstream
+=======
+    },
+    "TOKEN_ENCRYPTION_KEY": {
+      "description": "Fernet key used to encrypt/decrypt stored GitHub OAuth tokens. Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"",
+      "required": true
+    },
+    "REDIS_URL": {
+      "description": "Redis connection string (provided automatically by Heroku Redis add-on).",
+      "required": false
+>>>>>>> Stashed changes
+    },
+    "INTERNAL_CRON_TOKEN": {
+      "description": "Shared token for secured fallback sync trigger endpoint.",
+      "generator": "secret",
+      "required": true
     },
     "ASSIGNEE_USERNAME": {
-      "description": "GitHub username to @mention in auto-created issues (e.g. jules).",
+      "description": "GitHub username to mention in PR status comments.",
       "value": "jules",
       "required": false
     },
@@ -45,13 +68,14 @@
       "description": "OPTIONAL whitelist. Leave empty to auto-discover all repos the user has access to. Format: owner/repo,owner/repo",
       "value": "",
       "required": false
-    },
-    "SCAN_INTERVAL": {
-      "description": "Background scan interval in seconds.",
-      "value": "300",
-      "required": false
     }
   },
-  "formation": { "web": { "quantity": 1, "size": "basic" } },
-  "addons": [{ "plan": "heroku-postgresql:essential-0" }]
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" },
+    "worker": { "quantity": 1, "size": "basic" }
+  },
+  "addons": [
+    { "plan": "heroku-postgresql:essential-0" },
+    { "plan": "heroku-redis:mini" }
+  ]
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Bob | Galaxy Dashboard</title>
     <meta name="description" content="Intelligent monitoring for your PRs and CI/CD pipelines.">
     
@@ -19,7 +19,7 @@
 
     <div class="app-container">
         <!-- Desktop Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="desktop-sidebar">
             <div class="brand">
                 <span class="material-symbols-outlined" style="font-size: 36px; color: var(--primary); filter: drop-shadow(0 0 10px var(--primary-glow));">rocket_launch</span>
                 <span style="font-size: 28px;">BOB</span>
@@ -149,7 +149,7 @@
             </main>
 
             <!-- Mobile Bottom Nav -->
-            <nav class="bottom-nav">
+            <nav class="bottom-nav mob-dock" id="mobile-dock">
                 <a href="/dashboard" class="nav-link active" style="flex-direction: column; gap: 6px; padding: 8px;">
                     <span class="material-symbols-outlined">dashboard</span>
                     <span style="font-size: 10px;">HOME</span>
@@ -204,6 +204,18 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="app.js"></script>
     <script>
+        (function pruneNavigationTree() {
+            const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+            const sidebar = document.getElementById('desktop-sidebar');
+            const mobileDock = document.getElementById('mobile-dock');
+
+            if (isMobile) {
+                sidebar?.remove();
+            } else {
+                mobileDock?.remove();
+            }
+        })();
+
         const fab = document.getElementById('fab-new-alert');
         const dialog = document.getElementById('new-alert-dialog');
         const btnScan = document.getElementById('btn-trigger-scan');

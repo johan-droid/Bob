@@ -22,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+<<<<<<< Updated upstream
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
         {/*
@@ -68,6 +69,12 @@ export default function RootLayout({
             }
           `
         }} />
+=======
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+        />
+>>>>>>> Stashed changes
       </head>
       <body className="text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-purple-500/30">{children}</body>
     </html>

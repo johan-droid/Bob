@@ -9,12 +9,16 @@ os.environ.setdefault('WEBHOOK_SECRET', '')
 os.environ.setdefault('ALLOW_UNSIGNED_WEBHOOKS', '0')
 
 import pytest
+<<<<<<< Updated upstream
 try:
     from backend.api_server import app as flask_app
     from backend.api_server import _encrypt_token
 except ImportError:
     from api_server import app as flask_app
     from api_server import _encrypt_token
+=======
+from api_server import app as flask_app, get_user_token
+>>>>>>> Stashed changes
 
 @pytest.fixture
 def client():
@@ -123,6 +127,7 @@ def test_delete_account_success(client):
         assert u_db is None
 
 
+<<<<<<< Updated upstream
 def test_github_token_is_encrypted_at_rest(client):
     try:
         from backend.models import db, User
@@ -163,3 +168,36 @@ def test_plaintext_github_token_is_rejected_by_default(client):
         except ImportError:
             from api_server import get_user_token
         assert get_user_token(user_id) is None
+=======
+def test_plaintext_token_is_invalidated_and_requires_reauth(client):
+    from models import db, User
+
+    with flask_app.app_context():
+        u = User(username='legacy_token_user', github_id='1234567', access_token='ghp_plaintext_legacy')
+        db.session.add(u)
+        db.session.commit()
+        user_id = u.id
+
+        token = get_user_token(user_id)
+        assert token is None
+
+        refreshed = db.session.get(User, user_id)
+        assert refreshed.access_token is None
+
+
+def test_webhook_requires_secret_and_rejects_when_unconfigured(client, monkeypatch):
+    import api_server
+
+    monkeypatch.setattr(api_server, 'WEBHOOK_SECRET', '')
+    r = client.post('/api/webhooks/github', json={'repository': {'full_name': 'org/repo'}})
+    assert r.status_code == 503
+
+
+def test_webhook_rejects_missing_signature_when_secret_configured(client, monkeypatch):
+    import api_server
+
+    monkeypatch.setattr(api_server, 'WEBHOOK_SECRET', 'testsecret')
+    r = client.post('/api/webhooks/github', json={'repository': {'full_name': 'org/repo'}})
+    assert r.status_code == 403
+
+>>>>>>> Stashed changes
