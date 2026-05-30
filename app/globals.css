@@ -1,4 +1,16 @@
+@import "tailwindcss";
 @import './mobile-dashboard.css';
+
+@theme {
+  --color-brand: #7c3aed;
+  --color-brand-glow: rgba(124, 58, 237, 0.15);
+  --color-surface: #09090b;
+  --color-surface-card: #18181b;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
 
 :root {
   --bg: #050816;

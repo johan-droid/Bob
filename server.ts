@@ -1,9 +1,9 @@
-require('dotenv').config();
-const { createServer } = require('http');
-const { parse } = require('url');
-const next = require('next');
-const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
+import 'dotenv/config';
+import { createServer } from 'http';
+import { parse } from 'url';
+import next from 'next';
+import { Server as SocketIOServer } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -15,40 +15,40 @@ if ((!SECRET_KEY || SECRET_KEY === 'default-secret-key-change-me-in-production')
 }
 const EFFECTIVE_SECRET_KEY = SECRET_KEY || 'dev-only-secret-key-not-for-production';
 const SCAN_INTERVAL = parseInt(process.env.SCAN_INTERVAL || '300', 10);
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5000')
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
   .split(',')
-  .map(origin => origin.trim())
+  .map((o) => o.trim())
   .filter(Boolean);
 
-// Helper to parse cookies from header
-function parseCookies(cookieHeader) {
-  const list = {};
+function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+  const list: Record<string, string> = {};
   if (!cookieHeader) return list;
-  cookieHeader.split(';').forEach(cookie => {
+  cookieHeader.split(';').forEach((cookie) => {
     const parts = cookie.split('=');
-    list[parts.shift().trim()] = decodeURI(parts.join('='));
+    const key = parts.shift()?.trim();
+    if (key) list[key] = decodeURI(parts.join('='));
   });
   return list;
 }
 
-function isAllowedOrigin(origin, host) {
+function isAllowedOrigin(origin: string | undefined, host: string | undefined): boolean {
   if (!origin) return true;
   try {
     const parsed = new URL(origin);
     return parsed.host === host || ALLOWED_ORIGINS.includes(parsed.origin);
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-// Delayed dynamic import of db and scanner
+// Dynamic imports set after Next.js prepares
 let queryDb: (sql: string, params?: any[]) => Promise<any[]>;
 let runScanForUser: (userId: number, emitter: any) => Promise<void>;
 let getUserDashboardData: (userId: number) => Promise<any>;
 let initDatabase: () => Promise<void>;
 
 app.prepare().then(async () => {
-  // Dynamically import database and scanner logic (ES modules via tsx)
+  // Load TypeScript lib modules via dynamic import (resolved by tsx)
   const db = await import('./lib/db');
   const scanner = await import('./lib/scanner');
 
@@ -57,7 +57,7 @@ app.prepare().then(async () => {
   runScanForUser = scanner.runScanForUser;
   getUserDashboardData = scanner.getUserDashboardData;
 
-  // Initialize DB tables
+  // Initialize DB schema
   try {
     await initDatabase();
     console.log('> Database initialized successfully.');
@@ -66,51 +66,52 @@ app.prepare().then(async () => {
   }
 
   const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true);
+    const parsedUrl = parse(req.url!, true);
     handle(req, res, parsedUrl);
   });
 
-  const io = new Server(server, {
+  const io = new SocketIOServer(server, {
     path: '/socket.io',
     transports: ['websocket', 'polling'],
     cors: {
       origin: ALLOWED_ORIGINS,
-      credentials: true
+      credentials: true,
     },
-    allowRequest: (req, callback) => {
+    allowRequest: (req: any, callback: (err: string | null, success: boolean) => void) => {
       callback(null, isAllowedOrigin(req.headers.origin, req.headers.host));
-    }
+    },
   });
 
-  // Attach socket emitter to global object so API routes can emit updates
-  global.socketEmitter = (username, event, data) => {
+  // Expose emitter to Next.js API routes via global
+  (global as any).socketEmitter = (username: string, event: string, data: any) => {
     io.to(username).emit(event, data);
   };
 
   io.on('connection', async (socket) => {
     const cookieHeader = socket.handshake.headers.cookie;
     const cookies = parseCookies(cookieHeader);
-    const sessionToken = cookies.session;
+    const sessionToken = cookies['session'];
 
     if (!sessionToken) {
       socket.disconnect();
       return;
     }
 
-    let user;
+    let user: any;
     try {
       user = jwt.verify(sessionToken, EFFECTIVE_SECRET_KEY);
-    } catch (err) {
+    } catch {
       socket.disconnect();
       return;
     }
 
-    const username = user.username;
-    const userId = user.db_id;
+    const username: string = user.username;
+    const userId: number = user.db_id;
 
     socket.join(username);
     console.log(`> WS Connect: ${username}`);
 
+    // Push initial data immediately on connect
     try {
       const data = await getUserDashboardData(userId);
       socket.emit('update', data);
@@ -123,7 +124,7 @@ app.prepare().then(async () => {
         const data = await getUserDashboardData(userId);
         socket.emit('update', data);
       } catch (err) {
-        console.error(`> Error handling WS request_update for ${username}:`, err);
+        console.error(`> Error handling request_update for ${username}:`, err);
       }
     });
 
@@ -132,15 +133,14 @@ app.prepare().then(async () => {
     });
   });
 
-  // ── Background Cron Jobs ──
+  // ── Background Scanner ────────────────────────────────────────────────────
   async function runBackgroundScan() {
     console.log('> Starting periodic background scan...');
     try {
       const users = await queryDb('SELECT id, username FROM users');
       for (const u of users) {
-        console.log(`> BG Scan: running for user ${u.username} (ID: ${u.id})`);
         try {
-          await runScanForUser(u.id, global.socketEmitter);
+          await runScanForUser(u.id, (global as any).socketEmitter);
         } catch (err) {
           console.error(`> BG Scan error for user ${u.username}:`, err);
         }
@@ -150,16 +150,13 @@ app.prepare().then(async () => {
     }
   }
 
-  // Schedule scan interval
   if (SCAN_INTERVAL > 0) {
     setInterval(runBackgroundScan, SCAN_INTERVAL * 1000);
-    // Optional: run initial scan 5 seconds after startup
-    setTimeout(runBackgroundScan, 5000);
+    setTimeout(runBackgroundScan, 10_000); // first scan 10s after start
   }
 
-  const port = process.env.PORT || 3000;
-  server.listen(port, (err) => {
-    if (err) throw err;
+  const port = Number(process.env.PORT) || 3000;
+  server.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
   });
 });
