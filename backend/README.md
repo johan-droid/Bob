@@ -40,6 +40,33 @@ Server runs on `http://localhost:5000`.
 | POST | `/api/scan` | Queue manual scan for logged-in user |
 | POST | `/api/webhooks/github` | GitHub webhook receiver |
 | POST | `/api/internal/fallback-sync` | Queue daily fallback sync (internal token required) |
+| POST | `/api/actions/rebase` | Dry-run action contract for PR rebase |
+| POST | `/api/actions/approve-merge` | Dry-run action contract for approve+merge |
+
+## Repo Policy as Code
+
+Bob supports repository-level configuration via `.bob.yml` in each repository root.
+
+Example:
+
+```yaml
+policy:
+  required_checks:
+    - ci/test
+    - ci/lint
+  required_approvals: 2
+  stale_hours: 24
+```
+
+Policy is validated on load. If invalid, Bob falls back to defaults and publishes a failing merge-readiness check with validation details.
+
+## GitHub Checks API
+
+Bob publishes `bob/merge-readiness` check runs on PR head commits. Evaluation uses:
+
+- `required_checks` from `.bob.yml`
+- `required_approvals` from `.bob.yml`
+- Current check-run conclusions and PR review approvals
 
 ## Background Jobs (RQ)
 

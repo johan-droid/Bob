@@ -1,5 +1,4 @@
 import sys as _sys
-<<<<<<< Updated upstream
 import os
 
 
@@ -43,13 +42,6 @@ from datetime import datetime
 from functools import wraps
 from urllib.parse import urlencode
 from urllib import error as urllib_error, request as urllib_request
-=======
-import os, secrets, hmac, hashlib, time
-from datetime import datetime
-from functools import wraps
-from urllib.parse import urlencode
-from cryptography.fernet import Fernet, InvalidToken
->>>>>>> Stashed changes
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, jsonify, request, render_template, redirect, session, abort, url_for, send_from_directory
@@ -60,26 +52,26 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet, InvalidToken
 
-<<<<<<< Updated upstream
 try:
     from .database import init_db
     from .models import db, User, UserRepo, PRIssue, UserSettings
     from .logger import get_logger
     from .pr_health_scanner import PRHealthScanner
+    from .job_queue import enqueue_background_job, queue_is_configured
     from .notifications import dispatch_notifications
+    from .repo_config import load_repo_bob_config
+    from .policy_engine import evaluate_merge_readiness
+    from .github_checks import publish_merge_readiness_check
 except ImportError:
     from database import init_db
     from models import db, User, UserRepo, PRIssue, UserSettings
     from logger import get_logger
     from pr_health_scanner import PRHealthScanner
+    from job_queue import enqueue_background_job, queue_is_configured
     from notifications import dispatch_notifications
-=======
-from database import init_db
-from models import db, User, UserRepo, PRIssue, UserSettings
-from logger import get_logger
-from pr_health_scanner import PRHealthScanner
-from job_queue import enqueue_background_job, queue_is_configured
->>>>>>> Stashed changes
+    from repo_config import load_repo_bob_config
+    from policy_engine import evaluate_merge_readiness
+    from github_checks import publish_merge_readiness_check
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
@@ -103,12 +95,7 @@ GITHUB_CLIENT_ID      = os.getenv('GITHUB_CLIENT_ID')
 GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
 GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
 WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
-<<<<<<< Updated upstream
-ALLOW_UNSIGNED_WEBHOOKS = os.getenv('ALLOW_UNSIGNED_WEBHOOKS', '0') == '1'
-ALLOW_LEGACY_PLAINTEXT_TOKENS = os.getenv('ALLOW_LEGACY_PLAINTEXT_TOKENS', '0') == '1'
-=======
 TOKEN_ENCRYPTION_KEY  = os.getenv('TOKEN_ENCRYPTION_KEY', '')
->>>>>>> Stashed changes
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 STALE_RESYNC_HOURS     = int(os.getenv('STALE_RESYNC_HOURS', 24))
 FALLBACK_REPO_LIMIT    = int(os.getenv('FALLBACK_REPO_LIMIT', 25))
@@ -118,9 +105,6 @@ ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http:/
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
 APP_ENV               = (os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or os.getenv('ENV') or os.getenv('ENVIRONMENT') or '').lower()
 IS_PRODUCTION         = APP_ENV == 'production' or os.getenv('RENDER') == 'true' or bool(os.getenv('RENDER_EXTERNAL_URL'))
-
-if IS_PRODUCTION and ALLOW_UNSIGNED_WEBHOOKS:
-    raise RuntimeError("ALLOW_UNSIGNED_WEBHOOKS must not be enabled in production")
 
 if not TOKEN_ENCRYPTION_KEY:
     TOKEN_ENCRYPTION_KEY = Fernet.generate_key().decode()
@@ -223,42 +207,11 @@ def ensure_schema():
 
 ensure_schema()
 
-<<<<<<< Updated upstream
-def _start_bg_scan():
-    while True:
-        try:
-            background_scan()
-            break
-        except NameError:
-            time.sleep(1)
-
-
-_background_workers_started = False
-_background_workers_lock = threading.Lock()
-
-
-def _start_background_workers():
-    global _background_workers_started
-    with _background_workers_lock:
-        if _background_workers_started:
-            return
-        _background_workers_started = True
-        threading.Thread(target=_start_bg_scan, daemon=True).start()
-
-
-@app.before_request
-def _boot_background_workers():
-    _start_background_workers()
-
-=======
->>>>>>> Stashed changes
-
 GH_HEADERS = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def gh(token): return {**GH_HEADERS, 'Authorization': f'token {token}'}
 
 
-<<<<<<< Updated upstream
 class _HttpResponse:
     def __init__(self, status_code, headers, body_text):
         self.status_code = status_code
@@ -290,34 +243,6 @@ def _http_request_json(method, url, headers=None, json_body=None, form_body=None
         raw_body = exc.read().decode('utf-8', errors='replace')
         return _HttpResponse(exc.code, dict(exc.headers.items()), raw_body)
 
-TOKEN_PREFIX = 'v1:'
-
-def _token_cipher() -> Fernet:
-    token_secret = os.getenv('TOKEN_ENCRYPTION_KEY') or SECRET_KEY
-    key = base64.urlsafe_b64encode(hashlib.sha256(token_secret.encode()).digest())
-    return Fernet(key)
-
-
-def _encrypt_token(token: str) -> str:
-    return TOKEN_PREFIX + _token_cipher().encrypt(token.encode()).decode()
-
-
-def _decrypt_token(token: str | None) -> str | None:
-    if not token:
-        return None
-    if not token.startswith(TOKEN_PREFIX):
-        if ALLOW_LEGACY_PLAINTEXT_TOKENS:
-            logger.warning('Using legacy plaintext GitHub token from database; re-authenticate user to encrypt it')
-            return token
-        logger.warning('Refusing legacy plaintext GitHub token from database')
-        return None
-    try:
-        return _token_cipher().decrypt(token[len(TOKEN_PREFIX):].encode()).decode()
-    except InvalidToken:
-        logger.warning('Stored GitHub token could not be decrypted')
-        return None
-
-=======
 def _encrypt_github_token(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
 
@@ -346,8 +271,6 @@ def _queue_or_503(function_path, *args, **kwargs):
     if not job:
         return None, (jsonify({'error': 'Failed to enqueue background job'}), 503)
     return job, None
-
->>>>>>> Stashed changes
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 def login_required(f):
     @wraps(f)
@@ -594,11 +517,7 @@ def github_callback():
         user.name       = ud.get('name') or username
         user.email      = ud.get('email')
         user.last_login = datetime.utcnow()
-<<<<<<< Updated upstream
-        user.access_token = _encrypt_token(access_token)
-=======
         user.access_token = _encrypt_github_token(access_token)
->>>>>>> Stashed changes
         db.session.commit()
 
         # Ensure user has settings row
@@ -626,9 +545,6 @@ def github_callback():
 def get_user_token(user_id: int) -> str | None:
     """Retrieve the stored OAuth token for a user (server-side only)."""
     user = User.query.get(user_id)
-<<<<<<< Updated upstream
-    return _decrypt_token(user.access_token) if user else None
-=======
     if not user or not user.access_token:
         return None
 
@@ -641,7 +557,6 @@ def get_user_token(user_id: int) -> str | None:
     db.session.commit()
     logger.warning(f"Cleared undecryptable token for user_id={user_id}; re-auth required")
     return None
->>>>>>> Stashed changes
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
@@ -914,28 +829,7 @@ def trigger_scan():
     if err:
         return err
 
-<<<<<<< Updated upstream
-    def execute_manual_scan():
-        with app.app_context():
-            try:
-                settings_obj = UserSettings.query.filter_by(user_id=user_id).first()
-                scanner = PRHealthScanner(
-                    token, scan_repos, assignee=ASSIGNEE_USERNAME,
-                    auto_label_conflict=settings_obj.auto_label_conflict if settings_obj else True,
-                    tag_author_on_fail=settings_obj.tag_author_on_fail if settings_obj else False,
-                )
-                results = scanner.scan_all_repos()
-                _ingest_scan_results(results, user_id, scanner=scanner)
-                socketio.emit('update', _get_user_data(user_id), to=username)
-                socketio.emit('scan_complete', {'status': 'success'}, to=username)
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Manual scan error: {e}")
-            finally:
-                db.session.remove() # CRITICAL: Release connection back to Neon pool
-=======
     return jsonify({'success': True, 'message': 'Scan queued', 'job_id': job.id}), 202
->>>>>>> Stashed changes
 
 
 @csrf.exempt
@@ -1112,23 +1006,71 @@ def request_review(issue_id):
     return jsonify({'error': result.get('error', 'Failed to request review')}), 500
 
 
+def _validate_pr_action_payload(data):
+    repo = (data.get('repo') or '').strip()
+    pr_number = data.get('pr_number')
+    if not repo or '/' not in repo:
+        return None, None, (jsonify({'error': 'repo must be in owner/name format'}), 400)
+    if not isinstance(pr_number, int) or pr_number <= 0:
+        return None, None, (jsonify({'error': 'pr_number must be a positive integer'}), 400)
+    return repo, pr_number, None
+
+
+@app.route('/api/actions/rebase', methods=['POST'])
+@login_required
+def action_rebase_contract():
+    data = request.get_json() or {}
+    repo, pr_number, err = _validate_pr_action_payload(data)
+    if err:
+        return err
+
+    dry_run = bool(data.get('dry_run', True))
+    contract = {
+        'action': 'rebase',
+        'repo': repo,
+        'pr_number': pr_number,
+        'dry_run': dry_run,
+        'required_permission': 'push',
+        'github_endpoint': f'POST /repos/{repo}/pulls/{pr_number}/update-branch',
+        'would_execute': not dry_run,
+    }
+
+    if dry_run:
+        return jsonify({'ok': True, 'contract': contract}), 200
+    return jsonify({'ok': False, 'error': 'Execution disabled. Use dry_run=true for contract preview.', 'contract': contract}), 501
+
+
+@app.route('/api/actions/approve-merge', methods=['POST'])
+@login_required
+def action_approve_merge_contract():
+    data = request.get_json() or {}
+    repo, pr_number, err = _validate_pr_action_payload(data)
+    if err:
+        return err
+
+    dry_run = bool(data.get('dry_run', True))
+    merge_method = (data.get('merge_method') or 'squash').strip()
+    contract = {
+        'action': 'approve-merge',
+        'repo': repo,
+        'pr_number': pr_number,
+        'dry_run': dry_run,
+        'required_permission': 'maintain',
+        'preconditions': ['policy_ready', 'required_checks_passed', 'required_approvals_met'],
+        'github_endpoint': f'PUT /repos/{repo}/pulls/{pr_number}/merge',
+        'merge_method': merge_method,
+        'would_execute': not dry_run,
+    }
+
+    if dry_run:
+        return jsonify({'ok': True, 'contract': contract}), 200
+    return jsonify({'ok': False, 'error': 'Execution disabled. Use dry_run=true for contract preview.', 'contract': contract}), 501
+
+
 # ── API: GitHub Webhook ───────────────────────────────────────────────────────
 @csrf.exempt
 @app.route('/api/webhooks/github', methods=['POST'])
 def github_webhook():
-<<<<<<< Updated upstream
-    if not WEBHOOK_SECRET and not ALLOW_UNSIGNED_WEBHOOKS:
-        logger.warning('Rejected unsigned GitHub webhook because WEBHOOK_SECRET is not configured')
-        abort(403)
-
-    if WEBHOOK_SECRET:
-        sig = request.headers.get('X-Hub-Signature-256', '')
-        expected = 'sha256=' + hmac.new(
-            WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected):
-            logger.warning('Webhook signature mismatch')
-            abort(403)
-=======
     if not WEBHOOK_SECRET:
         logger.error('Rejected webhook request: WEBHOOK_SECRET is not configured')
         abort(503)
@@ -1143,7 +1085,6 @@ def github_webhook():
     if not hmac.compare_digest(sig, expected):
         logger.warning('Webhook signature mismatch')
         abort(403)
->>>>>>> Stashed changes
 
     event   = request.headers.get('X-GitHub-Event', '')
     payload = request.get_json(silent=True) or {}
@@ -1255,6 +1196,8 @@ def run_manual_scan_job(user_id, username, scan_repos):
             scanner = PRHealthScanner(token, scan_repos, assignee=ASSIGNEE_USERNAME)
             results = scanner.scan_all_repos()
             _ingest_scan_results(results, user_id, scanner=scanner)
+            for repo_name in scan_repos:
+                _evaluate_and_publish_merge_readiness(scanner, token, repo_name)
             socketio.emit('update', _get_user_data(user_id), to=username)
             socketio.emit('scan_complete', {'status': 'success'}, to=username)
         except Exception as e:
@@ -1290,6 +1233,7 @@ def _scan_repo_for_user(user_id, repo_full_name, reason='fallback'):
         scanner = PRHealthScanner(token, [repo_full_name], assignee=ASSIGNEE_USERNAME)
         result = scanner.scan_repository(repo_full_name)
         _ingest_scan_results([result], user.id, scanner=scanner)
+        _evaluate_and_publish_merge_readiness(scanner, token, repo_full_name)
 
         tracked_repo = UserRepo.query.filter_by(user_id=user.id, full_name=repo_full_name).first()
         if tracked_repo:
@@ -1300,6 +1244,51 @@ def _scan_repo_for_user(user_id, repo_full_name, reason='fallback'):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Repo scan failed for user {user_id}, repo {repo_full_name}: {e}")
+
+
+def _evaluate_and_publish_merge_readiness(scanner, token: str, repo_full_name: str):
+    try:
+        config_result = load_repo_bob_config(scanner, repo_full_name)
+        policy = config_result.get('policy', {})
+        config_errors = config_result.get('errors', [])
+
+        open_prs = scanner.get_open_prs(repo_full_name)
+        for pr in open_prs:
+            pr_number = pr.get('number')
+            head_sha = (pr.get('head') or {}).get('sha')
+            if not pr_number or not head_sha:
+                continue
+
+            reviews = scanner.get_pr_reviews(repo_full_name, pr_number)
+            check_runs = scanner.get_check_runs_for_ref(repo_full_name, head_sha)
+            evaluation = evaluate_merge_readiness(
+                policy=policy,
+                check_runs=check_runs,
+                approved_count=reviews.get('approved_count', 0),
+            )
+
+            if config_errors:
+                evaluation['ready'] = False
+                evaluation['summary'] = 'Invalid .bob.yml policy configuration'
+                evaluation['reasons'] = config_errors + evaluation.get('reasons', [])
+
+            details_url = (
+                f"{PUBLIC_BASE_URL}/org/dashboard?repo={repo_full_name}&pr={pr_number}"
+                if PUBLIC_BASE_URL else ''
+            )
+            resp = publish_merge_readiness_check(
+                scanner=scanner,
+                repo_full_name=repo_full_name,
+                head_sha=head_sha,
+                evaluation=evaluation,
+                details_url=details_url,
+            )
+            if isinstance(resp, dict) and resp.get('error'):
+                logger.warning(
+                    f"Checks publish failed for {repo_full_name}#{pr_number}: {resp.get('error')}"
+                )
+    except Exception as e:
+        logger.error(f"Merge readiness evaluation failed for {repo_full_name}: {e}")
 
 def _emit_to_repo_owners(repo_full_name):
     """Emit real-time update to all users who track this repo."""
@@ -1347,10 +1336,15 @@ def _ingest_scan_results(results, user_id, scanner=None):
                     author=f.get('author'),
                 )
                 db.session.add(issue)
-<<<<<<< Updated upstream
                 new_issues.append(issue)
 
-        # 3. Review issues (NEW)
+            elif f.get('pr') and not issue.pr_number:
+                issue.pr_number = f.get('pr')
+
+            if scanner and issue.status == 'pending':
+                _trigger_auto_comment(issue, scanner)
+
+        # 3. Review issues
         for ri in result.get('review_issues', []):
             key = f"{repo}#review{ri['pr']}"
             issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
@@ -1365,7 +1359,7 @@ def _ingest_scan_results(results, user_id, scanner=None):
                 db.session.add(issue)
                 new_issues.append(issue)
 
-        # 4. Stale PRs (NEW)
+            # 4. Stale PRs
         for sp in result.get('stale_prs', []):
             key = f"{repo}#stale{sp['pr']}"
             issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
@@ -1380,7 +1374,7 @@ def _ingest_scan_results(results, user_id, scanner=None):
                 db.session.add(issue)
                 new_issues.append(issue)
 
-        # 5. Oversized PRs (NEW)
+            # 5. Oversized PRs
         for op in result.get('oversized_prs', []):
             key = f"{repo}#size{op['pr']}"
             issue = PRIssue.query.filter_by(user_id=user_id, issue_key=key).first()
@@ -1394,15 +1388,6 @@ def _ingest_scan_results(results, user_id, scanner=None):
                 )
                 db.session.add(issue)
                 new_issues.append(issue)
-
-=======
-            elif f.get('pr') and not issue.pr_number:
-                issue.pr_number = f.get('pr')
-
-            if scanner and issue.status == 'pending':
-                _trigger_auto_comment(issue, scanner)
-    
->>>>>>> Stashed changes
     db.session.commit()
 
     # Dispatch real notifications for new issues
@@ -1658,46 +1643,6 @@ def run_fallback_sync_job():
                 logger.error(f"Fallback sync job error for user {uid}: {e}")
             finally:
                 db.session.remove()
-<<<<<<< Updated upstream
-                continue
-
-        # Step 2: Process each user in their own DB context
-        for uid in user_ids:
-            with app.app_context():
-                try:
-                    user = db.session.get(User, uid)
-                    if not user:
-                        continue
-
-                    token = get_user_token(user.id) or GITHUB_TOKEN
-                    if not token:
-                        continue
-
-                    settings = user.settings
-                    excluded = settings.get_excluded_list() if settings else []
-                    repos = [ur.full_name for ur in user.repos if ur.full_name not in excluded]
-
-                    if not repos:
-                        continue
-
-                    logger.info(f"BG scan: {user.username} → {len(repos)} repos")
-                    scanner = PRHealthScanner(
-                        token, repos, assignee=ASSIGNEE_USERNAME,
-                        auto_label_conflict=settings.auto_label_conflict if settings else True,
-                        tag_author_on_fail=settings.tag_author_on_fail if settings else False,
-                    )
-                    results = scanner.scan_all_repos()
-                    _ingest_scan_results(results, user.id)
-                    socketio.emit('update', _get_user_data(user.id), to=user.username)
-
-                except Exception as e:
-                    db.session.rollback()
-                    logger.error(f"BG scan error for user {uid}: {e}")
-                finally:
-                    # Crucial: Return the connection to the Neon DB pool
-                    db.session.remove()
-=======
->>>>>>> Stashed changes
 
 @app.route('/<path:route_path>')
 def react_fallback(route_path):

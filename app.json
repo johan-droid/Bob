@@ -42,8 +42,6 @@
     "WEBHOOK_SECRET": {
       "description": "Secret for GitHub Webhook HMAC-SHA256 verification. Set this in your GitHub Webhook config.",
       "required": true
-<<<<<<< Updated upstream
-=======
     },
     "TOKEN_ENCRYPTION_KEY": {
       "description": "Fernet key used to encrypt/decrypt stored GitHub OAuth tokens. Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"",
@@ -52,7 +50,6 @@
     "REDIS_URL": {
       "description": "Redis connection string (provided automatically by Heroku Redis add-on).",
       "required": false
->>>>>>> Stashed changes
     },
     "INTERNAL_CRON_TOKEN": {
       "description": "Shared token for secured fallback sync trigger endpoint.",
