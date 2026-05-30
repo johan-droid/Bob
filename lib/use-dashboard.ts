@@ -232,9 +232,17 @@ export function useDashboard() {
     let socket: ReturnType<typeof io> | null = null;
     let mounted = true;
 
+    // Kick off the HTTP load immediately
     void refreshState(true);
 
-    socket = io(realtimeBaseUrl() || window.location.origin, {
+    // Safety net: if neither cache, socket, nor API has resolved after 5s,
+    // stop showing the spinner so the user sees an empty/error state.
+    const loadingTimeout = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 5000);
+
+    const socketUrl = realtimeBaseUrl() || window.location.origin;
+    socket = io(socketUrl, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       withCredentials: true,
@@ -272,8 +280,14 @@ export function useDashboard() {
       setLiveStatus('disconnected');
     });
 
+    socket.on('connect_error', () => {
+      if (!mounted) return;
+      setLiveStatus('disconnected');
+    });
+
     return () => {
       mounted = false;
+      clearTimeout(loadingTimeout);
       socket?.disconnect();
     };
   }, [refreshState]);

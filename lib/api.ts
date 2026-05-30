@@ -119,10 +119,10 @@ export function realtimeBaseUrl() {
     return configuredBaseUrl;
   }
 
-  if (typeof window !== 'undefined' && 
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
-      window.location.port === '3000') {
-    return 'http://localhost:5000';
+  // Socket.IO is served by server.js on the same origin as the Next.js app.
+  // Always use window.location.origin so both dev (:3000) and prod work correctly.
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
   }
 
   return '';

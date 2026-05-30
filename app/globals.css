@@ -1,3 +1,5 @@
+@import './mobile-dashboard.css';
+
 :root {
   --bg: #050816;
   --bg-elevated: rgba(12, 18, 38, 0.84);

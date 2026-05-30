@@ -12,7 +12,7 @@ type Props = {
 // ── Responsive switch ───────────────────────────────────────────────────────
 
 function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${breakpoint}px)`);
@@ -729,6 +729,29 @@ function DesktopDashboard({ mode }: Props) {
 
 export function DashboardView({ mode }: Props) {
   const isMobile = useIsMobile();
+
+  // Show a minimal loading shell during SSR / before hydration to avoid
+  // a flash of the wrong layout on mobile devices.
+  if (isMobile === null) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: '#09090b',
+        }}
+      >
+        <span
+          className="material-symbols-outlined animate-spin"
+          style={{ fontSize: 32, color: '#7c3aed' }}
+        >
+          sync
+        </span>
+      </div>
+    );
+  }
 
   if (isMobile) {
     return <MobileDashboard mode={mode} />;
