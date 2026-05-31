@@ -139,7 +139,7 @@ export function SettingsForm() {
         )}
 
         {/* Monitored Repositories Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl font-extrabold text-white">Monitored Repositories</h2>
@@ -211,7 +211,7 @@ export function SettingsForm() {
         </section>
 
         {/* Notification Channels Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="mb-6">
             <h2 className="text-xl font-extrabold text-white">Notification Channels</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Configure where Bob routes high-priority pipeline blockers.</p>
@@ -245,7 +245,7 @@ export function SettingsForm() {
         </section>
 
         {/* Auto-Triage Rules Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="mb-6">
             <h2 className="text-xl font-extrabold text-white">Auto-Triage Rules</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Set up automated labeling and developer tagging for broken pipelines.</p>
@@ -306,7 +306,7 @@ export function SettingsForm() {
         </section>
 
         {/* Danger Zone Section */}
-        <section className="bg-surface-card border border-red-500/20 rounded-2xl p-6">
+        <section className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5">
           <div>
             <h2 className="text-xl font-extrabold text-red-500">Danger Zone</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>

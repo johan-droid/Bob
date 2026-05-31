@@ -133,3 +133,5 @@ Nothing needs to be added to the .gitignore file since the modified files are on
 # Sessions
 flask_sessions/
 ```
+.next/
+node_modules/
