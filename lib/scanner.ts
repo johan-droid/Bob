@@ -43,6 +43,11 @@ type RunScanOptions = {
 const DEFAULT_PR_SCAN_FRESHNESS_MS = Number(process.env.PR_SCAN_FRESHNESS_MS || 5 * 60 * 1000);
 const DEFAULT_WEBHOOK_REPO_DEBOUNCE_MS = Number(process.env.WEBHOOK_REPO_DEBOUNCE_MS || 45 * 1000);
 
+function resolveWriteToken(userToken: string): string {
+  const botToken = (process.env.GITHUB_TOKEN || '').trim();
+  return botToken || userToken;
+}
+
 export class PRHealthScanner {
   private token: string;
   private repos: string[];
@@ -742,12 +747,26 @@ export async function runScanForUser(
     return;
   }
 
-  const scanner = new PRHealthScanner(
+  const assignee = process.env.ASSIGNEE_USERNAME || user.username || 'jules';
+  const autoLabelConflict = settings ? settings.auto_label_conflict === 1 || settings.auto_label_conflict === true : true;
+  const tagAuthorOnFail = settings ? settings.tag_author_on_fail === 1 || settings.tag_author_on_fail === true : false;
+
+  // Read via user token, write (create issue/comment/label) via bot token when configured.
+  const readScanner = new PRHealthScanner(
     decryptedToken,
     selectedRepos,
-    process.env.ASSIGNEE_USERNAME || user.username || 'jules',
-    settings ? settings.auto_label_conflict === 1 || settings.auto_label_conflict === true : true,
-    settings ? settings.tag_author_on_fail === 1 || settings.tag_author_on_fail === true : false
+    assignee,
+    autoLabelConflict,
+    tagAuthorOnFail
+  );
+
+  const writeToken = resolveWriteToken(decryptedToken);
+  const writeScanner = new PRHealthScanner(
+    writeToken,
+    selectedRepos,
+    assignee,
+    autoLabelConflict,
+    tagAuthorOnFail
   );
 
   const results: ScanResult[] = [];
@@ -763,7 +782,7 @@ export async function runScanForUser(
 
     const prStateByNumber = await getPrStateByRepo(userId, repoFullName);
     const unresolvedIssueTypesByPr = await getUnresolvedIssueTypesByPr(userId, repoFullName);
-    const res = await scanner.scanRepository(repoFullName, {
+    const res = await readScanner.scanRepository(repoFullName, {
       prStateByNumber,
       unresolvedIssueTypesByPr,
       scanFreshnessMs: DEFAULT_PR_SCAN_FRESHNESS_MS,
@@ -814,7 +833,7 @@ export async function runScanForUser(
       }
 
       if (issue && issue.status === 'pending') {
-        await triggerAutoComment(issue, scanner);
+        await triggerAutoComment(issue, writeScanner);
       }
     }
 
@@ -929,7 +948,7 @@ export async function runScanForUser(
 
     if (repoHasNewTrackerIssue) {
       await createRepoTrackerIssues(
-        scanner,
+        writeScanner,
         repo,
         {
           ...res,
