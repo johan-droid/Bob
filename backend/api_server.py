@@ -1170,7 +1170,18 @@ def _webhook_resolve_pr(repo, pr_number):
         _emit_to_repo_owners(repo)
 
 def _webhook_check_pr_conflict(repo, pr):
-    _scan_repo_for_all_users(repo, reason=f"pull_request:{pr.get('number')}")
+    # GitHub Free Tier calculates conflict matrices out-of-band. 
+    # If mergeable state is missing or null, exit early to avoid wasting API credits.
+    if pr.get('mergeable') is None:
+        logger.info(f"PR #{pr.get('number')} conflict calculation is pending at GitHub. Skipping scanner invocation.")
+        return 
+
+    user_ids = [ur.user_id for ur in UserRepo.query.filter_by(full_name=repo).all()]
+    if not user_ids:
+        return
+    for user_id in user_ids:
+        # Pass a deferred task or scan cleanly knowing state is ready
+        _enqueue_job('api_server.run_repo_scan_job', user_id, repo, f"webhook_pr_{pr.get('number')}")
 
 def _webhook_ci_failure(repo, check_suite):
     _scan_repo_for_all_users(repo, reason=f"check_suite:{check_suite.get('id')}")
