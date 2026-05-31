@@ -147,17 +147,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Filters & Target Overrides
-    let rawTargetRepos = process.env.TARGET_REPOS || '';
-    const targetReposOverride = rawTargetRepos
-      .split(',')
-      .map(r => r.trim())
-      .filter(Boolean);
-
     let discovered = Object.values(reposMap);
-    if (targetReposOverride.length > 0) {
-      discovered = discovered.filter(r => targetReposOverride.includes(r.full_name));
-    }
 
     const uname = user.username;
     const accessible = discovered.filter((r: any) => {
@@ -216,7 +206,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       repos: accessible,
       total: accessible.length,
-      whitelisted: targetReposOverride.length > 0
+      whitelisted: false
     });
   } catch (error: any) {
     console.error('Discover repos endpoint error:', error);

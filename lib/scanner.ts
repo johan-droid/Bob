@@ -535,7 +535,7 @@ export async function runScanForUser(userId: number, socketEmitter?: (room: stri
   const scanner = new PRHealthScanner(
     decryptedToken,
     scanRepos,
-    process.env.ASSIGNEE_USERNAME || 'jules',
+    user.username,
     settings ? settings.auto_label_conflict === 1 || settings.auto_label_conflict === true : true,
     settings ? settings.tag_author_on_fail === 1 || settings.tag_author_on_fail === true : false
   );
