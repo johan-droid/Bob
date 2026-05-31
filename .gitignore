@@ -1,4 +1,21 @@
+```
 # Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -17,62 +34,33 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-.git/
-.mypy_cache/
+.ipynb_checkpoints
 .pytest_cache/
-.hypothesis/
-node_modules/
-yarn.lock
+.mypy_cache/
+hypothesis*
+.DS_Store
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
+# Build results
 dist/
-downloads/
-eggs/
+build/
+*.egg
+*.egg-info/
 .eggs/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
 lib/
 lib64/
-!lib/
-!lib/api.ts
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+area/
 
-# Next.js
-.next/
-out/
-
-# Environment
-.env
-.env.local
-.env.*.local
-*.env*
-
-# Flask sessions
-flask_sessions/
-backend/flask_sessions/
-backend/bob.db
-backend/*.db
-backend/*.sqlite3
-backend/*.sqlite
-backend/*.db-journal
-
-# Generated files
-result.json
-
-# Editors
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*.sublime-workspace
-*.sublime-project
 
 # OS generated files
 .DS_Store
@@ -82,3 +70,4 @@ result.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+```
