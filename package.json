@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint",
-    "dev:all": "concurrently -n \"next,flask\" -c \"bgBlue,bgGreen\" \"npm run dev\" \"cd backend && python api_server.py\""
+    "dev:all": "concurrently -n \"next,flask\" -c \"bgBlue,bgGreen\" \"npm run dev\" \"cd backend && python api_server.py\"",
+    "webhook-proxy": "tsx scripts/webhook-proxy.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.0",
