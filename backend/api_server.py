@@ -96,6 +96,16 @@ GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
 GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
 WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
 TOKEN_ENCRYPTION_KEY  = os.getenv('TOKEN_ENCRYPTION_KEY', '')
+
+if not TOKEN_ENCRYPTION_KEY:
+    raise RuntimeError(
+        "TOKEN_ENCRYPTION_KEY is required for production deployments.\n"
+        "\nGenerate a persistent key with:\n"
+        '  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"\n'
+        "\nThen set it as an environment variable before starting the server.\n"
+        "Without a persistent key, all encrypted tokens will become unreadable after restart."
+    )
+
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 STALE_RESYNC_HOURS     = int(os.getenv('STALE_RESYNC_HOURS', 24))
 FALLBACK_REPO_LIMIT    = int(os.getenv('FALLBACK_REPO_LIMIT', 25))
@@ -105,10 +115,6 @@ ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http:/
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
 APP_ENV               = (os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or os.getenv('ENV') or os.getenv('ENVIRONMENT') or '').lower()
 IS_PRODUCTION         = APP_ENV == 'production' or os.getenv('RENDER') == 'true' or bool(os.getenv('RENDER_EXTERNAL_URL'))
-
-if not TOKEN_ENCRYPTION_KEY:
-    TOKEN_ENCRYPTION_KEY = Fernet.generate_key().decode()
-    logger.warning('TOKEN_ENCRYPTION_KEY is not configured. Using ephemeral key; users must re-authenticate after restart.')
 
 if not WEBHOOK_SECRET:
     logger.warning('WEBHOOK_SECRET is not configured. GitHub webhook endpoint will reject all requests.')

@@ -1,4 +1,5 @@
 ```python
+```
 # Python
 __pycache__/
 *.pyc
@@ -36,6 +37,11 @@ htmlcov/
 *.log
 
 # Environment variables
+*.db
+
+# Dependencies
+venv/
+.venv/
 .env
 .env.local
 *.env.*
@@ -57,3 +63,15 @@ Wait, I need to reconsider. The only modified file is `backend/api_server.py` wh
 
 ```
 Nothing needs to be added to the .gitignore file since the modified files are only Python source files (.py) and test files, which should not be ignored.
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# Sessions
+flask_sessions/
+```
