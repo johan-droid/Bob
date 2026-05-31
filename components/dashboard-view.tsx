@@ -351,7 +351,7 @@ function DesktopDashboard({ mode }: Props) {
             </div>
           </div>
 
-          <div className="mb-5 overflow-x-auto">
+          <div className="mb-5 overflow-x-auto whitespace-nowrap scrollbar-none flex-nowrap">
             <div className="flex items-center gap-2 min-w-max pb-1">
               <button
                 type="button"
@@ -468,7 +468,7 @@ function DesktopDashboard({ mode }: Props) {
                     <tr key={issue.id || issue.issue_key} className="hover:bg-zinc-900/30 transition-colors">
                       <td className="py-4 px-4 font-semibold text-white">
                         <div className="flex flex-col">
-                          <span className="text-zinc-200 text-sm">{issue.repo}</span>
+                          <span className="text-zinc-200 text-sm truncate block max-w-full">{issue.repo}</span>
                           {issue.branch && (
                             <span className="text-[10px] text-zinc-500 font-mono mt-0.5">{issue.branch}</span>
                           )}
@@ -611,7 +611,7 @@ function DesktopDashboard({ mode }: Props) {
         </section>
 
         {/* Activity Feed + Org Settings (replaces dummy Team Velocity) */}
-        <section id="team-velocity" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <section id="team-velocity" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8">
           <div className="bg-surface-card border border-border rounded-2xl p-6 flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -635,7 +635,7 @@ function DesktopDashboard({ mode }: Props) {
                       <span className="material-symbols-outlined text-success text-[16px]">check_circle</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-white truncate">{issue.title}</p>
+                      <p className="text-xs font-bold text-white truncate block max-w-[250px] sm:max-w-full">{issue.title}</p>
                       <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
                         <span>{issue.repo}</span>
                         <span>•</span>

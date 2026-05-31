@@ -1,8 +1,8 @@
 .landing-page-root {
-  --bg-dark: #09090b;
-  --bg-surface: #121214;
+  --bg-dark: #0f1115;
+  --bg-surface: rgba(255, 255, 255, 0.03);
   --bg-glass: rgba(255, 255, 255, 0.03);
-  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.15);
   --text-main: #ffffff;
   --text-muted: #a1a1aa;
@@ -29,7 +29,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 48px;
+  min-height: 48px;
   padding: 0 24px;
   border-radius: 9999px;
   font-weight: 600;
@@ -372,7 +372,7 @@
   top: -48px;
   right: 48px;
   width: 72px;
-  height: 48px;
+  min-height: 48px;
   background: rgba(18, 18, 20, 0.9);
   border: 1px solid var(--border-glass);
   border-bottom: none;
@@ -748,7 +748,7 @@
 
 .landing-page-root .feature-icon {
   width: 48px;
-  height: 48px;
+  min-height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -907,6 +907,7 @@
 }
 
 @media (max-width: 768px) {
+  .landing-page-root .button { width: 100%; }
   .landing-page-root .nav-links, .landing-page-root .nav-actions { display: none; }
   .landing-page-root .mobile-menu-toggle { display: block; }
   

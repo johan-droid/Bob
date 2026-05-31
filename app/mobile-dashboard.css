@@ -5,10 +5,10 @@
 
 /* ── Design Tokens ──────────────────────────────────────────────────────── */
 .mob-dash {
-  --m-bg: #09090b;
-  --m-surface: #18181b;
+  --m-bg: #0f1115;
+  --m-surface: rgba(255, 255, 255, 0.03);
   --m-surface-raised: #1f1f23;
-  --m-border: rgba(255, 255, 255, 0.07);
+  --m-border: rgba(255, 255, 255, 0.06);
   --m-text: #f4f4f5;
   --m-muted: #71717a;
   --m-brand: #7c3aed;
