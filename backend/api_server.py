@@ -1088,6 +1088,29 @@ def action_rebase_contract():
             return jsonify({'ok': False, 'error': f'Failed to fetch PR: {error_msg}'}), 400
         
         pr_data = pr_resp.json()
+
+        # Check mergeable state, poll if None
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            mergeable = pr_data.get('mergeable')
+            if mergeable is not None:
+                break
+            time.sleep(2)
+            pr_resp = _http_request_json('GET', pr_url, headers=gh(token), timeout=10)
+            if pr_resp.status_code == 200:
+                pr_data = pr_resp.json()
+            time.sleep(0.2)
+
+        if pr_data.get('mergeable') is False:
+            logger.warning(f"Conflict detected during pre-check for {repo}#{pr_number}")
+            return jsonify({
+                'ok': False,
+                'error': 'Merge conflict detected during pre-check',
+                'contract': contract,
+                'conflict_details': {'structural_report': 'conflict_identified'}
+            }), 409
+
         head_branch = pr_data.get('head', {}).get('ref')
         base_branch = pr_data.get('base', {}).get('ref')
         
