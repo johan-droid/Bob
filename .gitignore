@@ -43,3 +43,4 @@ ENV/
 .env.staging.docker
 .env.test.docker
 ```
+Nothing should be ignored in this case, as only a Python source file was modified and no build artifacts, dependencies, or temporary files were detected.

@@ -615,6 +615,9 @@ def discover_repos():
         # Source 1: user/repos
         page = 1
         while True:
+            # Introduce an intentional micro-delay (200ms) between outbound requests
+            # to stop the Free Tier API from triggering secondary abuse limits.
+            time.sleep(0.2)
             r = _http_request_json(
                 'GET',
                 'https://api.github.com/user/repos?' + urlencode({
@@ -643,6 +646,8 @@ def discover_repos():
             if not org_login: continue
             p = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 or_ = _http_request_json(
                     'GET',
                     f'https://api.github.com/orgs/{org_login}/repos?' + urlencode({'type': 'all', 'per_page': 100, 'page': p}),
@@ -664,6 +669,8 @@ def discover_repos():
         if GITHUB_TOKEN:
             ap = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 ar = _http_request_json(
                     'GET',
                     'https://api.github.com/user/repos?' + urlencode({'per_page': 100, 'page': ap}),
@@ -1188,7 +1195,18 @@ def _webhook_resolve_pr(repo, pr_number):
         _emit_to_repo_owners(repo)
 
 def _webhook_check_pr_conflict(repo, pr):
-    _scan_repo_for_all_users(repo, reason=f"pull_request:{pr.get('number')}")
+    # GitHub Free Tier calculates conflict matrices out-of-band. 
+    # If mergeable state is missing or null, exit early to avoid wasting API credits.
+    if pr.get('mergeable') is None:
+        logger.info(f"PR #{pr.get('number')} conflict calculation is pending at GitHub. Skipping scanner invocation.")
+        return 
+
+    user_ids = [ur.user_id for ur in UserRepo.query.filter_by(full_name=repo).all()]
+    if not user_ids:
+        return
+    for user_id in user_ids:
+        # Pass a deferred task or scan cleanly knowing state is ready
+        _enqueue_job('api_server.run_repo_scan_job', user_id, repo, f"webhook_pr_{pr.get('number')}")
 
 def _webhook_ci_failure(repo, check_suite):
     _scan_repo_for_all_users(repo, reason=f"check_suite:{check_suite.get('id')}")

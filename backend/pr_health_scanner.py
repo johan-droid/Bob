@@ -41,20 +41,31 @@ class PRHealthScanner:
         )
 
     def _get(self, url: str, params: dict = None, retries: int = 4) -> Any:
+        # Introduce an intentional micro-delay (e.g., 200ms) between outbound requests
+        # to stop the Free Tier API from triggering secondary abuse limits.
+        time.sleep(0.2)
+        
         for attempt in range(retries):
             try:
                 r = self.session.get(url, params=params, timeout=15)
-                remaining = int(r.headers.get("X-RateLimit-Remaining", 999))
-                if remaining < 10:
-                    reset_at = int(r.headers.get("X-RateLimit-Reset", time.time() + 60))
-                    wait = max(0, reset_at - time.time()) + 2
-                    logger.warning("Rate limit low (%s), sleeping %.0fs", remaining, wait)
-                    time.sleep(wait)
+                
+                # Read exact GitHub rate limiting metrics
+                remaining = r.headers.get("X-RateLimit-Remaining")
+                reset_time = r.headers.get("X-RateLimit-Reset")
+                
+                if r.status_code == 403 or r.status_code == 429:
+                    if reset_time:
+                        wait = max(1, int(reset_time) - int(time.time())) + 5
+                        logger.warning(f"Rate limited by GitHub. Cool down required: sleeping {wait}s")
+                        time.sleep(wait)
+                        continue
+                    else:
+                        time.sleep((attempt + 1) * 5)
+                        continue
+                        
                 if r.status_code == 200:
                     return r.json()
-                if r.status_code in (403, 429):
-                    time.sleep((attempt + 1) * 3)
-                    continue
+                    
                 return {"error": f"HTTP {r.status_code}", "status_code": r.status_code}
             except requests.RequestException as e:
                 if attempt == retries - 1:
@@ -191,6 +202,54 @@ class PRHealthScanner:
             f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}/requested_reviewers",
             {"reviewers": reviewers},
         )
+
+    def batch_scan_graphql(self, owner: str, repo_name: str) -> Dict[str, Any]:
+        """
+        Batches pull requests, mergeable states, conflict flags, and review summaries
+        using a single GraphQL token request instead of dozens of REST calls.
+        """
+        url = "https://api.github.com/graphql"
+        query = """
+        query($owner: String!, $name: String!) {
+          repository(owner: $owner, name: $name) {
+            pullRequests(states: OPEN, first: 50) {
+              nodes {
+                number
+                title
+                url
+                mergeable
+                author { login }
+                headRef { name target { oid } }
+                reviews(last: 10) {
+                  nodes {
+                    state
+                    author { login }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        
+        headers = {
+            "Authorization": f"bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.post(url, json={"query": query, "variables": {"owner": owner, "name": repo_name}}, headers=headers, timeout=15)
+            if response.status_code != 200:
+                return {"error": f"GraphQL Error {response.status_code}"}
+                
+            data = response.json()
+            if "errors" in data:
+                return {"error": data["errors"][0]["message"]}
+                
+            # Parse output safely directly into Bob's internal scan schema
+            return data.get("data", {}).get("repository", {})
+        except Exception as e:
+            return {"error": str(e)}
 
     def scan_repository(self, repo: str) -> Dict[str, Any]:
         results = {
