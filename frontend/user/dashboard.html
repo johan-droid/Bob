@@ -5,25 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Bob developer workspace for personal PR monitoring and action items.">
     <title>Bob | My Workspace</title>
-    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="/user/user-dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 </head>
 <body>
-    <div class="ops-shell bento-theme">
-        <nav class="ops-topbar">
-            <div class="ops-topbar-left">
-                <a href="/user/dashboard" class="ops-brand">
+    <div class="user-ops-shell bento-theme">
+        <nav class="user-ops-topbar">
+            <div class="user-ops-topbar-left">
+                <a href="/user/dashboard" class="user-ops-brand">
                     <span>B</span>
                     Bob Developer
                 </a>
             </div>
-            <div class="ops-topbar-center">
+            <div class="user-ops-topbar-center">
                 <a href="#my-prs" class="active">My Pull Requests</a>
                 <a href="#action-required">Action Required</a>
                 <a href="#preferences">Profile Preferences</a>
             </div>
-            <div class="ops-topbar-right">
+            <div class="user-ops-topbar-right">
                 <div class="connection-status" id="ws-status" aria-live="polite">
                     <span class="status-dot connecting"></span>
                     <span class="status-text" style="font-size: 0.85rem; font-weight: 600; color: #a1a1aa;">Awaiting Auth...</span>
@@ -31,31 +31,31 @@
                 <div class="avatar-circle user-avatar" aria-hidden="true" title="Developer Profile">
                     <span class="material-icons-outlined" style="font-size: 18px;">person</span>
                 </div>
-                <a href="/logout" class="logout-link ops-button outline">Logout</a>
+                <a href="/logout" class="logout-link user-ops-button outline">Logout</a>
             </div>
         </nav>
 
-        <main class="ops-main">
-            <header class="ops-header">
+        <main class="user-ops-main">
+            <header class="user-ops-header">
                 <div>
-                    <span class="ops-kicker">Developer Profile</span>
+                    <span class="user-ops-kicker">Developer Profile</span>
                     <h1>My Workspace</h1>
                     <p>Personal pull request monitoring and action items.</p>
                 </div>
             </header>
 
-            <section id="action-required" class="ops-grid" style="grid-template-columns: 1fr; margin-bottom: 32px;">
+            <section id="action-required" class="user-ops-grid" style="grid-template-columns: 1fr; margin-bottom: 32px;">
                 <div class="bento-box alert-card">
-                    <div class="ops-panel-head" style="margin-bottom: 16px;">
+                    <div class="user-ops-panel-head" style="margin-bottom: 16px;">
                         <div>
-                            <span class="ops-kicker">Priority</span>
+                            <span class="user-ops-kicker">Priority</span>
                             <h2 style="color: #fbbf24; display: flex; align-items: center; gap: 8px;">
                                 <span class="material-icons-outlined">notifications_active</span> Requires Your Attention
                             </h2>
                         </div>
                     </div>
                     <div class="action-grid" id="action-items-container">
-                        <div class="ops-empty bento-inner" style="min-height: 120px;">
+                        <div class="user-ops-empty bento-inner" style="min-height: 120px;">
                             <span class="material-icons-outlined" style="font-size: 32px; margin-bottom: 8px; color: #34d399;">task_alt</span>
                             <p style="color: #a1a1aa; font-size: 0.9rem;">You have no blocking merge conflicts or failing CI checks assigned to you.</p>
                         </div>
@@ -63,11 +63,11 @@
                 </div>
             </section>
 
-            <section id="my-prs" class="ops-grid" style="grid-template-columns: 1fr;">
+            <section id="my-prs" class="user-ops-grid" style="grid-template-columns: 1fr;">
                 <div class="bento-box large">
-                    <div class="ops-panel-head">
+                    <div class="user-ops-panel-head">
                         <div>
-                            <span class="ops-kicker">Live Tracking</span>
+                            <span class="user-ops-kicker">Live Tracking</span>
                             <h2>My Active Pull Requests</h2>
                         </div>
                     </div>
@@ -84,7 +84,7 @@
                             <tbody id="my-pr-table-body">
                                 <tr class="empty-state-row">
                                     <td colspan="4">
-                                        <div class="ops-empty" style="min-height: 200px; display: grid; place-items: center; text-align: center; color: #a1a1aa;">
+                                        <div class="user-ops-empty" style="min-height: 200px; display: grid; place-items: center; text-align: center; color: #a1a1aa;">
                                             <span class="material-icons-outlined" style="font-size: 48px; margin-bottom: 16px;">commit</span>
                                             <p>Awaiting GitHub payload. Bob will list PRs authored by your connected account here.</p>
                                         </div>
@@ -96,11 +96,11 @@
                 </div>
             </section>
 
-            <section id="preferences" class="ops-grid" style="grid-template-columns: 1fr; margin-top: 32px;">
+            <section id="preferences" class="user-ops-grid" style="grid-template-columns: 1fr; margin-top: 32px;">
                 <div class="bento-box feed-card">
-                    <div class="ops-panel-head">
+                    <div class="user-ops-panel-head">
                         <div>
-                            <span class="ops-kicker">Configuration</span>
+                            <span class="user-ops-kicker">Configuration</span>
                             <h2>Profile Preferences</h2>
                         </div>
                     </div>
@@ -110,7 +110,7 @@
                                 <h3 style="margin: 0 0 4px; font-size: 1rem; color: #fff;">Account Settings</h3>
                                 <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Manage your developer profile and preferences.</p>
                             </div>
-                            <a class="ops-button outline sm" href="/permissions" aria-label="Refresh repository setup">
+                            <a class="user-ops-button outline sm" href="/permissions" aria-label="Refresh repository setup">
                                 <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">sync</span>
                                 Refresh Setup
                             </a>
@@ -120,7 +120,7 @@
                                 <h3 style="margin: 0 0 4px; font-size: 1rem; color: #ef4444;">Danger Zone</h3>
                                 <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Permanently delete your account and all associated data.</p>
                             </div>
-                            <button id="delete-account-btn" class="ops-button" style="background: transparent; border: 1px solid #ef4444; color: #ef4444;">
+                            <button id="delete-account-btn" class="user-ops-button" style="background: transparent; border: 1px solid #ef4444; color: #ef4444;">
                                 <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">delete_forever</span>
                                 Delete Account
                             </button>
@@ -130,7 +130,7 @@
             </section>
 
             <!-- Deletion Modal -->
-            <div id="delete-modal" class="ops-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; place-items: center;">
+            <div id="delete-modal" class="user-ops-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; place-items: center;">
                 <div class="bento-box" style="max-width: 400px; width: 90%; background: #18181b; border: 1px solid rgba(239, 68, 68, 0.2);">
                     <h2 style="color: #ef4444; margin-top: 0; display: flex; align-items: center; gap: 8px;">
                         <span class="material-icons-outlined">warning</span> Confirm Deletion
@@ -139,8 +139,8 @@
                         Are you absolutely sure? This action cannot be undone. All your PR monitoring data and connections will be permanently removed.
                     </p>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button id="cancel-delete-btn" class="ops-button outline">Cancel</button>
-                        <button id="confirm-delete-btn" class="ops-button" style="background: #ef4444; color: #fff; border: none;">Yes, Delete Everything</button>
+                        <button id="cancel-delete-btn" class="user-ops-button outline">Cancel</button>
+                        <button id="confirm-delete-btn" class="user-ops-button" style="background: #ef4444; color: #fff; border: none;">Yes, Delete Everything</button>
                     </div>
                 </div>
             </div>
