@@ -137,8 +137,42 @@ class PRHealthScanner:
         return []
 
     def check_merge_conflict(self, repo: str, pr_number: int) -> bool:
-        pr = self.get_pr_detail(repo, pr_number)
-        return isinstance(pr, dict) and pr.get("mergeable") is False
+        """Check if a PR has a merge conflict, with retry logic for async mergeable status.
+        
+        GitHub calculates mergeable status asynchronously. When a PR is modified,
+        the mergeable field may return None initially. This method polls up to 3 times
+        with 2-second delays until it gets an explicit True or False value.
+        """
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            pr = self.get_pr_detail(repo, pr_number)
+            if not isinstance(pr, dict):
+                return False
+            
+            mergeable = pr.get("mergeable")
+            
+            # If we have an explicit boolean value, return it immediately
+            if mergeable is True:
+                return False  # mergeable=True means no conflict
+            if mergeable is False:
+                return True   # mergeable=False means there IS a conflict
+            
+            # mergeable is None - GitHub is still calculating, wait and retry
+            if attempt < max_retries - 1:
+                logger.debug(
+                    f"PR #{pr_number} mergeable status is None (async calculation), "
+                    f"retry {attempt + 1}/{max_retries} after {retry_delay}s"
+                )
+                time.sleep(retry_delay)
+        
+        # After all retries, if still None, treat as no conflict (conservative default)
+        logger.warning(
+            f"PR #{pr_number} mergeable status remained None after {max_retries} attempts, "
+            f"assuming no conflict"
+        )
+        return False
 
     def scan_workflow_failures(self, repo: str) -> List[Dict[str, Any]]:
         result = self._get(
@@ -263,41 +297,61 @@ class PRHealthScanner:
             "healthy_prs": 0,
         }
 
-        prs = self.get_open_prs(repo)
-        results["total_prs"] = len(prs)
+        # Parse repo into owner/name for GraphQL
+        parts = repo.split("/")
+        if len(parts) != 2:
+            logger.error(f"Invalid repo format: {repo}. Expected 'owner/name'")
+            return results
+        
+        owner, repo_name = parts
+        
+        # Use GraphQL batch query instead of individual REST calls
+        graphql_result = self.batch_scan_graphql(owner, repo_name)
+        
+        if "error" in graphql_result:
+            logger.error(f"GraphQL scan failed for {repo}: {graphql_result['error']}")
+            return results
+        
+        pull_requests = graphql_result.get("pullRequests", {}).get("nodes", [])
+        results["total_prs"] = len(pull_requests)
 
         branch_to_pr: Dict[str, int] = {}
-        for pr in prs:
-            pr_num = pr.get("number")
-            head = pr.get("head") or {}
-            head_branch = head.get("ref")
+        for pr_node in pull_requests:
+            pr_num = pr_node.get("number")
+            head_ref = pr_node.get("headRef") or {}
+            head_branch = head_ref.get("name")
             if head_branch:
                 branch_to_pr[head_branch] = pr_num
 
-            if self.check_merge_conflict(repo, pr_num):
+            # Check mergeable status from GraphQL (already includes async resolution)
+            mergeable = pr_node.get("mergeable")
+            if mergeable == "CONFLICTING":
                 results["conflicting_prs"].append(
                     {
                         "pr": pr_num,
-                        "title": pr.get("title"),
-                        "url": pr.get("html_url"),
+                        "title": pr_node.get("title"),
+                        "url": pr_node.get("url"),
                         "head_branch": head_branch,
-                        "author": (pr.get("user") or {}).get("login"),
-                        "head_sha": (head or {}).get("sha"),
+                        "author": (pr_node.get("author") or {}).get("login"),
+                        "head_sha": (head_ref.get("target") or {}).get("oid"),
                     }
                 )
 
-            review_info = self.get_pr_reviews(repo, pr_num)
-            if review_info.get("changes_requested_count", 0) > 0:
+            # Process reviews from GraphQL response
+            reviews = pr_node.get("reviews", {}).get("nodes", [])
+            changes_requested = sum(1 for r in reviews if r.get("state") == "CHANGES_REQUESTED")
+            if changes_requested > 0:
                 results["review_issues"].append(
                     {
                         "pr": pr_num,
-                        "title": pr.get("title"),
-                        "url": pr.get("html_url"),
+                        "title": pr_node.get("title"),
+                        "url": pr_node.get("url"),
                         "head_branch": head_branch,
-                        "author": (pr.get("user") or {}).get("login"),
+                        "author": (pr_node.get("author") or {}).get("login"),
                     }
                 )
 
+        # Still need REST for workflow failures (not available in current GraphQL query)
         failures = self.scan_workflow_failures(repo)
         for failure in failures:
             failure["pr"] = branch_to_pr.get(failure.get("branch"))
