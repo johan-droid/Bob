@@ -22,7 +22,6 @@ coverage.xml
 .pytest_cache/
 .hypothesis/
 node_modules/
-package-lock.json
 yarn.lock
 
 # Distribution / packaging
