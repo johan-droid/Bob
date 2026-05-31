@@ -2,6 +2,12 @@ import { get, query, run } from './db';
 import { decryptToken } from './auth';
 
 const GITHUB_API = 'https://api.github.com';
+const DEFAULT_AGENT_HINTS = ['codex', 'copilot', 'jules'];
+const CONFIGURED_AGENT_HINTS = (process.env.AGENT_IDENTITIES || '')
+  .split(',')
+  .map(v => v.trim().toLowerCase())
+  .filter(Boolean);
+const AGENT_HINTS = CONFIGURED_AGENT_HINTS.length > 0 ? CONFIGURED_AGENT_HINTS : DEFAULT_AGENT_HINTS;
 
 export interface ScanResult {
   repo: string;
@@ -12,7 +18,30 @@ export interface ScanResult {
   oversized_prs: any[];
   total_prs: number;
   healthy_prs: number;
+  pr_heads: Array<{ pr: number; head_sha: string }>;
 }
+
+type PrScanStateRow = {
+  pr_number: number;
+  head_sha?: string | null;
+  last_scanned_at?: string | null;
+};
+
+type ScanRepositoryOptions = {
+  prStateByNumber?: Map<number, PrScanStateRow>;
+  unresolvedIssueTypesByPr?: Map<number, Set<string>>;
+  scanFreshnessMs?: number;
+  force?: boolean;
+};
+
+type RunScanOptions = {
+  repos?: string[];
+  reason?: string;
+  force?: boolean;
+};
+
+const DEFAULT_PR_SCAN_FRESHNESS_MS = Number(process.env.PR_SCAN_FRESHNESS_MS || 5 * 60 * 1000);
+const DEFAULT_WEBHOOK_REPO_DEBOUNCE_MS = Number(process.env.WEBHOOK_REPO_DEBOUNCE_MS || 45 * 1000);
 
 export class PRHealthScanner {
   private token: string;
@@ -254,7 +283,31 @@ export class PRHealthScanner {
     });
   }
 
-  public async scanRepository(repo: string): Promise<ScanResult> {
+  private isAgentLogin(login: string): boolean {
+    const normalized = (login || '').toLowerCase();
+    if (!normalized) return false;
+    if (normalized.endsWith('[bot]')) return true;
+    return AGENT_HINTS.some((hint) => normalized.includes(hint));
+  }
+
+  public async getLiveAgentsForRepo(repo: string): Promise<string[]> {
+    const res = await this.fetchGitHub(`${GITHUB_API}/repos/${repo}/contributors?per_page=100`);
+    if (!Array.isArray(res)) return [];
+
+    const unique = new Set<string>();
+    for (const contributor of res) {
+      const login = contributor?.login;
+      if (typeof login === 'string' && this.isAgentLogin(login)) {
+        unique.add(login);
+      }
+    }
+
+    return [...unique];
+  }
+
+  public async scanRepository(repo: string, options: ScanRepositoryOptions = {}): Promise<ScanResult> {
+    const now = Date.now();
+    const freshnessMs = options.scanFreshnessMs ?? DEFAULT_PR_SCAN_FRESHNESS_MS;
     const results: ScanResult = {
       repo,
       conflicting_prs: [],
@@ -263,7 +316,8 @@ export class PRHealthScanner {
       stale_prs: [],
       oversized_prs: [],
       total_prs: 0,
-      healthy_prs: 0
+      healthy_prs: 0,
+      pr_heads: []
     };
 
     const prs = await this.getOpenPRs(repo);
@@ -275,7 +329,27 @@ export class PRHealthScanner {
       const prUrl = pr.html_url || '';
       const prAuthor = pr.user?.login || 'Unknown';
       const headBranch = pr.head?.ref || '';
+      const headSha = pr.head?.sha || '';
+      results.pr_heads.push({ pr: prNum, head_sha: headSha });
       let hasIssues = false;
+
+      const cached = options.prStateByNumber?.get(prNum);
+      const cachedAt = cached?.last_scanned_at ? new Date(cached.last_scanned_at).getTime() : 0;
+      const isFresh = cachedAt > 0 && now - cachedAt < freshnessMs;
+      const isSameHead = !!headSha && !!cached?.head_sha && headSha === cached.head_sha;
+      const unresolvedTypes = options.unresolvedIssueTypesByPr?.get(prNum);
+      const hasUnresolvedIssueInDb = !!unresolvedTypes && unresolvedTypes.size > 0;
+      const canUseCachedState = !options.force && isFresh && isSameHead;
+
+      if (canUseCachedState) {
+        if (hasUnresolvedIssueInDb) {
+          hasIssues = true;
+        }
+        if (!hasIssues) {
+          results.healthy_prs++;
+        }
+        continue;
+      }
 
       // 1. Merge conflict detection
       const isConflicting = await this.checkMergeConflict(repo, prNum);
@@ -358,11 +432,14 @@ export class PRHealthScanner {
       console.log(`Scanning ${repo}...`);
       const result = await this.scanRepository(repo);
       allResults.push(result);
+      const liveAgents = await this.getLiveAgentsForRepo(repo);
+      const mentionTargets = liveAgents.length > 0 ? liveAgents : [this.assignee];
+      const mentionText = mentionTargets.map((login) => `@${login}`).join(' ');
 
       // Create GitHub issues for conflicts
       for (const cp of result.conflicting_prs) {
         const title = `🚨 Merge conflict in PR #${cp.pr}`;
-        const body = `@${this.assignee} merge conflict detected.\n\nBranch \`${cp.head_branch}\` conflicts with base.\n\nPR: ${cp.url}`;
+        const body = `${mentionText} merge conflict detected.\n\nBranch \`${cp.head_branch}\` conflicts with base.\n\nPR: ${cp.url}`;
         await this.createIssue(repo, title, body, ['needs-fix', 'merge-conflict']);
 
         if (this.autoLabelConflict) {
@@ -373,9 +450,9 @@ export class PRHealthScanner {
       // Create GitHub issues for workflow failures
       for (const f of result.workflow_failures) {
         const title = `⚠️ Workflow '${f.name}' failed on ${f.branch}`;
-        let body = `@${this.assignee} please investigate: ${f.html_url}`;
+        let body = `${mentionText} please investigate: ${f.html_url}`;
         if (this.tagAuthorOnFail && f.author) {
-          body = `@${f.author} @${this.assignee} please investigate: ${f.html_url}`;
+          body = `@${f.author} ${mentionText} please investigate: ${f.html_url}`;
         }
         await this.createIssue(repo, title, body, ['needs-fix', 'ci-failure']);
       }
@@ -506,8 +583,130 @@ async function triggerAutoComment(issue: any, scanner: PRHealthScanner) {
   }
 }
 
+function isWebhookReason(reason: string): boolean {
+  return reason.startsWith('webhook:') || reason.startsWith('pull_request:') || reason.startsWith('check_suite:') || reason.startsWith('pull_request_review:');
+}
+
+async function getPrStateByRepo(userId: number, repo: string): Promise<Map<number, PrScanStateRow>> {
+  const rows = await query<PrScanStateRow>(
+    'SELECT pr_number, head_sha, last_scanned_at FROM pr_scan_state WHERE user_id = $1 AND repo = $2',
+    [userId, repo]
+  );
+  const map = new Map<number, PrScanStateRow>();
+  for (const row of rows) {
+    map.set(Number(row.pr_number), row);
+  }
+  return map;
+}
+
+async function getUnresolvedIssueTypesByPr(userId: number, repo: string): Promise<Map<number, Set<string>>> {
+  const rows = await query<{ pr_number: number; issue_type: string }>(
+    `SELECT pr_number, issue_type
+     FROM pr_issues
+     WHERE user_id = $1
+       AND repo = $2
+       AND pr_number IS NOT NULL
+       AND status IN ($3, $4, $5)`,
+    [userId, repo, 'pending', 'in_progress', 'failed']
+  );
+
+  const map = new Map<number, Set<string>>();
+  for (const row of rows) {
+    const prNumber = Number(row.pr_number);
+    const issueType = String(row.issue_type || '');
+    const set = map.get(prNumber) || new Set<string>();
+    if (issueType) set.add(issueType);
+    map.set(prNumber, set);
+  }
+  return map;
+}
+
+async function syncPrScanState(
+  userId: number,
+  repo: string,
+  prHeads: Array<{ pr: number; head_sha: string }>,
+  reason: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  for (const item of prHeads) {
+    await run(
+      `INSERT INTO pr_scan_state (user_id, repo, pr_number, head_sha, last_scanned_at, last_scan_reason, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (user_id, repo, pr_number) DO UPDATE
+       SET head_sha = excluded.head_sha,
+           last_scanned_at = excluded.last_scanned_at,
+           last_scan_reason = excluded.last_scan_reason,
+           updated_at = excluded.updated_at`,
+      [userId, repo, item.pr, item.head_sha || null, now, reason, now]
+    );
+  }
+
+  const openNumbers = new Set<number>(prHeads.map((p) => Number(p.pr)));
+  const existing = await query<{ pr_number: number }>(
+    'SELECT pr_number FROM pr_scan_state WHERE user_id = $1 AND repo = $2',
+    [userId, repo]
+  );
+  for (const row of existing) {
+    const prNumber = Number(row.pr_number);
+    if (!openNumbers.has(prNumber)) {
+      await run(
+        'DELETE FROM pr_scan_state WHERE user_id = $1 AND repo = $2 AND pr_number = $3',
+        [userId, repo, prNumber]
+      );
+    }
+  }
+}
+
+async function shouldSkipRepoByDebounce(userId: number, repo: string, reason: string): Promise<boolean> {
+  if (!isWebhookReason(reason)) return false;
+  const row = await get<{ last_scanned_at?: string | null }>(
+    'SELECT MAX(last_scanned_at) AS last_scanned_at FROM pr_scan_state WHERE user_id = $1 AND repo = $2',
+    [userId, repo]
+  );
+  if (!row?.last_scanned_at) return false;
+  const last = new Date(row.last_scanned_at).getTime();
+  if (!Number.isFinite(last)) return false;
+  return Date.now() - last < DEFAULT_WEBHOOK_REPO_DEBOUNCE_MS;
+}
+
+async function createRepoTrackerIssues(
+  scanner: PRHealthScanner,
+  repo: string,
+  result: ScanResult,
+  tagAuthorOnFail: boolean,
+  autoLabelConflict: boolean
+): Promise<void> {
+  if (result.conflicting_prs.length === 0 && result.workflow_failures.length === 0) return;
+
+  const liveAgents = await scanner.getLiveAgentsForRepo(repo);
+  const mentionTargets = liveAgents.length > 0 ? liveAgents : [scanner.assignee];
+  const mentionText = mentionTargets.map((login) => `@${login}`).join(' ');
+
+  for (const cp of result.conflicting_prs) {
+    const title = `🚨 Merge conflict in PR #${cp.pr}`;
+    const body = `${mentionText} merge conflict detected.\n\nBranch \`${cp.head_branch}\` conflicts with base.\n\nPR: ${cp.url}`;
+    await scanner.createIssue(repo, title, body, ['needs-fix', 'merge-conflict']);
+    if (autoLabelConflict) {
+      await scanner.addLabel(repo, cp.pr, 'needs-fix');
+    }
+  }
+
+  for (const f of result.workflow_failures) {
+    const title = `⚠️ Workflow '${f.name}' failed on ${f.branch}`;
+    let body = `${mentionText} please investigate: ${f.html_url}`;
+    if (tagAuthorOnFail && f.author) {
+      body = `@${f.author} ${mentionText} please investigate: ${f.html_url}`;
+    }
+    await scanner.createIssue(repo, title, body, ['needs-fix', 'ci-failure']);
+  }
+}
+
 // ── Real Scan Orchestration and Ingestion ────────────────────────────────────
-export async function runScanForUser(userId: number, socketEmitter?: (room: string, event: string, data: any) => void): Promise<void> {
+export async function runScanForUser(
+  userId: number,
+  socketEmitter?: (room: string, event: string, data: any) => void,
+  options: RunScanOptions = {}
+): Promise<void> {
   const user = await get('SELECT * FROM users WHERE id = $1', [userId]);
   if (!user) return;
 
@@ -532,18 +731,51 @@ export async function runScanForUser(userId: number, socketEmitter?: (room: stri
     return;
   }
 
+  const reason = options.reason || 'manual';
+  let selectedRepos = scanRepos;
+  if (Array.isArray(options.repos) && options.repos.length > 0) {
+    const allowed = new Set(scanRepos);
+    selectedRepos = options.repos.filter((repo) => allowed.has(repo));
+  }
+
+  if (selectedRepos.length === 0) {
+    return;
+  }
+
   const scanner = new PRHealthScanner(
     decryptedToken,
-    scanRepos,
-    user.username,
+    selectedRepos,
+    process.env.ASSIGNEE_USERNAME || user.username || 'jules',
     settings ? settings.auto_label_conflict === 1 || settings.auto_label_conflict === true : true,
     settings ? settings.tag_author_on_fail === 1 || settings.tag_author_on_fail === true : false
   );
 
-  const results = await scanner.scanAllRepos();
+  const results: ScanResult[] = [];
   const newIssues: any[] = [];
 
-  for (const res of results) {
+  for (const repoFullName of selectedRepos) {
+    if (!options.force) {
+      const skip = await shouldSkipRepoByDebounce(userId, repoFullName, reason);
+      if (skip) {
+        continue;
+      }
+    }
+
+    const prStateByNumber = await getPrStateByRepo(userId, repoFullName);
+    const unresolvedIssueTypesByPr = await getUnresolvedIssueTypesByPr(userId, repoFullName);
+    const res = await scanner.scanRepository(repoFullName, {
+      prStateByNumber,
+      unresolvedIssueTypesByPr,
+      scanFreshnessMs: DEFAULT_PR_SCAN_FRESHNESS_MS,
+      force: !!options.force
+    });
+
+    results.push(res);
+    await syncPrScanState(userId, repoFullName, res.pr_heads, reason);
+
+    // Only create repo tracker issues when we have at least one new finding in DB later in this loop.
+    let repoHasNewTrackerIssue = false;
+
     const repo = res.repo;
 
     // 1. Conflicts
@@ -578,6 +810,7 @@ export async function runScanForUser(userId: number, socketEmitter?: (room: stri
           comment_count: 0
         };
         newIssues.push({ ...pr, id: issue.id, repo, issue_type: 'merge_conflict' });
+        repoHasNewTrackerIssue = true;
       }
 
       if (issue && issue.status === 'pending') {
@@ -609,6 +842,7 @@ export async function runScanForUser(userId: number, socketEmitter?: (room: stri
           ]
         );
         newIssues.push({ title, repo, url: f.html_url, author: f.author, issue_type: 'ci_failure' });
+        repoHasNewTrackerIssue = true;
       }
     }
 
@@ -691,6 +925,20 @@ export async function runScanForUser(userId: number, socketEmitter?: (room: stri
         );
         newIssues.push({ title, repo, url: op.url, author: op.author, issue_type: 'oversized_pr' });
       }
+    }
+
+    if (repoHasNewTrackerIssue) {
+      await createRepoTrackerIssues(
+        scanner,
+        repo,
+        {
+          ...res,
+          conflicting_prs: res.conflicting_prs,
+          workflow_failures: res.workflow_failures
+        },
+        settings ? settings.tag_author_on_fail === 1 || settings.tag_author_on_fail === true : false,
+        settings ? settings.auto_label_conflict === 1 || settings.auto_label_conflict === true : true
+      );
     }
   }
 

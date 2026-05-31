@@ -152,6 +152,20 @@ export async function initDatabase() {
       CONSTRAINT uq_user_issue UNIQUE (user_id, issue_key)
     );
   `;
+
+  const createPrScanStateTable = `
+    CREATE TABLE IF NOT EXISTS pr_scan_state (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      repo VARCHAR(500) NOT NULL,
+      pr_number INTEGER NOT NULL,
+      head_sha VARCHAR(100),
+      last_scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_scan_reason VARCHAR(100) DEFAULT 'unknown',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT uq_pr_scan_state UNIQUE (user_id, repo, pr_number)
+    );
+  `;
   
   const createUserSettingsTable = `
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -216,6 +230,7 @@ export async function initDatabase() {
     await conn.query(createUsersTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createUserReposTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createPrIssuesTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
+    await conn.query(createPrScanStateTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createUserSettingsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createMergeContractsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createMergeLogsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
@@ -232,6 +247,7 @@ export async function initDatabase() {
     conn.exec(toSqlite(createUsersTable));
     conn.exec(toSqlite(createUserReposTable));
     conn.exec(toSqlite(createPrIssuesTable));
+    conn.exec(toSqlite(createPrScanStateTable));
     conn.exec(toSqlite(createUserSettingsTable));
     conn.exec(toSqlite(createMergeContractsTable));
     conn.exec(toSqlite(createMergeLogsTable));
