@@ -27,6 +27,7 @@
   min-height: 100dvh;
   background: var(--m-bg);
   color: var(--m-text);
+  overflow-y: auto;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
@@ -189,9 +190,29 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: calc(var(--m-dock-h) + var(--m-safe-bottom) + 16px);
+  padding-bottom: calc(var(--m-dock-h) + var(--m-safe-bottom) + 96px);
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 #09090b;
+}
+
+.mob-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mob-content::-webkit-scrollbar-track {
+  background: #09090b;
+  border-radius: 4px;
+}
+
+.mob-content::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+
+.mob-content::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
 
 /* ── KPI Chips ──────────────────────────────────────────────────────────── */
