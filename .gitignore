@@ -23,6 +23,7 @@ target/
 *.tmp
 
 # Python specific
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -62,4 +63,24 @@ pids
 *.gz
 *.rar
 *.7z
+*.db
+
+# Dependencies
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# Sessions
+flask_sessions/
 ```
