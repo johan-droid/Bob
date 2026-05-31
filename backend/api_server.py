@@ -248,9 +248,19 @@ def _encrypt_github_token(token: str) -> str:
 
 
 def _decrypt_github_token(ciphertext: str) -> str | None:
+    """Decrypt a GitHub OAuth token stored in the database.
+    
+    Returns None if decryption fails, allowing graceful handling upstream.
+    """
     try:
         return fernet.decrypt(ciphertext.encode()).decode()
-    except (InvalidToken, ValueError, TypeError):
+    except InvalidToken:
+        # Encryption key mismatch or corrupted token - caller should purge and re-auth
+        logger.warning("Token decryption failed: InvalidToken (key mismatch or corruption)")
+        return None
+    except (ValueError, TypeError) as e:
+        # Malformed ciphertext or encoding issues
+        logger.warning(f"Token decryption failed: {type(e).__name__} - {e}")
         return None
 
 
@@ -543,20 +553,28 @@ def github_callback():
         return redirect('/?error=oauth_failed')
 
 def get_user_token(user_id: int) -> str | None:
-    """Retrieve the stored OAuth token for a user (server-side only)."""
+    """Retrieve the stored OAuth token for a user (server-side only).
+    
+    If decryption fails due to key rotation or corruption, the invalid
+    database state is purged and None is returned, forcing re-authentication.
+    """
     user = User.query.get(user_id)
     if not user or not user.access_token:
         return None
 
-    token = _decrypt_github_token(user.access_token)
-    if token:
+    try:
+        token = fernet.decrypt(user.access_token.encode()).decode()
         return token
-
-    # Fail closed: if token cannot be decrypted, force re-authentication.
-    user.access_token = None
-    db.session.commit()
-    logger.warning(f"Cleared undecryptable token for user_id={user_id}; re-auth required")
-    return None
+    except InvalidToken:
+        logger.error(f"Encryption key mismatch for user_id {user_id}. Purging corrupted credentials.")
+        user.access_token = None
+        db.session.commit()
+        return None
+    except (ValueError, TypeError) as e:
+        logger.error(f"Token format error for user_id {user_id}: {type(e).__name__} - {e}")
+        user.access_token = None
+        db.session.commit()
+        return None
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
@@ -815,8 +833,8 @@ def trigger_scan():
         return jsonify({'success': False, 'error': 'No repos discovered yet.'}), 400
 
     settings = user.settings
-    excluded = settings.get_excluded_list() if settings else []
-    scan_repos = [r for r in repos if r not in excluded]
+    excluded_set = settings.get_excluded_set() if settings else set()
+    scan_repos = [r for r in repos if r not in excluded_set]
     if not scan_repos:
         return jsonify({'success': False, 'error': 'No active repos available to scan.'}), 400
 
@@ -1221,8 +1239,8 @@ def _scan_repo_for_user(user_id, repo_full_name, reason='fallback'):
             return
 
         settings = user.settings
-        excluded = settings.get_excluded_list() if settings else []
-        if repo_full_name in excluded:
+        excluded_set = settings.get_excluded_set() if settings else set()
+        if repo_full_name in excluded_set:
             return
 
         token = get_user_token(user.id) or GITHUB_TOKEN
@@ -1444,7 +1462,7 @@ def _get_user_data(user_id):
         
     user_repos = UserRepo.query.filter_by(user_id=user_id).all()
     settings = UserSettings.query.filter_by(user_id=user_id).first()
-    excluded = settings.get_excluded_list() if settings else []
+    excluded_set = settings.get_excluded_set() if settings else set()
     
     repos_list = []
     for ur in user_repos:
@@ -1456,7 +1474,7 @@ def _get_user_data(user_id):
             'archived': ur.archived,
             'fork': ur.fork,
             'last_synced': ur.last_synced.isoformat() if ur.last_synced else None,
-            'is_active': ur.full_name not in excluded,
+            'is_active': ur.full_name not in excluded_set,
             'issue_count': len(repo_issues),
             'permission': ur.permissions_level,
             'agent_permission': ur.agent_permission,
@@ -1611,12 +1629,12 @@ def run_fallback_sync_job():
                     continue
 
                 settings = user.settings
-                excluded = set(settings.get_excluded_list() if settings else [])
+                excluded_set = settings.get_excluded_set() if settings else set()
                 stale_cutoff = datetime.utcnow().timestamp() - (STALE_RESYNC_HOURS * 3600)
 
                 repos = []
                 for ur in user.repos:
-                    if ur.full_name in excluded:
+                    if ur.full_name in excluded_set:
                         continue
                     if not ur.last_synced or ur.last_synced.timestamp() <= stale_cutoff:
                         repos.append(ur.full_name)

@@ -1,19 +1,9 @@
 ```
+# Database
+*.db
+
 # Dependencies
 node_modules/
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Editors
-.vscode/
-.idea/
 
 # Python
 __pycache__/
@@ -24,50 +14,32 @@ __pycache__/
 env/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.ipynb_checkpoints
-.pytest_cache/
-.mypy_cache/
-hypothesis*
-.DS_Store
-
-# Build results
-dist/
-build/
-*.egg
-*.egg-info/
-.eggs/
-eggs/
-parts/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-lib/
-lib64/
-area/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+.ENV
+.env
+.env.*
+.venv/
+venv/
+ENV/
+.env.bak
+.env.local
+.env.dev
+.env.development
+.env.prod
+.env.production
+.env.staging
+.env.test
+.env.testing
+.env.example
+.env.sample
+.env.template
+.env.defaults
+.env.local.example
+.env.production.example
+.env.staging.example
+.env.test.example
+.env.docker
+.env.local.docker
+.env.production.docker
+.env.staging.docker
+.env.test.docker
 ```
