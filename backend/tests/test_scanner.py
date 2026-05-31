@@ -78,13 +78,25 @@ def test_scan_repository_maps_failure_branch_to_pr(scanner):
     pulls = [{'number': 7, 'title': 'Fix', 'html_url': 'http://pr', 'head': {'ref': 'feature/a'}}]
     failures = [{'id': 99, 'name': 'CI', 'conclusion': 'failure', 'head_branch': 'feature/a',
                  'html_url': 'http://run', 'created_at': '2024-01-01'}]
-    with patch.object(scanner, 'get_open_prs', return_value=pulls):
-        with patch.object(scanner, 'check_merge_conflict', return_value=False):
-            with patch.object(scanner, 'scan_workflow_failures', return_value=[{
-                'id': 99, 'name': 'CI', 'conclusion': 'failure', 'branch': 'feature/a',
-                'html_url': 'http://run', 'created_at': '2024-01-01'
-            }]):
-                result = scanner.scan_repository('org/repo')
+    graphql_data = {
+        "pullRequests": {
+            "nodes": [{
+                "number": 7,
+                "title": "Fix",
+                "url": "http://pr",
+                "mergeable": "MERGEABLE",
+                "author": {"login": "dev"},
+                "headRef": {"name": "feature/a", "target": {"oid": "abc123"}},
+                "reviews": {"nodes": []}
+            }]
+        }
+    }
+    with patch.object(scanner, 'batch_scan_graphql', return_value=graphql_data):
+        with patch.object(scanner, 'scan_workflow_failures', return_value=[{
+            'id': 99, 'name': 'CI', 'conclusion': 'failure', 'branch': 'feature/a',
+            'html_url': 'http://run', 'created_at': '2024-01-01'
+        }]):
+            result = scanner.scan_repository('org/repo')
     assert result['workflow_failures'][0]['pr'] == 7
 
 
