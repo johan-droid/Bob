@@ -17,9 +17,9 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
     access_token = db.Column(db.String(255), nullable=True)
 
-    repos    = db.relationship('UserRepo',     backref='user', lazy='dynamic', cascade='all,delete-orphan')
-    issues   = db.relationship('PRIssue',      backref='user', lazy='dynamic', cascade='all,delete-orphan')
-    settings = db.relationship('UserSettings', backref='user', uselist=False,  cascade='all,delete-orphan')
+    repos    = db.relationship('UserRepo',     backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    issues   = db.relationship('PRIssue',      backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    settings = db.relationship('UserSettings', backref='user', uselist=False,  cascade='all, delete-orphan')
 
 
 class UserRepo(db.Model):

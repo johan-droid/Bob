@@ -107,8 +107,11 @@ APP_ENV               = (os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or os.ge
 IS_PRODUCTION         = APP_ENV == 'production' or os.getenv('RENDER') == 'true' or bool(os.getenv('RENDER_EXTERNAL_URL'))
 
 if not TOKEN_ENCRYPTION_KEY:
-    TOKEN_ENCRYPTION_KEY = Fernet.generate_key().decode()
-    logger.warning('TOKEN_ENCRYPTION_KEY is not configured. Using ephemeral key; users must re-authenticate after restart.')
+    raise RuntimeError(
+        "TOKEN_ENCRYPTION_KEY is required for production deployments. "
+        "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+        "and set it as an environment variable before starting the server."
+    )
 
 if not WEBHOOK_SECRET:
     logger.warning('WEBHOOK_SECRET is not configured. GitHub webhook endpoint will reject all requests.')
