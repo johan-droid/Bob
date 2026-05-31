@@ -1,3 +1,49 @@
+```
+# Database
+*.db
+
+# Dependencies
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.env
+.env.*
+.venv/
+venv/
+ENV/
+.env.bak
+.env.local
+.env.dev
+.env.development
+.env.prod
+.env.production
+.env.staging
+.env.test
+.env.testing
+.env.example
+.env.sample
+.env.template
+.env.defaults
+.env.local.example
+.env.production.example
+.env.staging.example
+.env.test.example
+.env.docker
+.env.local.docker
+.env.production.docker
+.env.staging.docker
+.env.test.docker
+```
+Nothing should be ignored in this case, as only a Python source file was modified and no build artifacts, dependencies, or temporary files were detected.
 # Examples
 
     Input:
