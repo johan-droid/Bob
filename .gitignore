@@ -1,20 +1,4 @@
 ```
-# Dependencies
-node_modules/
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Editors
-.vscode/
-.idea/
-
 # Python
 __pycache__/
 *.pyc
@@ -24,6 +8,8 @@ __pycache__/
 env/
 venv/
 .venv/
+.ENV
+.venv.bak/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
@@ -34,40 +20,36 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-.ipynb_checkpoints
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+.tags*
+TAGS
+.idlerc/
 .pytest_cache/
 .mypy_cache/
-hypothesis*
-.DS_Store
 
-# Build results
-dist/
-build/
-*.egg
-*.egg-info/
-.eggs/
-eggs/
-parts/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-lib/
-lib64/
-area/
+# Distribution / packaging
+.Python
+env/
+venv/
+.venv/
+.ENV
+.venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# Testing
+.pytest_cache/
+.mypy_cache/
+coverage/
+htmlcov/
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Environment variables
+.env
+.venv
+.env.local
+.env.*
 ```

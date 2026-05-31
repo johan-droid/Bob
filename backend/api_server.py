@@ -597,6 +597,9 @@ def discover_repos():
         # Source 1: user/repos
         page = 1
         while True:
+            # Introduce an intentional micro-delay (200ms) between outbound requests
+            # to stop the Free Tier API from triggering secondary abuse limits.
+            time.sleep(0.2)
             r = _http_request_json(
                 'GET',
                 'https://api.github.com/user/repos?' + urlencode({
@@ -625,6 +628,8 @@ def discover_repos():
             if not org_login: continue
             p = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 or_ = _http_request_json(
                     'GET',
                     f'https://api.github.com/orgs/{org_login}/repos?' + urlencode({'type': 'all', 'per_page': 100, 'page': p}),
@@ -646,6 +651,8 @@ def discover_repos():
         if GITHUB_TOKEN:
             ap = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 ar = _http_request_json(
                     'GET',
                     'https://api.github.com/user/repos?' + urlencode({'per_page': 100, 'page': ap}),
