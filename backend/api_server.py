@@ -1068,7 +1068,95 @@ def action_rebase_contract():
 
     if dry_run:
         return jsonify({'ok': True, 'contract': contract}), 200
-    return jsonify({'ok': False, 'error': 'Execution disabled. Use dry_run=true for contract preview.', 'contract': contract}), 501
+    
+    # Execute the rebase using GitHub's update-branch API
+    user = current_user()
+    if not user:
+        return jsonify({'ok': False, 'error': 'User not authenticated'}), 401
+    
+    token = get_user_token(user.id) or GITHUB_TOKEN
+    if not token:
+        return jsonify({'ok': False, 'error': 'No GitHub token available'}), 401
+    
+    try:
+        # First, get the PR details to verify it exists and get the head branch info
+        pr_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}'
+        pr_resp = _http_request_json('GET', pr_url, headers=gh(token), timeout=10)
+        
+        if pr_resp.status_code != 200:
+            error_msg = pr_resp.json().get('message', 'Failed to fetch PR details')
+            return jsonify({'ok': False, 'error': f'Failed to fetch PR: {error_msg}'}), 400
+        
+        pr_data = pr_resp.json()
+        head_branch = pr_data.get('head', {}).get('ref')
+        base_branch = pr_data.get('base', {}).get('ref')
+        
+        if not head_branch or not base_branch:
+            return jsonify({'ok': False, 'error': 'Could not determine branch information'}), 400
+        
+        # Check if the branch needs updating (compare with base)
+        compare_url = f'https://api.github.com/repos/{repo}/compare/{head_branch}...{base_branch}'
+        compare_resp = _http_request_json('GET', compare_url, headers=gh(token), timeout=10)
+        
+        if compare_resp.status_code != 200:
+            error_msg = compare_resp.json().get('message', 'Failed to compare branches')
+            return jsonify({'ok': False, 'error': f'Failed to compare branches: {error_msg}'}), 400
+        
+        compare_data = compare_resp.json()
+        behind_by = compare_data.get('behind_by', 0)
+        status = compare_data.get('status')
+        
+        if behind_by == 0 and status != 'diverged':
+            return jsonify({
+                'ok': True, 
+                'message': 'Branch is already up-to-date with base',
+                'contract': contract,
+                'result': {'updated': False, 'behind_by': 0}
+            }), 200
+        
+        # Update the PR branch using GitHub's update-branch API
+        update_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}/update-branch'
+        update_body = {'expected_head_sha': pr_data.get('head', {}).get('sha')}
+        
+        update_resp = _http_request_json('PUT', update_url, headers=gh(token), json_body=update_body, timeout=30)
+        
+        if update_resp.status_code == 202:
+            result_data = update_resp.json()
+            logger.info(f"Successfully initiated branch update for {repo}#{pr_number}")
+            return jsonify({
+                'ok': True,
+                'message': 'Branch update initiated successfully',
+                'contract': contract,
+                'result': {
+                    'updated': True,
+                    'behind_by': behind_by,
+                    'expected_head_sha': update_body['expected_head_sha'],
+                    'message': result_data.get('message', '')
+                }
+            }), 202
+        elif update_resp.status_code == 409:
+            # Conflict detected during update
+            error_data = update_resp.json()
+            logger.warning(f"Conflict detected while updating {repo}#{pr_number}: {error_data}")
+            return jsonify({
+                'ok': False,
+                'error': 'Merge conflict detected during branch update',
+                'contract': contract,
+                'conflict_details': error_data
+            }), 409
+        else:
+            error_data = update_resp.json()
+            error_msg = error_data.get('message', 'Unknown error occurred')
+            logger.error(f"Failed to update branch for {repo}#{pr_number}: {error_msg}")
+            return jsonify({
+                'ok': False,
+                'error': f'Failed to update branch: {error_msg}',
+                'contract': contract
+            }), update_resp.status_code
+            
+    except Exception as e:
+        logger.error(f"Exception during rebase action for {repo}#{pr_number}: {e}")
+        return jsonify({'ok': False, 'error': f'Internal error: {str(e)}'}), 500
 
 
 @app.route('/api/actions/approve-merge', methods=['POST'])
