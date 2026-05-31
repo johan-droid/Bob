@@ -42,6 +42,25 @@
   background: var(--text-main);
   color: var(--bg-dark);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-page-root .button-primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent);
+  transform: skewX(-20deg);
+}
+
+.landing-page-root .button-primary:hover::after {
+  animation: shine 0.7s forwards;
+}
+
+@keyframes shine {
+  100% { left: 200%; }
 }
 
 .landing-page-root .button-primary:hover {
@@ -345,6 +364,12 @@
   backdrop-filter: blur(20px);
   position: relative;
   box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+  animation: floatPanel 6s ease-in-out infinite;
+}
+
+@keyframes floatPanel {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .landing-page-root .card-glow {
@@ -656,12 +681,14 @@
   padding: 40px;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .landing-page-root .feature-card:hover {
-  background: rgba(255,255,255,0.04);
-  border-color: var(--border-hover);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.05) inset;
 }
 
 .landing-page-root .feature-card-large { grid-column: span 2; }
