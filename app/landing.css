@@ -367,6 +367,56 @@
   animation: floatPanel 6s ease-in-out infinite;
 }
 
+.landing-page-root .bob-mascot {
+  position: absolute;
+  top: -48px;
+  right: 48px;
+  width: 72px;
+  height: 48px;
+  background: rgba(18, 18, 20, 0.9);
+  border: 1px solid var(--border-glass);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 -10px 30px rgba(59, 130, 246, 0.15);
+  backdrop-filter: blur(20px);
+  z-index: -1;
+  animation: bobPeek 6s ease-in-out infinite;
+}
+
+.landing-page-root .bob-eye {
+  width: 14px;
+  height: 14px;
+  background: var(--blue);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--blue);
+  animation: bobBlink 4s infinite, eyeShift 6s infinite;
+}
+
+.landing-page-root .bob-eye:nth-child(2) {
+  background: var(--green);
+  box-shadow: 0 0 12px var(--green);
+}
+
+@keyframes bobBlink {
+  0%, 96%, 100% { transform: scaleY(1); }
+  98% { transform: scaleY(0.1); }
+}
+
+@keyframes bobPeek {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes eyeShift {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+}
+
 @keyframes floatPanel {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }

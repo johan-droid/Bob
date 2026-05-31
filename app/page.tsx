@@ -82,12 +82,12 @@ export default function LandingPage() {
               </div>
 
               <h1 className="hero-headline">
-                Your PR health,<br />
-                <span className="headline-accent" id="typed-words">always alive.</span>
+                Meet Bob.<br />
+                <span className="headline-accent" id="typed-words">He watches your PRs.</span>
               </h1>
 
               <p className="hero-sub">
-                Bob connects to GitHub via OAuth to monitor repository health in real time. Effortlessly track PR states, merge conflicts, failing CI suites, and review bottlenecks—all on a speed-optimized, mobile-ready unified dashboard.
+                Bob is your new best friend for GitHub. He tirelessly monitors your repository health in real time, alerting you to merge conflicts, failing CI suites, and review bottlenecks—so you don't have to.
               </p>
 
               <div className="hero-actions">
@@ -120,6 +120,10 @@ export default function LandingPage() {
             </div>
 
             <div className="auth-card auth-panel" id="flow">
+              <div className="bob-mascot" aria-label="Bob the bot">
+                <div className="bob-eye"></div>
+                <div className="bob-eye"></div>
+              </div>
               <div className="card-glow"></div>
 
               <div className="auth-toolbar">
