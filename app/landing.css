@@ -1,8 +1,8 @@
 .landing-page-root {
-  --bg-dark: #09090b;
-  --bg-surface: #121214;
+  --bg-dark: #0f1115;
+  --bg-surface: rgba(255, 255, 255, 0.03);
   --bg-glass: rgba(255, 255, 255, 0.03);
-  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.15);
   --text-main: #ffffff;
   --text-muted: #a1a1aa;
@@ -29,7 +29,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 48px;
+  min-height: 48px;
   padding: 0 24px;
   border-radius: 9999px;
   font-weight: 600;
@@ -42,6 +42,25 @@
   background: var(--text-main);
   color: var(--bg-dark);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-page-root .button-primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent);
+  transform: skewX(-20deg);
+}
+
+.landing-page-root .button-primary:hover::after {
+  animation: shine 0.7s forwards;
+}
+
+@keyframes shine {
+  100% { left: 200%; }
 }
 
 .landing-page-root .button-primary:hover {
@@ -345,6 +364,62 @@
   backdrop-filter: blur(20px);
   position: relative;
   box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+  animation: floatPanel 6s ease-in-out infinite;
+}
+
+.landing-page-root .bob-mascot {
+  position: absolute;
+  top: -48px;
+  right: 48px;
+  width: 72px;
+  min-height: 48px;
+  background: rgba(18, 18, 20, 0.9);
+  border: 1px solid var(--border-glass);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 -10px 30px rgba(59, 130, 246, 0.15);
+  backdrop-filter: blur(20px);
+  z-index: -1;
+  animation: bobPeek 6s ease-in-out infinite;
+}
+
+.landing-page-root .bob-eye {
+  width: 14px;
+  height: 14px;
+  background: var(--blue);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--blue);
+  animation: bobBlink 4s infinite, eyeShift 6s infinite;
+}
+
+.landing-page-root .bob-eye:nth-child(2) {
+  background: var(--green);
+  box-shadow: 0 0 12px var(--green);
+}
+
+@keyframes bobBlink {
+  0%, 96%, 100% { transform: scaleY(1); }
+  98% { transform: scaleY(0.1); }
+}
+
+@keyframes bobPeek {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes eyeShift {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+}
+
+@keyframes floatPanel {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .landing-page-root .card-glow {
@@ -656,12 +731,14 @@
   padding: 40px;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .landing-page-root .feature-card:hover {
-  background: rgba(255,255,255,0.04);
-  border-color: var(--border-hover);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.05) inset;
 }
 
 .landing-page-root .feature-card-large { grid-column: span 2; }
@@ -671,7 +748,7 @@
 
 .landing-page-root .feature-icon {
   width: 48px;
-  height: 48px;
+  min-height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -830,6 +907,7 @@
 }
 
 @media (max-width: 768px) {
+  .landing-page-root .button { width: 100%; }
   .landing-page-root .nav-links, .landing-page-root .nav-actions { display: none; }
   .landing-page-root .mobile-menu-toggle { display: block; }
   

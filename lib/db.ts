@@ -152,6 +152,20 @@ export async function initDatabase() {
       CONSTRAINT uq_user_issue UNIQUE (user_id, issue_key)
     );
   `;
+
+  const createPrScanStateTable = `
+    CREATE TABLE IF NOT EXISTS pr_scan_state (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      repo VARCHAR(500) NOT NULL,
+      pr_number INTEGER NOT NULL,
+      head_sha VARCHAR(100),
+      last_scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_scan_reason VARCHAR(100) DEFAULT 'unknown',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT uq_pr_scan_state UNIQUE (user_id, repo, pr_number)
+    );
+  `;
   
   const createUserSettingsTable = `
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -170,12 +184,57 @@ export async function initDatabase() {
     );
   `;
 
+  const createMergeContractsTable = `
+    CREATE TABLE IF NOT EXISTS merge_contracts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      repo VARCHAR(255) NOT NULL,
+      pr_number INTEGER NOT NULL,
+      checklist_json TEXT,
+      approved_by TEXT,
+      approved_at TIMESTAMP,
+      merge_method VARCHAR(20) DEFAULT 'squash',
+      merged BOOLEAN DEFAULT FALSE,
+      merged_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(repo, pr_number)
+    );
+  `;
+
+  const createMergeLogsTable = `
+    CREATE TABLE IF NOT EXISTS merge_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      repo VARCHAR(255) NOT NULL,
+      pr_number INTEGER NOT NULL,
+      merge_sha VARCHAR(64),
+      merged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      merge_method VARCHAR(20) DEFAULT 'squash'
+    );
+  `;
+
+  const createAiReviewLogsTable = `
+    CREATE TABLE IF NOT EXISTS ai_review_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      repo VARCHAR(255) NOT NULL,
+      pr_number INTEGER,
+      run_id BIGINT,
+      summary_preview TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   if (isPostgres) {
     // pg-specific adjustments (replace SERIAL with autoincrement integer for serial primary keys)
     await conn.query(createUsersTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createUserReposTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createPrIssuesTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
+    await conn.query(createPrScanStateTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
     await conn.query(createUserSettingsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
+    await conn.query(createMergeContractsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
+    await conn.query(createMergeLogsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
+    await conn.query(createAiReviewLogsTable.replace(/SERIAL PRIMARY KEY/g, 'SERIAL PRIMARY KEY'));
   } else {
     // sqlite-specific adjustments (replace SERIAL with INTEGER PRIMARY KEY AUTOINCREMENT)
     const toSqlite = (sql: string) => sql
@@ -188,6 +247,10 @@ export async function initDatabase() {
     conn.exec(toSqlite(createUsersTable));
     conn.exec(toSqlite(createUserReposTable));
     conn.exec(toSqlite(createPrIssuesTable));
+    conn.exec(toSqlite(createPrScanStateTable));
     conn.exec(toSqlite(createUserSettingsTable));
+    conn.exec(toSqlite(createMergeContractsTable));
+    conn.exec(toSqlite(createMergeLogsTable));
+    conn.exec(toSqlite(createAiReviewLogsTable));
   }
 }

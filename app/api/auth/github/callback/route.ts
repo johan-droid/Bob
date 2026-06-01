@@ -4,6 +4,10 @@ import { get, run } from '@/lib/db';
 import { encryptToken, signSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
+  const proto = request.headers.get('x-forwarded-proto') || 'http';
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const baseUrl = host ? `${proto}://${host}` : request.url;
+
   const { searchParams } = new URL(request.url);
   const returnedState = searchParams.get('state');
   const code = searchParams.get('code');
@@ -13,7 +17,7 @@ export async function GET(request: Request) {
   
   if (!returnedState || returnedState !== storedState) {
     console.warn('OAuth state mismatch — possible CSRF');
-    return NextResponse.redirect(new URL('/?error=invalid_state', request.url));
+    return NextResponse.redirect(new URL('/?error=invalid_state', baseUrl));
   }
   
   // Clean up state cookie
@@ -28,7 +32,7 @@ export async function GET(request: Request) {
   cookieStore.set('oauth_portal', '', expiredCookie);
   
   if (!code) {
-    return NextResponse.redirect(new URL('/?error=no_code', request.url));
+    return NextResponse.redirect(new URL('/?error=no_code', baseUrl));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
@@ -156,12 +160,14 @@ export async function GET(request: Request) {
     
     if (hasRepos) {
       console.log(`User ${username} already has synced repos. Redirecting straight to dashboard.`);
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/dashboard', baseUrl));
     }
 
-    return NextResponse.redirect(new URL('/permissions', request.url));
+    return NextResponse.redirect(new URL('/permissions', baseUrl));
   } catch (error) {
     console.error('OAuth callback error:', error);
-    return NextResponse.redirect(new URL('/?error=oauth_failed', request.url));
+    return NextResponse.redirect(new URL('/?error=oauth_failed', baseUrl));
   }
 }
+
+

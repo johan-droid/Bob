@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { get, query, run } from '@/lib/db';
 import { getUserDashboardData } from '@/lib/scanner';
+import { runScanForUser } from '@/lib/scanner';
 
 function safeCompare(left: string, right: string) {
   const leftBytes = Buffer.from(left);
@@ -32,6 +33,23 @@ async function webhookResolvePr(repoFullName: string, prNumber: number) {
     ['resolved', now, repoFullName, key]
   );
   await emitToRepoOwners(repoFullName);
+}
+
+async function queueRepoScanForOwners(repoFullName: string, reason: string) {
+  const owners = await query(
+    'SELECT DISTINCT user_id FROM user_repos WHERE full_name = $1 AND agent_permission IN ($2, $3)',
+    [repoFullName, 'write', 'admin']
+  );
+
+  for (const owner of owners) {
+    runScanForUser(
+      owner.user_id,
+      (global as any).socketEmitter,
+      { repos: [repoFullName], reason: `webhook:${reason}` }
+    ).catch((err) => {
+      console.error(`Failed webhook-triggered scan (${reason}) for user ${owner.user_id}:`, err);
+    });
+  }
 }
 
 export async function POST(request: Request) {
@@ -78,11 +96,21 @@ export async function POST(request: Request) {
       const pr = payload.pull_request || {};
       if (action === 'closed' && pr.merged) {
         await webhookResolvePr(repoName, pr.number);
+      } else if (['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(action)) {
+        await queueRepoScanForOwners(repoName, `pull_request:${pr.number || 'unknown'}:${action}`);
       }
     } else if (event === 'check_suite') {
       const cs = payload.check_suite || {};
-      if (cs.conclusion === 'failure') {
+      if (cs.status === 'completed') {
+        await queueRepoScanForOwners(repoName, `check_suite:${cs.id || 'unknown'}:${cs.conclusion || 'none'}`);
+      } else if (cs.conclusion === 'failure') {
         await emitToRepoOwners(repoName);
+      }
+    } else if (event === 'pull_request_review') {
+      const action = payload.action;
+      const pr = payload.pull_request || {};
+      if (['submitted', 'dismissed', 'edited'].includes(action)) {
+        await queueRepoScanForOwners(repoName, `pull_request_review:${pr.number || 'unknown'}:${action}`);
       }
     } else if (event === 'installation' || event === 'installation_repositories') {
       const action = payload.action;

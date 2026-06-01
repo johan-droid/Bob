@@ -98,3 +98,7 @@ class UserSettings(db.Model):
 
     def get_excluded_list(self):
         return [r.strip() for r in (self.excluded_repos or '').split(',') if r.strip()]
+
+    def get_excluded_set(self):
+        """Return excluded repos as a set for O(1) lookup performance."""
+        return {r.strip() for r in (self.excluded_repos or '').split(',') if r.strip()}

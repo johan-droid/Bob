@@ -96,6 +96,16 @@ GITHUB_CLIENT_SECRET  = os.getenv('GITHUB_CLIENT_SECRET')
 GITHUB_TOKEN          = os.getenv('GITHUB_TOKEN')
 WEBHOOK_SECRET        = os.getenv('WEBHOOK_SECRET', '')
 TOKEN_ENCRYPTION_KEY  = os.getenv('TOKEN_ENCRYPTION_KEY', '')
+
+if not TOKEN_ENCRYPTION_KEY:
+    raise RuntimeError(
+        "TOKEN_ENCRYPTION_KEY is required for production deployments.\n"
+        "\nGenerate a persistent key with:\n"
+        '  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"\n'
+        "\nThen set it as an environment variable before starting the server.\n"
+        "Without a persistent key, all encrypted tokens will become unreadable after restart."
+    )
+
 ASSIGNEE_USERNAME     = os.getenv('ASSIGNEE_USERNAME', 'jules')
 STALE_RESYNC_HOURS     = int(os.getenv('STALE_RESYNC_HOURS', 24))
 FALLBACK_REPO_LIMIT    = int(os.getenv('FALLBACK_REPO_LIMIT', 25))
@@ -105,10 +115,6 @@ ALLOWED_ORIGINS       = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http:/
 PUBLIC_BASE_URL       = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
 APP_ENV               = (os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or os.getenv('ENV') or os.getenv('ENVIRONMENT') or '').lower()
 IS_PRODUCTION         = APP_ENV == 'production' or os.getenv('RENDER') == 'true' or bool(os.getenv('RENDER_EXTERNAL_URL'))
-
-if not TOKEN_ENCRYPTION_KEY:
-    TOKEN_ENCRYPTION_KEY = Fernet.generate_key().decode()
-    logger.warning('TOKEN_ENCRYPTION_KEY is not configured. Using ephemeral key; users must re-authenticate after restart.')
 
 if not WEBHOOK_SECRET:
     logger.warning('WEBHOOK_SECRET is not configured. GitHub webhook endpoint will reject all requests.')
@@ -248,9 +254,19 @@ def _encrypt_github_token(token: str) -> str:
 
 
 def _decrypt_github_token(ciphertext: str) -> str | None:
+    """Decrypt a GitHub OAuth token stored in the database.
+    
+    Returns None if decryption fails, allowing graceful handling upstream.
+    """
     try:
         return fernet.decrypt(ciphertext.encode()).decode()
-    except (InvalidToken, ValueError, TypeError):
+    except InvalidToken:
+        # Encryption key mismatch or corrupted token - caller should purge and re-auth
+        logger.warning("Token decryption failed: InvalidToken (key mismatch or corruption)")
+        return None
+    except (ValueError, TypeError) as e:
+        # Malformed ciphertext or encoding issues
+        logger.warning(f"Token decryption failed: {type(e).__name__} - {e}")
         return None
 
 
@@ -543,20 +559,28 @@ def github_callback():
         return redirect('/?error=oauth_failed')
 
 def get_user_token(user_id: int) -> str | None:
-    """Retrieve the stored OAuth token for a user (server-side only)."""
+    """Retrieve the stored OAuth token for a user (server-side only).
+    
+    If decryption fails due to key rotation or corruption, the invalid
+    database state is purged and None is returned, forcing re-authentication.
+    """
     user = User.query.get(user_id)
     if not user or not user.access_token:
         return None
 
-    token = _decrypt_github_token(user.access_token)
-    if token:
+    try:
+        token = fernet.decrypt(user.access_token.encode()).decode()
         return token
-
-    # Fail closed: if token cannot be decrypted, force re-authentication.
-    user.access_token = None
-    db.session.commit()
-    logger.warning(f"Cleared undecryptable token for user_id={user_id}; re-auth required")
-    return None
+    except InvalidToken:
+        logger.error(f"Encryption key mismatch for user_id {user_id}. Purging corrupted credentials.")
+        user.access_token = None
+        db.session.commit()
+        return None
+    except (ValueError, TypeError) as e:
+        logger.error(f"Token format error for user_id {user_id}: {type(e).__name__} - {e}")
+        user.access_token = None
+        db.session.commit()
+        return None
 
 # ── API: Verify Scopes ────────────────────────────────────────────────────────
 @app.route('/api/verify-permissions')
@@ -597,6 +621,9 @@ def discover_repos():
         # Source 1: user/repos
         page = 1
         while True:
+            # Introduce an intentional micro-delay (200ms) between outbound requests
+            # to stop the Free Tier API from triggering secondary abuse limits.
+            time.sleep(0.2)
             r = _http_request_json(
                 'GET',
                 'https://api.github.com/user/repos?' + urlencode({
@@ -625,6 +652,8 @@ def discover_repos():
             if not org_login: continue
             p = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 or_ = _http_request_json(
                     'GET',
                     f'https://api.github.com/orgs/{org_login}/repos?' + urlencode({'type': 'all', 'per_page': 100, 'page': p}),
@@ -646,6 +675,8 @@ def discover_repos():
         if GITHUB_TOKEN:
             ap = 1
             while True:
+                # Introduce an intentional micro-delay (200ms) between outbound requests
+                time.sleep(0.2)
                 ar = _http_request_json(
                     'GET',
                     'https://api.github.com/user/repos?' + urlencode({'per_page': 100, 'page': ap}),
@@ -815,8 +846,8 @@ def trigger_scan():
         return jsonify({'success': False, 'error': 'No repos discovered yet.'}), 400
 
     settings = user.settings
-    excluded = settings.get_excluded_list() if settings else []
-    scan_repos = [r for r in repos if r not in excluded]
+    excluded_set = settings.get_excluded_set() if settings else set()
+    scan_repos = [r for r in repos if r not in excluded_set]
     if not scan_repos:
         return jsonify({'success': False, 'error': 'No active repos available to scan.'}), 400
 
@@ -1037,7 +1068,118 @@ def action_rebase_contract():
 
     if dry_run:
         return jsonify({'ok': True, 'contract': contract}), 200
-    return jsonify({'ok': False, 'error': 'Execution disabled. Use dry_run=true for contract preview.', 'contract': contract}), 501
+    
+    # Execute the rebase using GitHub's update-branch API
+    user = current_user()
+    if not user:
+        return jsonify({'ok': False, 'error': 'User not authenticated'}), 401
+    
+    token = get_user_token(user.id) or GITHUB_TOKEN
+    if not token:
+        return jsonify({'ok': False, 'error': 'No GitHub token available'}), 401
+    
+    try:
+        # First, get the PR details to verify it exists and get the head branch info
+        pr_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}'
+        pr_resp = _http_request_json('GET', pr_url, headers=gh(token), timeout=10)
+        
+        if pr_resp.status_code != 200:
+            error_msg = pr_resp.json().get('message', 'Failed to fetch PR details')
+            return jsonify({'ok': False, 'error': f'Failed to fetch PR: {error_msg}'}), 400
+        
+        pr_data = pr_resp.json()
+
+        # Check mergeable state, poll if None
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            mergeable = pr_data.get('mergeable')
+            if mergeable is not None:
+                break
+            time.sleep(2)
+            pr_resp = _http_request_json('GET', pr_url, headers=gh(token), timeout=10)
+            if pr_resp.status_code == 200:
+                pr_data = pr_resp.json()
+            time.sleep(0.2)
+
+        if pr_data.get('mergeable') is False:
+            logger.warning(f"Conflict detected during pre-check for {repo}#{pr_number}")
+            return jsonify({
+                'ok': False,
+                'error': 'Merge conflict detected during pre-check',
+                'contract': contract,
+                'conflict_details': {'structural_report': 'conflict_identified'}
+            }), 409
+
+        head_branch = pr_data.get('head', {}).get('ref')
+        base_branch = pr_data.get('base', {}).get('ref')
+        
+        if not head_branch or not base_branch:
+            return jsonify({'ok': False, 'error': 'Could not determine branch information'}), 400
+        
+        # Check if the branch needs updating (compare with base)
+        compare_url = f'https://api.github.com/repos/{repo}/compare/{head_branch}...{base_branch}'
+        compare_resp = _http_request_json('GET', compare_url, headers=gh(token), timeout=10)
+        
+        if compare_resp.status_code != 200:
+            error_msg = compare_resp.json().get('message', 'Failed to compare branches')
+            return jsonify({'ok': False, 'error': f'Failed to compare branches: {error_msg}'}), 400
+        
+        compare_data = compare_resp.json()
+        behind_by = compare_data.get('behind_by', 0)
+        status = compare_data.get('status')
+        
+        if behind_by == 0 and status != 'diverged':
+            return jsonify({
+                'ok': True, 
+                'message': 'Branch is already up-to-date with base',
+                'contract': contract,
+                'result': {'updated': False, 'behind_by': 0}
+            }), 200
+        
+        # Update the PR branch using GitHub's update-branch API
+        update_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}/update-branch'
+        update_body = {'expected_head_sha': pr_data.get('head', {}).get('sha')}
+        
+        update_resp = _http_request_json('PUT', update_url, headers=gh(token), json_body=update_body, timeout=30)
+        
+        if update_resp.status_code == 202:
+            result_data = update_resp.json()
+            logger.info(f"Successfully initiated branch update for {repo}#{pr_number}")
+            return jsonify({
+                'ok': True,
+                'message': 'Branch update initiated successfully',
+                'contract': contract,
+                'result': {
+                    'updated': True,
+                    'behind_by': behind_by,
+                    'expected_head_sha': update_body['expected_head_sha'],
+                    'message': result_data.get('message', '')
+                }
+            }), 202
+        elif update_resp.status_code == 409:
+            # Conflict detected during update
+            error_data = update_resp.json()
+            logger.warning(f"Conflict detected while updating {repo}#{pr_number}: {error_data}")
+            return jsonify({
+                'ok': False,
+                'error': 'Merge conflict detected during branch update',
+                'contract': contract,
+                'conflict_details': error_data
+            }), 409
+        else:
+            error_data = update_resp.json()
+            error_msg = error_data.get('message', 'Unknown error occurred')
+            logger.error(f"Failed to update branch for {repo}#{pr_number}: {error_msg}")
+            return jsonify({
+                'ok': False,
+                'error': f'Failed to update branch: {error_msg}',
+                'contract': contract
+            }), update_resp.status_code
+            
+    except Exception as e:
+        logger.error(f"Exception during rebase action for {repo}#{pr_number}: {e}")
+        return jsonify({'ok': False, 'error': f'Internal error: {str(e)}'}), 500
 
 
 @app.route('/api/actions/approve-merge', methods=['POST'])
@@ -1170,7 +1312,18 @@ def _webhook_resolve_pr(repo, pr_number):
         _emit_to_repo_owners(repo)
 
 def _webhook_check_pr_conflict(repo, pr):
-    _scan_repo_for_all_users(repo, reason=f"pull_request:{pr.get('number')}")
+    # GitHub Free Tier calculates conflict matrices out-of-band. 
+    # If mergeable state is missing or null, exit early to avoid wasting API credits.
+    if pr.get('mergeable') is None:
+        logger.info(f"PR #{pr.get('number')} conflict calculation is pending at GitHub. Skipping scanner invocation.")
+        return 
+
+    user_ids = [ur.user_id for ur in UserRepo.query.filter_by(full_name=repo).all()]
+    if not user_ids:
+        return
+    for user_id in user_ids:
+        # Pass a deferred task or scan cleanly knowing state is ready
+        _enqueue_job('api_server.run_repo_scan_job', user_id, repo, f"webhook_pr_{pr.get('number')}")
 
 def _webhook_ci_failure(repo, check_suite):
     _scan_repo_for_all_users(repo, reason=f"check_suite:{check_suite.get('id')}")
@@ -1221,8 +1374,8 @@ def _scan_repo_for_user(user_id, repo_full_name, reason='fallback'):
             return
 
         settings = user.settings
-        excluded = settings.get_excluded_list() if settings else []
-        if repo_full_name in excluded:
+        excluded_set = settings.get_excluded_set() if settings else set()
+        if repo_full_name in excluded_set:
             return
 
         token = get_user_token(user.id) or GITHUB_TOKEN
@@ -1444,7 +1597,7 @@ def _get_user_data(user_id):
         
     user_repos = UserRepo.query.filter_by(user_id=user_id).all()
     settings = UserSettings.query.filter_by(user_id=user_id).first()
-    excluded = settings.get_excluded_list() if settings else []
+    excluded_set = settings.get_excluded_set() if settings else set()
     
     repos_list = []
     for ur in user_repos:
@@ -1456,7 +1609,7 @@ def _get_user_data(user_id):
             'archived': ur.archived,
             'fork': ur.fork,
             'last_synced': ur.last_synced.isoformat() if ur.last_synced else None,
-            'is_active': ur.full_name not in excluded,
+            'is_active': ur.full_name not in excluded_set,
             'issue_count': len(repo_issues),
             'permission': ur.permissions_level,
             'agent_permission': ur.agent_permission,
@@ -1611,12 +1764,12 @@ def run_fallback_sync_job():
                     continue
 
                 settings = user.settings
-                excluded = set(settings.get_excluded_list() if settings else [])
+                excluded_set = settings.get_excluded_set() if settings else set()
                 stale_cutoff = datetime.utcnow().timestamp() - (STALE_RESYNC_HOURS * 3600)
 
                 repos = []
                 for ur in user.repos:
-                    if ur.full_name in excluded:
+                    if ur.full_name in excluded_set:
                         continue
                     if not ur.last_synced or ur.last_synced.timestamp() <= stale_cutoff:
                         repos.append(ur.full_name)

@@ -69,6 +69,7 @@ export function SettingsForm() {
 
   const toggleRepo = async (repo: RepoItem) => {
     if (!repo.full_name) return;
+    const previousDraft = { ...draft };
     const nextExcluded = new Set(draft.excluded_repos || []);
     if (nextExcluded.has(repo.full_name)) {
       nextExcluded.delete(repo.full_name);
@@ -76,8 +77,24 @@ export function SettingsForm() {
       nextExcluded.add(repo.full_name);
     }
     const nextDraft = { ...draft, excluded_repos: Array.from(nextExcluded) };
+
+    // Optimistic UI Update
     setDraft(nextDraft);
-    await save(nextDraft);
+
+    try {
+      setSaving(true);
+      setError(null);
+      await api.saveSettings(nextDraft);
+      const payload = await api.appState();
+      setState(payload);
+      setDraft(payload.settings || nextDraft);
+    } catch (err) {
+      // Revert on failure
+      setDraft(previousDraft);
+      setError(err instanceof Error ? err.message : 'Unable to toggle repo tracking.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -139,7 +156,7 @@ export function SettingsForm() {
         )}
 
         {/* Monitored Repositories Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl font-extrabold text-white">Monitored Repositories</h2>
@@ -158,7 +175,7 @@ export function SettingsForm() {
             <button
               type="button"
               className="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-800 border border-border hover:bg-zinc-700 transition-colors text-white"
-              onClick={() => void forceSync()}
+              disabled={saving} onClick={(e) => { e.stopPropagation(); void forceSync(); }}
             >
               Force Sync
             </button>
@@ -194,7 +211,7 @@ export function SettingsForm() {
                       <button
                         type="button"
                         className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 border border-border hover:bg-zinc-750 transition-colors text-white"
-                        onClick={() => void toggleRepo(repo)}
+                        disabled={saving} onClick={(e) => { e.stopPropagation(); void toggleRepo(repo); }}
                       >
                         {isActive ? 'Pause' : 'Resume'}
                       </button>
@@ -211,7 +228,7 @@ export function SettingsForm() {
         </section>
 
         {/* Notification Channels Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="mb-6">
             <h2 className="text-xl font-extrabold text-white">Notification Channels</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Configure where Bob routes high-priority pipeline blockers.</p>
@@ -245,7 +262,7 @@ export function SettingsForm() {
         </section>
 
         {/* Auto-Triage Rules Card */}
-        <section className="bg-surface-card border border-border rounded-2xl p-6">
+        <section className="bg-surface-card border border-border rounded-2xl p-5">
           <div className="mb-6">
             <h2 className="text-xl font-extrabold text-white">Auto-Triage Rules</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Set up automated labeling and developer tagging for broken pipelines.</p>
@@ -279,7 +296,24 @@ export function SettingsForm() {
                   id="rule-label-conflict"
                   className="sr-only peer"
                   checked={draft.auto_label_conflict ?? true}
-                  onChange={(event) => setDraft((current) => ({ ...current, auto_label_conflict: event.target.checked }))}
+                  onChange={async (event) => {
+                    const checked = event.target.checked;
+                    const previousDraft = { ...draft };
+                    const nextDraft = { ...draft, auto_label_conflict: checked };
+                    setDraft(nextDraft);
+                    try {
+                      setSaving(true);
+                      await api.saveSettings(nextDraft);
+                      const payload = await api.appState();
+                      setState(payload);
+                      setDraft(payload.settings || nextDraft);
+                    } catch (err) {
+                      setDraft(previousDraft);
+                      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
                 />
                 <div className="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
               </label>
@@ -297,7 +331,24 @@ export function SettingsForm() {
                   id="rule-tag-author"
                   className="sr-only peer"
                   checked={draft.tag_author_on_fail ?? false}
-                  onChange={(event) => setDraft((current) => ({ ...current, tag_author_on_fail: event.target.checked }))}
+                  onChange={async (event) => {
+                    const checked = event.target.checked;
+                    const previousDraft = { ...draft };
+                    const nextDraft = { ...draft, tag_author_on_fail: checked };
+                    setDraft(nextDraft);
+                    try {
+                      setSaving(true);
+                      await api.saveSettings(nextDraft);
+                      const payload = await api.appState();
+                      setState(payload);
+                      setDraft(payload.settings || nextDraft);
+                    } catch (err) {
+                      setDraft(previousDraft);
+                      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
                 />
                 <div className="w-11 h-6 bg-zinc-800 border border-border rounded-full peer peer-focus:ring-1 peer-focus:ring-brand peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
               </label>
@@ -306,7 +357,7 @@ export function SettingsForm() {
         </section>
 
         {/* Danger Zone Section */}
-        <section className="bg-surface-card border border-red-500/20 rounded-2xl p-6">
+        <section className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5">
           <div>
             <h2 className="text-xl font-extrabold text-red-500">Danger Zone</h2>
             <p className="text-zinc-400 text-sm mt-0.5">Permanently delete your account and all associated repository metadata. This action is irreversible.</p>

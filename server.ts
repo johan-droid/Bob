@@ -150,10 +150,14 @@ app.prepare().then(async () => {
     }
   }
 
+  // Background scanning is disabled by default to prevent exhausting free-tier GitHub API rate limits.
+  // Users must trigger scans manually via the dashboard UI.
+  /*
   if (SCAN_INTERVAL > 0) {
     setInterval(runBackgroundScan, SCAN_INTERVAL * 1000);
     setTimeout(runBackgroundScan, 10_000); // first scan 10s after start
   }
+  */
 
   const port = Number(process.env.PORT) || 3000;
   server.listen(port, () => {
