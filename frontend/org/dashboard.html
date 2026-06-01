@@ -57,176 +57,67 @@
             </header>
 
             <section class="kpi-grid" aria-label="Executive summary metrics">
-                <article class="card kpi-card kpi-warning">
-                    <div class="kpi-label">
-                        <span class="material-symbols-outlined kpi-icon">warning</span>
-                        Merge Conflicts
+                <article class="kpi-pill kpi-pill-danger">
+                    <div class="kpi-pill-icon"><span class="material-symbols-outlined">warning</span></div>
+                    <div class="kpi-pill-content">
+                        <span class="kpi-pill-label">Merge Conflicts</span>
+                        <span class="kpi-pill-value" id="kpi-conflicts">0</span>
                     </div>
-                    <strong class="kpi-value" id="kpi-conflicts">0</strong>
-                    <p class="metric-note">Open pull requests blocked by target branch drift.</p>
                 </article>
-                <article class="card kpi-card kpi-danger">
-                    <div class="kpi-label">
-                        <span class="material-symbols-outlined kpi-icon">error_outline</span>
-                        Failing CI Checks
+                <article class="kpi-pill kpi-pill-danger">
+                    <div class="kpi-pill-icon"><span class="material-symbols-outlined">error_outline</span></div>
+                    <div class="kpi-pill-content">
+                        <span class="kpi-pill-label">Failing CI Checks</span>
+                        <span class="kpi-pill-value" id="kpi-failing">0</span>
                     </div>
-                    <strong class="kpi-value" id="kpi-failing">0</strong>
-                    <p class="metric-note">Pipelines currently red across monitored repositories.</p>
                 </article>
-                <article class="card kpi-card kpi-success">
-                    <div class="kpi-label">
-                        <span class="material-symbols-outlined kpi-icon">check_circle_outline</span>
-                        Ready to Merge
+                <article class="kpi-pill kpi-pill-success">
+                    <div class="kpi-pill-icon"><span class="material-symbols-outlined">check_circle_outline</span></div>
+                    <div class="kpi-pill-content">
+                        <span class="kpi-pill-label">Ready to Merge</span>
+                        <span class="kpi-pill-value" id="kpi-ready">0</span>
                     </div>
-                    <strong class="kpi-value" id="kpi-ready">0</strong>
-                    <p class="metric-note">Pull requests clear for review completion and merge.</p>
                 </article>
             </section>
 
-            <section id="pipeline-health" class="card table-card">
-                <div class="table-toolbar">
-                    <div class="section-header-copy">
-                        <span class="kicker">Live Tracking</span>
-                        <h2>Pull Request Status</h2>
-                        <p>Real-time health signals for every monitored repository.</p>
-                    </div>
-                    <button class="btn btn-outline btn-sm" aria-label="Filter">
-                        <span class="material-symbols-outlined">filter_list</span>
-                        Filter
-                    </button>
+            <section class="dashboard-filters">
+                <input type="text" id="pr-search" class="filter-input" placeholder="Search by PR title or author...">
+                <select id="repo-filter" class="filter-select">
+                    <option value="">All Repositories</option>
+                </select>
+            </section>
+
+            <section class="status-section status-danger" id="requires-action-section">
+                <div class="status-section-header">
+                    <h2><span class="material-symbols-outlined">gpp_bad</span> Requires Action</h2>
                 </div>
-                <div class="table-shell">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Repository</th>
-                                <th>PR Details</th>
-                                <th>Developer</th>
-                                <th>CI Status</th>
-                                <th>Merge Health</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pr-table-body">
-                            <tr class="empty-state-row">
-                                <td colspan="5">
-                                    <div class="table-empty">
-                                        <div>
-                                            <span class="material-symbols-outlined">sync</span>
-                                            <p>Awaiting WebSocket payload from connected repositories...</p>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="requires-action-container">
+                    <!-- Populated by JS -->
                 </div>
             </section>
 
-            <section id="team-velocity" class="two-column-grid">
-                <article class="card panel-card">
-                    <div class="table-toolbar">
-                        <div class="section-header-copy">
-                            <span class="kicker">Analytics</span>
-                            <h2>Team Velocity</h2>
-                            <p>Watch PR flow and intervention hotspots as activity comes in.</p>
-                        </div>
-                        <button class="btn btn-outline btn-sm" aria-label="Refresh velocity feed">
-                            <span class="material-symbols-outlined">refresh</span>
-                        </button>
-                    </div>
-                    <div id="velocity-feed" class="feed-placeholder">
-                        <div>
-                            <span class="material-symbols-outlined">timeline</span>
-                            <p>Waiting for team activity events to populate this feed.</p>
-                        </div>
-                    </div>
-                </article>
-
-                <div class="panel-stack">
-                    <article class="card panel-card">
-                        <div class="section-header-copy">
-                            <span class="kicker">Configuration</span>
-                            <h2>Organization Settings</h2>
-                            <p>Quick links for repository rules and monitoring controls.</p>
-                        </div>
-                        <div class="settings-row">
-                            <div class="settings-copy">
-                                <h3>Repository Settings</h3>
-                                <p>Manage org-level configuration.</p>
-                            </div>
-                            <a href="/org/settings" class="btn btn-outline btn-sm">
-                                <span class="material-symbols-outlined">open_in_new</span>
-                                Settings
-                            </a>
-                        </div>
-                    </article>
-
-                    <article class="card danger-panel">
-                        <div class="danger-copy">
-                            <h3>Danger Zone</h3>
-                            <p>Permanently delete the organization and all repository connections.</p>
-                        </div>
-                        <button id="delete-org-btn" class="btn btn-danger">
-                            <span class="material-symbols-outlined">delete_forever</span>
-                            Delete Org
-                        </button>
-                    </article>
+            <section class="status-section status-warning" id="in-progress-section">
+                <div class="status-section-header">
+                    <h2><span class="material-symbols-outlined">pending</span> In Progress</h2>
+                </div>
+                <div id="in-progress-container">
+                    <!-- Populated by JS -->
                 </div>
             </section>
+
+            <section class="status-section status-success" id="ready-section">
+                <div class="status-section-header">
+                    <h2><span class="material-symbols-outlined">gpp_good</span> Ready to Merge</h2>
+                </div>
+                <div id="ready-container">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
         </main>
     </div>
 
-    <div id="delete-modal" class="modal-overlay">
-        <div class="card modal">
-            <h2 class="modal-title">
-                <span class="material-symbols-outlined">warning</span>
-                Confirm Deletion
-            </h2>
-            <p class="modal-copy">
-                Are you absolutely sure? This action cannot be undone. The organization and all repository connections will be permanently removed.
-            </p>
-            <div class="modal-actions">
-                <button id="cancel-delete-btn" class="btn btn-outline">Cancel</button>
-                <button id="confirm-delete-btn" class="btn btn-danger">Yes, Delete Organization</button>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const deleteBtn = document.getElementById('delete-org-btn');
-            const cancelBtn = document.getElementById('cancel-delete-btn');
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            const modal = document.getElementById('delete-modal');
-
-            if (deleteBtn && modal) {
-                deleteBtn.addEventListener('click', () => modal.classList.add('open'));
-                cancelBtn.addEventListener('click', () => modal.classList.remove('open'));
-
-                confirmBtn.addEventListener('click', async () => {
-                    try {
-                        const response = await fetch('/api/org/delete', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-
-                        if (response.ok || response.status === 200 || response.status === 204) {
-                            window.location.href = '/login?deleted=true';
-                            return;
-                        }
-
-                        alert('Failed to delete organization. Please try again.');
-                    } catch (err) {
-                        console.error('Deletion error:', err);
-                        alert('An error occurred while deleting the organization.');
-                    }
-
-                    modal.classList.remove('open');
-                });
-            }
-        });
-    </script>
-    <script src="dashboard.js"></script>
+    <script src="dashboard-data.js"></script>
 </body>
 </html>

@@ -1843,5 +1843,5 @@ if __name__ == '__main__':
     logger.info("Bob PR Health Scanner starting up")
     port = int(os.getenv('PORT', 5000))
     _local_dev = (_sys.platform == 'win32')
-    socketio.run(app, host='0.0.0.0', port=port, debug=False,
-                 allow_unsafe_werkzeug=_local_dev)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False,
+                 allow_unsafe_werkzeug=True)
