@@ -218,6 +218,8 @@
 /* ── KPI Chips ──────────────────────────────────────────────────────────── */
 .mob-kpi-scroll {
   display: flex;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
   gap: 8px;
   padding: 14px 12px 6px;
   overflow-x: auto;
@@ -362,8 +364,8 @@
 .mob-card__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 16px;
+  padding: 16px;
   min-height: 52px;
 }
 
@@ -431,7 +433,7 @@
 }
 
 .mob-card__detail {
-  padding: 0 14px 14px;
+  padding: 0 16px 16px;
   animation: mob-expand 0.2s ease;
 }
 
@@ -444,6 +446,9 @@
 }
 
 .mob-card__branch {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0 0 10px;
   font-size: 10px;
   font-weight: 600;
@@ -710,18 +715,21 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   animation: mob-fade-in 0.2s ease;
 }
 
 .mob-sheet {
+  z-index: 201;
   width: 100%;
   max-height: 70vh;
   padding: 12px 20px calc(20px + var(--m-safe-bottom));
   border-radius: 24px 24px 0 0;
-  background: var(--m-surface);
+  background: var(--m-bg);
   border-top: 1px solid var(--m-border);
   overflow-y: auto;
   animation: mob-slide-up 0.25s ease;
@@ -874,11 +882,12 @@
 
 /* ── Menu Drawer Sheet ───────────────────────────────────────────────────── */
 .mob-drawer-sheet {
+  z-index: 201;
   width: 100%;
   max-height: 85vh;
   padding: 16px 20px calc(24px + var(--m-safe-bottom));
   border-radius: 24px 24px 0 0;
-  background: var(--m-surface);
+  background: var(--m-bg);
   border-top: 1px solid var(--m-border);
   overflow-y: auto;
   animation: mob-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);

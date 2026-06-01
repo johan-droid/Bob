@@ -135,3 +135,5 @@ flask_sessions/
 ```
 .next/
 node_modules/
+backend/bob.db-shm
+backend/bob.db-wal
