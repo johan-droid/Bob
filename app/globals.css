@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import './mobile-dashboard.css';
 
-@theme {
+:root {
   --color-brand: #7c3aed;
   --color-brand-glow: rgba(124, 58, 237, 0.15);
   --color-surface: #09090b;
@@ -10,9 +10,7 @@
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-}
 
-:root {
   --bg: #0f1115;
   --bg-elevated: rgba(255, 255, 255, 0.03);
   --bg-soft: rgba(255, 255, 255, 0.03);

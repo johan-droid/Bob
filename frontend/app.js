@@ -41,16 +41,16 @@ function requestUpdate() {
 function showToast(msg, type = 'info', duration = 4000) {
     const icons = { success: 'check_circle', error: 'error', info: 'info', warning: 'warning' };
     const themeColors = { 
-        success: 'var(--success)', 
-        error: 'var(--error)', 
-        info: 'var(--primary)', 
-        warning: 'var(--warning)' 
+        success: 'var(--success)',
+        error: 'var(--danger)',
+        info: 'var(--accent)',
+        warning: 'var(--warning)'
     };
     
     const el = document.createElement('div');
     el.className = `card ${type}`;
     el.style.cssText = `
-        background: rgba(13, 17, 23, 0.9);
+        background: var(--bg-elevated);
         backdrop-filter: blur(12px);
         border-radius: 16px;
         padding: 14px 24px;
@@ -59,7 +59,7 @@ function showToast(msg, type = 'info', duration = 4000) {
         gap: 16px;
         min-width: 320px;
         box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        border: 1px solid var(--outline);
+        border: 1px solid var(--border);
         border-left: 6px solid ${themeColors[type]};
         margin-bottom: 12px;
         pointer-events: auto;
@@ -67,8 +67,8 @@ function showToast(msg, type = 'info', duration = 4000) {
     `;
     el.innerHTML = `
         <span class="material-symbols-outlined" style="color: ${themeColors[type]};">${icons[type]}</span>
-        <span style="flex: 1; font-weight: 600; color: white; font-size: 13px;">${escHtml(msg)}</span>
-        <span class="material-symbols-outlined" style="cursor: pointer; font-size: 18px; color: var(--on-surface-variant);" onclick="this.parentElement.remove()">close</span>`;
+        <span style="flex: 1; font-weight: 600; color: var(--text-primary); font-size: 13px;">${escHtml(msg)}</span>
+        <span class="material-symbols-outlined" style="cursor: pointer; font-size: 18px; color: var(--text-secondary);" onclick="this.parentElement.remove()">close</span>`;
     document.getElementById('toast-container').prepend(el);
     setTimeout(() => { 
         if(el.parentElement) {
@@ -152,17 +152,17 @@ function renderList(containerId, items) {
     const el = document.getElementById(containerId);
     if (!el) return;
     if (!items.length) {
-        el.innerHTML = '<div style="padding: 32px; text-align: center; color: var(--on-surface-variant); font-size: 13px; font-weight: 500; border: 1px dashed var(--outline); border-radius: 16px;">System optimal. No pending tasks.</div>';
+        el.innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text-secondary); font-size: 13px; font-weight: 500; border: 1px dashed var(--border); border-radius: 16px;">System optimal. No pending tasks.</div>';
         return;
     }
     el.innerHTML = items.map(pr => {
         const statusColors = {
-            failed: 'var(--error)',
+            failed: 'var(--danger)',
             resolved: 'var(--success)',
-            in_progress: '#f9ab00',
-            pending: 'var(--primary)'
+            in_progress: 'var(--warning)',
+            pending: 'var(--accent)'
         };
-        const color = statusColors[pr.status] || 'var(--primary)';
+        const color = statusColors[pr.status] || 'var(--accent)';
         
         return `
         <div class="card" style="display: flex; gap: 20px; align-items: center; border-left: 4px solid ${color};">
@@ -170,16 +170,16 @@ function renderList(containerId, items) {
                 ${pr.status === 'failed' ? 'report' : pr.status === 'resolved' ? 'check_circle' : pr.status === 'in_progress' ? 'hourglass_top' : 'emergency_home'}
             </span>
             <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 700; color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(pr.title || 'Untitled Operation')}</div>
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--on-surface-variant); margin-top: 4px;">
+                <div style="font-weight: 700; color: var(--text-primary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(pr.title || 'Untitled Operation')}</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
                     ${escHtml(pr.repo)} · ${pr.type === 'merge_conflict' ? 'CONFLICT' : 'CI FAILURE'}
                 </div>
             </div>
             <div style="display: flex; gap: 12px; align-items: center;">
-                <select class="input-field" style="background: rgba(255,255,255,0.05); border: 1px solid var(--outline); color: white; height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${pr.id}, this.value)">
+                <select class="input-field" style="background: var(--bg-overlay); border: 1px solid var(--border); color: var(--text-primary); height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${pr.id}, this.value)">
                     ${['pending','in_progress','failed','resolved'].map(s => `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`).join('')}
                 </select>
-                <a href="${escHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 22px;">open_in_new</a>
+                <a href="${escHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 22px;">open_in_new</a>
             </div>
         </div>`;
     }).join('');
@@ -208,23 +208,23 @@ function renderRepos(repos) {
             <span class="material-symbols-outlined bento-bg-icon">${icon}</span>
             <div style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 1;">
                 <div>
-                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--primary); font-weight: 700; letter-spacing: 1px;">${r.language || 'UNKNOWN'}</div>
-                    <div class="text-title" style="margin-top: 6px; font-size: 20px; color: white;">${escHtml(r.full_name.split('/')[1])}</div>
-                    <div style="font-size: 12px; color: var(--on-surface-variant); margin-top: 4px; font-weight: 500;">${escHtml(r.full_name.split('/')[0])}</div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent); font-weight: 700; letter-spacing: 1px;">${r.language || 'UNKNOWN'}</div>
+                    <div class="text-title" style="margin-top: 6px; font-size: 20px; color: var(--text-primary);">${escHtml(r.full_name.split('/')[1])}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 500;">${escHtml(r.full_name.split('/')[0])}</div>
                 </div>
-                <div style="background: ${r.is_active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${r.is_active ? '#10b981' : 'var(--on-surface-variant)'}; padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 800; border: 1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.2)' : 'var(--outline)'};">
+                <div style="background: ${r.is_active ? 'var(--success-muted)' : 'var(--bg-overlay)'}; color: ${r.is_active ? 'var(--success)' : 'var(--text-secondary)'}; padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 800; border: 1px solid ${r.is_active ? 'var(--border-hover)' : 'var(--border)'};">
                     ${r.is_active ? 'MONITORED' : 'IDLE'}
                 </div>
             </div>
             <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; z-index: 1;">
                 <div style="display: flex; gap: 16px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        <span class="material-symbols-outlined" style="font-size: 16px; color: var(--error);">report</span>
-                        <span style="font-size: 14px; font-weight: 700; color: white;">${r.issue_count}</span>
+                        <span class="material-symbols-outlined" style="font-size: 16px; color: var(--danger);">report</span>
+                        <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${r.issue_count}</span>
                     </div>
-                    <div style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escHtml(r.permissions_level)}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escHtml(r.permissions_level)}</div>
                 </div>
-                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--primary); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
+                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
             </div>
         </div>
         `;

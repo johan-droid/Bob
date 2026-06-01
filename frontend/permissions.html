@@ -3,32 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setting Up Your Access – Bob</title>
+    <title>Setting Up Your Access - Bob</title>
     <meta name="description" content="Bob is automatically configuring your repository access and permissions. No manual steps required.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="tokens.css">
+    <link rel="stylesheet" href="components.css">
     <link rel="stylesheet" href="permissions.css">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
-    <!-- Animated background particles -->
-    <div class="bg-grid"></div>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-
     <div class="page-wrapper">
-        <!-- Top nav -->
-        <nav class="topnav">
-            <div class="brand">
-                <div class="brand-icon">
+        <nav class="permissions-topbar">
+            <div class="permissions-brand">
+                <div class="permissions-brand-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                        <circle cx="12" cy="12" r="3"></circle><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path>
                     </svg>
                 </div>
-                <span class="brand-name">Bob</span>
-                <span class="brand-badge">PR Intelligence</span>
+                <div class="permissions-brand-copy">
+                    <strong>Bob</strong>
+                    <span>PR Intelligence</span>
+                </div>
             </div>
             <div class="user-chip" id="user-chip">
                 <img id="user-avatar" src="" alt="" class="chip-avatar">
@@ -37,48 +32,43 @@
             </div>
         </nav>
 
-        <!-- Main content -->
         <main class="saas-setup-root">
             <div class="saas-setup-container">
-                <!-- Animated Connection Nodes -->
-                <div class="connection-nodes">
-                    <div class="node bob-node">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                        </svg>
+                <div class="card setup-card">
+                    <div class="connection-nodes">
+                        <div class="node bob-node">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <circle cx="12" cy="12" r="3"></circle><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path>
+                            </svg>
+                        </div>
+                        <div class="sync-line">
+                            <div id="sync-pulse" class="sync-pulse active"></div>
+                        </div>
+                        <div class="node github-node">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                            </svg>
+                        </div>
                     </div>
-                    
-                    <div class="sync-line">
-                        <div id="sync-pulse" class="sync-pulse active"></div>
-                    </div>
-                    
-                    <div class="node github-node">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-                        </svg>
-                    </div>
-                </div>
 
-                <!-- Status Text Area -->
-                <div class="status-container">
-                    <h2 class="status-heading" id="status-heading">Configuring Workspace</h2>
-                    <div class="status-string">
-                        <div class="spinner" id="status-spinner"></div>
-                        <span class="text-muted" id="status-text">Connecting to GitHub...</span>
+                    <div class="status-container">
+                        <h2 class="status-heading" id="status-heading">Configuring Workspace</h2>
+                        <div class="status-string">
+                            <div class="spinner" id="status-spinner"></div>
+                            <span id="status-text">Connecting to GitHub...</span>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Action Buttons (Only visible on error) -->
-                <div class="error-actions" id="error-actions" style="display: none;">
-                    <p class="error-detail" id="error-detail"></p>
-                    <a href="" class="button-primary" id="btn-reauth">Re-authorize GitHub</a>
+                    <div class="error-actions" id="error-actions">
+                        <p class="error-detail" id="error-detail"></p>
+                        <a href="" class="btn btn-primary" id="btn-reauth">Re-authorize GitHub</a>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        // Inject server-side user data
         const DASHBOARD_URL = "{{ dashboard_url }}";
         const PORTAL = "{{ portal }}";
         const AUTH_URL = "{{ auth_url }}";

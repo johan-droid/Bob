@@ -42,10 +42,10 @@ function isAllowedOrigin(origin, host) {
 }
 
 // Delayed dynamic import of db and scanner
-let queryDb: (sql: string, params?: any[]) => Promise<any[]>;
-let runScanForUser: (userId: number, emitter: any) => Promise<void>;
-let getUserDashboardData: (userId: number) => Promise<any>;
-let initDatabase: () => Promise<void>;
+let queryDb;
+let runScanForUser;
+let getUserDashboardData;
+let initDatabase;
 
 app.prepare().then(async () => {
   // Dynamically import database and scanner logic (ES modules via tsx)

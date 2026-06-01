@@ -1,0 +1,162 @@
+@import url('../tokens.css');
+@import url('../components.css');
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, var(--accent-muted), transparent 28%),
+    radial-gradient(circle at bottom right, var(--warning-muted), transparent 24%),
+    var(--bg);
+}
+
+.user-shell {
+  min-height: 100vh;
+}
+
+.user-header h1 {
+  font-size: clamp(30px, 4vw, 38px);
+  font-weight: 800;
+}
+
+.user-header p,
+.panel-copy p,
+.empty-state,
+.pref-copy p,
+.modal-copy {
+  color: var(--text-secondary);
+}
+
+.user-stack,
+.preferences-list,
+.task-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alert-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--warning);
+}
+
+.table-shell {
+  overflow-x: auto;
+}
+
+.empty-state {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.empty-state .material-icons-outlined {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.inline-empty {
+  min-height: 120px;
+}
+
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.task-card strong {
+  font-size: 14px;
+}
+
+.task-card p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.task-card.merge_conflict {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.task-card.ci_failure {
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.user-table td:first-child,
+.pr-number {
+  font-family: var(--font-mono);
+}
+
+.pr-title {
+  font-weight: 700;
+}
+
+.pr-number {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.preferences-card,
+.danger-row,
+.pref-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.pref-row,
+.danger-row {
+  padding-block: 16px;
+}
+
+.danger-row {
+  border-top: 1px solid var(--border);
+}
+
+.pref-copy h3,
+.danger-copy h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.danger-copy h3,
+.modal-title {
+  color: var(--danger);
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .pref-row,
+  .danger-row,
+  .topbar-right {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topbar-right {
+    gap: 10px;
+  }
+}

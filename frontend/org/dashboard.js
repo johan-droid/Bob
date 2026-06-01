@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateConnectionStatus = (status, text) => {
         if (wsStatusDot) {
-            wsStatusDot.className = `status-dot w-2 h-2 rounded-full ${status}`;
+            wsStatusDot.className = `status-dot ${status}`;
         }
         if (wsStatusText) {
             wsStatusText.textContent = text;
@@ -37,9 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tableBody.innerHTML = `
             <tr class="empty-state-row">
-                <td colspan="5" class="py-16 text-center text-zinc-500">
-                    <div class="flex flex-col items-center gap-3">
-                        <span class="material-symbols-outlined text-3xl animate-spin text-zinc-600">sync</span>
+                <td colspan="5">
+                    <div class="table-empty">
+                        <span class="material-symbols-outlined">sync</span>
                         <p class="font-medium">${message}</p>
                     </div>
                 </td>
@@ -68,23 +68,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasConflict = pr.merge_health === 'Conflict' || pr.merge_health === 'Conflicting';
 
             const ciBadge = isFailing
-                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20"><span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>Failed</span>`
-                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Passing</span>`;
+                ? `<span class="badge badge-danger"><span class="status-dot disconnected"></span>Failed</span>`
+                : `<span class="badge badge-success"><span class="status-dot connected"></span>Passing</span>`;
 
             const mergeBadge = hasConflict
-                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">Conflict</span>`
-                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 border border-border text-zinc-400">Healthy</span>`;
+                ? `<span class="badge badge-warning">Conflict</span>`
+                : `<span class="badge badge-neutral">Healthy</span>`;
 
             return `
-                <tr class="hover:bg-zinc-900/40 transition-colors">
-                    <td class="py-4 px-4 font-mono text-zinc-300 font-medium">${escapeHtml(pr.repo || '')}</td>
-                    <td class="py-4 px-4">
-                        <div class="font-bold text-white">${escapeHtml(pr.title || 'Untitled PR')}</div>
-                        <div class="text-xs text-zinc-500 mt-1 font-mono">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
+                <tr>
+                    <td><span class="repo-name">${escapeHtml(pr.repo || '')}</span></td>
+                    <td>
+                        <div class="pr-meta">${escapeHtml(pr.title || 'Untitled PR')}</div>
+                        <div class="pr-number">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
                     </td>
-                    <td class="py-4 px-4 font-semibold text-zinc-400">${escapeHtml(pr.author || 'Pending event')}</td>
-                    <td class="py-4 px-4">${ciBadge}</td>
-                    <td class="py-4 px-4">${mergeBadge}</td>
+                    <td>${escapeHtml(pr.author || 'Pending event')}</td>
+                    <td>${ciBadge}</td>
+                    <td>${mergeBadge}</td>
                 </tr>
             `;
         }).join('');

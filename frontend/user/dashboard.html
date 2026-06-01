@@ -5,188 +5,179 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Bob developer workspace for personal PR monitoring and action items.">
     <title>Bob | My Workspace</title>
-    <link rel="stylesheet" href="/user/user-dashboard.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/tokens.css">
+    <link rel="stylesheet" href="/components.css">
+    <link rel="stylesheet" href="/user/dashboard-layout.css">
 </head>
 <body>
-    <div class="user-ops-shell bento-theme">
-        <nav class="user-ops-topbar">
-            <div class="user-ops-topbar-left">
-                <a href="/user/dashboard" class="user-ops-brand">
-                    <span>B</span>
-                    Bob Developer
+    <div class="user-shell">
+        <nav class="topbar">
+            <div class="topbar-brand">
+                <a href="/user/dashboard" class="topbar-brand">
+                    <span class="topbar-brand-icon">B</span>
+                    <span>Bob Developer</span>
                 </a>
+                <div class="topbar-nav">
+                    <a href="#my-prs" class="active">My Pull Requests</a>
+                    <a href="#action-required">Action Required</a>
+                    <a href="#preferences">Profile Preferences</a>
+                </div>
             </div>
-            <div class="user-ops-topbar-center">
-                <a href="#my-prs" class="active">My Pull Requests</a>
-                <a href="#action-required">Action Required</a>
-                <a href="#preferences">Profile Preferences</a>
-            </div>
-            <div class="user-ops-topbar-right">
-                <div class="connection-status" id="ws-status" aria-live="polite">
+            <div class="topbar-right">
+                <div class="connection-pill" id="ws-status" aria-live="polite">
                     <span class="status-dot connecting"></span>
-                    <span class="status-text" style="font-size: 0.85rem; font-weight: 600; color: #a1a1aa;">Awaiting Auth...</span>
+                    <span class="status-text">Awaiting Auth...</span>
                 </div>
-                <div class="avatar-circle user-avatar" aria-hidden="true" title="Developer Profile">
-                    <span class="material-icons-outlined" style="font-size: 18px;">person</span>
+                <div class="avatar-badge user-avatar" aria-hidden="true" title="Developer Profile">
+                    <span class="material-icons-outlined">person</span>
                 </div>
-                <a href="/logout" class="logout-link user-ops-button outline">Logout</a>
+                <a href="/logout" class="btn btn-outline">Logout</a>
             </div>
         </nav>
 
-        <main class="user-ops-main">
-            <header class="user-ops-header">
-                <div>
-                    <span class="user-ops-kicker">Developer Profile</span>
-                    <h1>My Workspace</h1>
-                    <p>Personal pull request monitoring and action items.</p>
-                </div>
+        <main class="page-main">
+            <header class="user-header">
+                <span class="kicker">Developer Profile</span>
+                <h1>My Workspace</h1>
+                <p>Personal pull request monitoring and action items.</p>
             </header>
 
-            <section id="action-required" class="user-ops-grid" style="grid-template-columns: 1fr; margin-bottom: 32px;">
-                <div class="bento-box alert-card">
-                    <div class="user-ops-panel-head" style="margin-bottom: 16px;">
+            <section id="action-required" class="card user-stack">
+                <div class="panel-copy">
+                    <span class="kicker">Priority</span>
+                    <h2 class="alert-heading">
+                        <span class="material-icons-outlined">notifications_active</span>
+                        Requires Your Attention
+                    </h2>
+                </div>
+                <div class="task-grid" id="action-items-container">
+                    <div class="empty-state inline-empty">
                         <div>
-                            <span class="user-ops-kicker">Priority</span>
-                            <h2 style="color: #fbbf24; display: flex; align-items: center; gap: 8px;">
-                                <span class="material-icons-outlined">notifications_active</span> Requires Your Attention
-                            </h2>
-                        </div>
-                    </div>
-                    <div class="action-grid" id="action-items-container">
-                        <div class="user-ops-empty bento-inner" style="min-height: 120px;">
-                            <span class="material-icons-outlined" style="font-size: 32px; margin-bottom: 8px; color: #34d399;">task_alt</span>
-                            <p style="color: #a1a1aa; font-size: 0.9rem;">You have no blocking merge conflicts or failing CI checks assigned to you.</p>
+                            <span class="material-icons-outlined">task_alt</span>
+                            <p>You have no blocking merge conflicts or failing CI checks assigned to you.</p>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <section id="my-prs" class="user-ops-grid" style="grid-template-columns: 1fr;">
-                <div class="bento-box large">
-                    <div class="user-ops-panel-head">
-                        <div>
-                            <span class="user-ops-kicker">Live Tracking</span>
-                            <h2>My Active Pull Requests</h2>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="md3-table" style="width: 100%; text-align: left; border-collapse: separate; border-spacing: 0 8px;">
-                            <thead>
-                                <tr>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">Repository</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">PR Title</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">CI Status</th>
-                                    <th style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa; text-transform: uppercase; font-size: 0.8rem;">Target Branch Health</th>
-                                </tr>
-                            </thead>
-                            <tbody id="my-pr-table-body">
-                                <tr class="empty-state-row">
-                                    <td colspan="4">
-                                        <div class="user-ops-empty" style="min-height: 200px; display: grid; place-items: center; text-align: center; color: #a1a1aa;">
-                                            <span class="material-icons-outlined" style="font-size: 48px; margin-bottom: 16px;">commit</span>
+            <section id="my-prs" class="card user-stack">
+                <div class="panel-copy">
+                    <span class="kicker">Live Tracking</span>
+                    <h2>My Active Pull Requests</h2>
+                    <p>Bob lists PRs authored by your connected GitHub account here.</p>
+                </div>
+                <div class="table-shell">
+                    <table class="data-table user-table">
+                        <thead>
+                            <tr>
+                                <th>Repository</th>
+                                <th>PR Title</th>
+                                <th>CI Status</th>
+                                <th>Target Branch Health</th>
+                            </tr>
+                        </thead>
+                        <tbody id="my-pr-table-body">
+                            <tr class="empty-state-row">
+                                <td colspan="4">
+                                    <div class="empty-state">
+                                        <div>
+                                            <span class="material-icons-outlined">commit</span>
                                             <p>Awaiting GitHub payload. Bob will list PRs authored by your connected account here.</p>
                                         </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
-            <section id="preferences" class="user-ops-grid" style="grid-template-columns: 1fr; margin-top: 32px;">
-                <div class="bento-box feed-card">
-                    <div class="user-ops-panel-head">
-                        <div>
-                            <span class="user-ops-kicker">Configuration</span>
-                            <h2>Profile Preferences</h2>
+            <section id="preferences" class="card user-stack">
+                <div class="panel-copy">
+                    <span class="kicker">Configuration</span>
+                    <h2>Profile Preferences</h2>
+                    <p>Manage your developer profile and preferences.</p>
+                </div>
+                <div class="preferences-list">
+                    <div class="pref-row">
+                        <div class="pref-copy">
+                            <h3>Account Settings</h3>
+                            <p>Manage your developer profile and preferences.</p>
                         </div>
+                        <a class="btn btn-outline" href="/permissions" aria-label="Refresh repository setup">
+                            <span class="material-icons-outlined">sync</span>
+                            Refresh Setup
+                        </a>
                     </div>
-                    <div class="bento-inner" style="display: flex; flex-direction: column; gap: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                            <div>
-                                <h3 style="margin: 0 0 4px; font-size: 1rem; color: #fff;">Account Settings</h3>
-                                <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Manage your developer profile and preferences.</p>
-                            </div>
-                            <a class="user-ops-button outline sm" href="/permissions" aria-label="Refresh repository setup">
-                                <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">sync</span>
-                                Refresh Setup
-                            </a>
+                    <div class="danger-row">
+                        <div class="danger-copy">
+                            <h3>Danger Zone</h3>
+                            <p>Permanently delete your account and all associated data.</p>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <h3 style="margin: 0 0 4px; font-size: 1rem; color: #ef4444;">Danger Zone</h3>
-                                <p style="margin: 0; color: #a1a1aa; font-size: 0.85rem;">Permanently delete your account and all associated data.</p>
-                            </div>
-                            <button id="delete-account-btn" class="user-ops-button" style="background: transparent; border: 1px solid #ef4444; color: #ef4444;">
-                                <span class="material-icons-outlined" style="font-size: 16px; margin-right: 4px;">delete_forever</span>
-                                Delete Account
-                            </button>
-                        </div>
+                        <button id="delete-account-btn" class="btn btn-danger">
+                            <span class="material-icons-outlined">delete_forever</span>
+                            Delete Account
+                        </button>
                     </div>
                 </div>
             </section>
-
-            <!-- Deletion Modal -->
-            <div id="delete-modal" class="user-ops-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; place-items: center;">
-                <div class="bento-box" style="max-width: 400px; width: 90%; background: #18181b; border: 1px solid rgba(239, 68, 68, 0.2);">
-                    <h2 style="color: #ef4444; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                        <span class="material-icons-outlined">warning</span> Confirm Deletion
-                    </h2>
-                    <p style="color: #a1a1aa; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">
-                        Are you absolutely sure? This action cannot be undone. All your PR monitoring data and connections will be permanently removed.
-                    </p>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button id="cancel-delete-btn" class="user-ops-button outline">Cancel</button>
-                        <button id="confirm-delete-btn" class="user-ops-button" style="background: #ef4444; color: #fff; border: none;">Yes, Delete Everything</button>
-                    </div>
-                </div>
-            </div>
         </main>
+    </div>
+
+    <div id="delete-modal" class="modal-overlay">
+        <div class="card modal">
+            <h2 class="modal-title">
+                <span class="material-icons-outlined">warning</span>
+                Confirm Deletion
+            </h2>
+            <p class="modal-copy">
+                Are you absolutely sure? This action cannot be undone. All your PR monitoring data and connections will be permanently removed.
+            </p>
+            <div class="modal-actions">
+                <button id="cancel-delete-btn" class="btn btn-outline">Cancel</button>
+                <button id="confirm-delete-btn" class="btn btn-danger">Yes, Delete Everything</button>
+            </div>
+        </div>
     </div>
 
     <script src="dashboard.js"></script>
     <script>
-        // Account Deletion Logic
         document.addEventListener('DOMContentLoaded', () => {
             const deleteBtn = document.getElementById('delete-account-btn');
             const cancelBtn = document.getElementById('cancel-delete-btn');
             const confirmBtn = document.getElementById('confirm-delete-btn');
             const modal = document.getElementById('delete-modal');
 
-            if(deleteBtn && modal) {
+            if (deleteBtn && modal) {
                 deleteBtn.addEventListener('click', () => {
-                    modal.style.display = 'grid';
+                    modal.classList.add('open');
                 });
 
                 cancelBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
+                    modal.classList.remove('open');
                 });
 
                 confirmBtn.addEventListener('click', async () => {
                     try {
                         const response = await fetch('/api/account/delete', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                // Include CSRF token if applicable
-                                // 'X-CSRF-Token': getCsrfToken()
-                            }
+                            headers: { 'Content-Type': 'application/json' }
                         });
-                        
+
                         if (response.ok || response.status === 200 || response.status === 204) {
                             window.location.href = '/?deleted=true';
-                        } else {
-                            alert('Failed to delete account. Please try again.');
-                            modal.style.display = 'none';
+                            return;
                         }
+
+                        alert('Failed to delete account. Please try again.');
                     } catch (err) {
                         console.error('Deletion error:', err);
                         alert('An error occurred while deleting your account.');
-                        modal.style.display = 'none';
                     }
+
+                    modal.classList.remove('open');
                 });
             }
         });

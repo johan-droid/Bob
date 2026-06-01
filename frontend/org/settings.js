@@ -82,14 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (detailLine) detailLine.textContent = `${meta.active_repo_count} repositories actively monitored.`;
                     if (syncIcon) {
                         syncIcon.textContent = 'sync';
-                        syncIcon.className = 'material-symbols-outlined text-success text-2xl';
+                        syncIcon.className = 'material-symbols-outlined sync-icon synced';
                     }
                 } else {
                     if (statusLine) statusLine.textContent = 'Not Synchronized';
                     if (detailLine) detailLine.textContent = 'Awaiting GitHub App installation token payload.';
                     if (syncIcon) {
                         syncIcon.textContent = 'sync_problem';
-                        syncIcon.className = 'material-symbols-outlined text-danger text-2xl';
+                        syncIcon.className = 'material-symbols-outlined sync-icon';
                     }
                 }
             }
@@ -103,8 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Failed to load settings:', err);
             if (reposGrid) {
                 reposGrid.innerHTML = `
-                    <div class="col-span-full py-8 text-center text-red-500 font-medium">
-                        Failed to load repository status.
+                    <div class="repo-card">
+                        <div class="section-copy">
+                            <h3>Failed to load repository status.</h3>
+                        </div>
                     </div>
                 `;
             }
@@ -115,8 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!reposGrid) return;
         if (!repos.length) {
             reposGrid.innerHTML = `
-                <div class="col-span-full py-8 text-center text-zinc-500">
-                    No repositories connected yet. Discovered repositories will show up here.
+                <div class="repo-card">
+                    <div class="section-copy">
+                        <h3>No repositories connected yet.</h3>
+                        <p>Discovered repositories will show up here.</p>
+                    </div>
                 </div>
             `;
             return;
@@ -125,27 +130,25 @@ document.addEventListener('DOMContentLoaded', () => {
         reposGrid.innerHTML = repos.map((repo) => {
             const isActive = repo.is_active;
             const statusBadge = isActive
-                ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Active</span>`
-                : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400 border border-border">Paused</span>`;
+                ? `<span class="badge badge-success">Active</span>`
+                : `<span class="badge badge-neutral">Paused</span>`;
 
             return `
-                <div class="bg-zinc-900 border border-border rounded-xl p-5 hover:border-zinc-800 transition-colors flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-start gap-4">
-                            <div>
-                                <h3 class="font-bold text-white text-sm break-all">${escapeHtml(repo.full_name || '')}</h3>
-                                <p class="text-zinc-500 text-xs mt-1">${escapeHtml(repo.language || 'Unknown language')}</p>
+                <div class="repo-card">
+                    <div class="repo-head">
+                        <div>
+                            <h3>${escapeHtml(repo.full_name || '')}</h3>
+                            <p>${escapeHtml(repo.language || 'Unknown language')}</p>
                             </div>
                             ${statusBadge}
                         </div>
-                        <div class="flex justify-between items-center text-xs text-zinc-400 mt-4">
-                            <span>Open Risks: <strong class="text-white">${repo.issue_count ?? 0}</strong></span>
-                            <span class="bg-zinc-800/40 px-2 py-0.5 border border-border rounded text-[10px] uppercase font-bold text-zinc-400">${escapeHtml(repo.permission || 'read')}</span>
-                        </div>
+                    <div class="repo-meta">
+                        <span>Open Risks: <strong>${repo.issue_count ?? 0}</strong></span>
+                        <span class="repo-permission">${escapeHtml(repo.permission || 'read')}</span>
                     </div>
-                    <div class="mt-5 pt-4 border-t border-zinc-800/60 flex justify-between items-center gap-4">
-                        <span class="text-[10px] text-zinc-500 font-medium">Synced ${repo.last_synced ? 'recently' : 'never'}</span>
-                        <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors toggle-monitor-btn" data-repo="${escapeHtml(repo.full_name || '')}" data-active="${isActive}">
+                    <div class="repo-actions">
+                        <span>Synced ${repo.last_synced ? 'recently' : 'never'}</span>
+                        <button type="button" class="btn btn-outline btn-sm toggle-monitor-btn" data-repo="${escapeHtml(repo.full_name || '')}" data-active="${isActive}">
                             ${isActive ? 'Pause' : 'Resume'}
                         </button>
                     </div>

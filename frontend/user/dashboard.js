@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${escapeHtml(pr.repo || '')}</td>
                         <td>
                             <div class="pr-title">${escapeHtml(pr.title || 'Untitled PR')}</div>
-                            <div class="pr-meta">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
+                            <div class="pr-number">${escapeHtml(pr.number ? `#${pr.number}` : 'Pending event')}</div>
                         </td>
                         <td>${escapeHtml(pr.ci_status || 'Awaiting payload')}</td>
                         <td>${escapeHtml(pr.merge_health || 'Awaiting payload')}</td>
