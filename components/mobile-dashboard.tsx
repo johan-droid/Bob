@@ -128,7 +128,7 @@ function IssueCard({
         <div className="mob-card__row">
           <TypeBadge type={issue.type} />
           <div className="mob-card__info">
-            <span className="mob-card__repo">{issue.repo}</span>
+            <span className="mob-card__repo truncate">{issue.repo}</span>
             {issue.pr_number && <span className="mob-card__pr">#{issue.pr_number}</span>}
           </div>
           <div className="mob-card__meta">
@@ -151,7 +151,7 @@ function IssueCard({
               <button
                 type="button"
                 className="mob-action mob-action--resolve"
-                onClick={onResolve}
+                onClick={(e) => { e.stopPropagation(); onResolve(); }}
                 disabled={disabled}
               >
                 <span className="material-symbols-outlined">check</span>
@@ -161,7 +161,7 @@ function IssueCard({
                 <button
                   type="button"
                   className="mob-action mob-action--ci"
-                  onClick={onRerunCi}
+                  onClick={(e) => { e.stopPropagation(); onRerunCi(); }}
                   disabled={disabled}
                 >
                   <span className="material-symbols-outlined">replay</span>
@@ -172,7 +172,7 @@ function IssueCard({
                 <button
                   type="button"
                   className="mob-action mob-action--review"
-                  onClick={onRequestReview}
+                  onClick={(e) => { e.stopPropagation(); onRequestReview(); }}
                   disabled={disabled}
                 >
                   <span className="material-symbols-outlined">person_add</span>
@@ -658,24 +658,36 @@ function MenuDrawer({
   onClose: () => void;
   db: ReturnType<typeof useDashboard>;
 }) {
+  const [optimisticSettings, setOptimisticSettings] = useState(db.settings);
+
+  useEffect(() => {
+    setOptimisticSettings(db.settings);
+  }, [db.settings]);
+
   if (!open) return null;
 
   const updateSetting = async (key: string, value: any) => {
+    // Optimistic UI update
+    const previousSettings = { ...optimisticSettings };
+    const nextSettings = { ...optimisticSettings, [key]: value };
+    setOptimisticSettings(nextSettings);
+
     try {
       db.setNotice(null);
       const payload = {
-        scan_interval: db.settings.scan_interval || 300,
-        notify_in_app: db.settings.notify_in_app,
-        auto_label_conflict: db.settings.auto_label_conflict,
-        tag_author_on_fail: db.settings.tag_author_on_fail,
-        slack_webhook: db.settings.slack_webhook || '',
-        discord_webhook: db.settings.discord_webhook || '',
-        [key]: value
+        scan_interval: nextSettings.scan_interval || 300,
+        notify_in_app: nextSettings.notify_in_app,
+        auto_label_conflict: nextSettings.auto_label_conflict,
+        tag_author_on_fail: nextSettings.tag_author_on_fail,
+        slack_webhook: nextSettings.slack_webhook || '',
+        discord_webhook: nextSettings.discord_webhook || '',
       };
+
       await api.saveSettings(payload);
       await db.refreshState(true);
       db.setNotice('Settings saved successfully.');
     } catch (e: any) {
+      setOptimisticSettings(previousSettings);
       db.setError(e.message || 'Failed to save settings.');
     }
   };
@@ -711,7 +723,7 @@ function MenuDrawer({
               <input
                 type="checkbox"
                 className="mob-switch"
-                checked={!!db.settings.notify_in_app}
+                checked={!!optimisticSettings.notify_in_app}
                 onChange={(e) => void updateSetting('notify_in_app', e.target.checked)}
               />
             </label>
@@ -724,7 +736,7 @@ function MenuDrawer({
               <input
                 type="checkbox"
                 className="mob-switch"
-                checked={!!db.settings.auto_label_conflict}
+                checked={!!optimisticSettings.auto_label_conflict}
                 onChange={(e) => void updateSetting('auto_label_conflict', e.target.checked)}
               />
             </label>
@@ -737,7 +749,7 @@ function MenuDrawer({
               <input
                 type="checkbox"
                 className="mob-switch"
-                checked={!!db.settings.tag_author_on_fail}
+                checked={!!optimisticSettings.tag_author_on_fail}
                 onChange={(e) => void updateSetting('tag_author_on_fail', e.target.checked)}
               />
             </label>
@@ -751,7 +763,7 @@ function MenuDrawer({
                 type="text"
                 className="mob-input-text"
                 placeholder="https://hooks.slack.com/services/..."
-                defaultValue={db.settings.slack_webhook || ''}
+                defaultValue={optimisticSettings.slack_webhook || ''}
                 onBlur={(e) => void updateSetting('slack_webhook', e.target.value)}
               />
             </div>
@@ -761,7 +773,7 @@ function MenuDrawer({
                 type="text"
                 className="mob-input-text"
                 placeholder="https://discord.com/api/webhooks/..."
-                defaultValue={db.settings.discord_webhook || ''}
+                defaultValue={optimisticSettings.discord_webhook || ''}
                 onBlur={(e) => void updateSetting('discord_webhook', e.target.value)}
               />
             </div>
@@ -769,7 +781,11 @@ function MenuDrawer({
 
           <h4 className="mob-drawer-sheet__section-title">Account Actions</h4>
           <div className="mob-settings-list" style={{ gap: 12 }}>
-            <a href="/logout" className="mob-btn mob-btn--logout">
+            <a href="/logout" className="mob-btn mob-btn--logout" onClick={(e) => {
+              if (!window.confirm('Are you sure you want to log out?')) {
+                e.preventDefault();
+              }
+            }}>
               <span className="material-symbols-outlined">logout</span>
               Log Out
             </a>
@@ -777,8 +793,10 @@ function MenuDrawer({
               type="button"
               className="mob-btn mob-btn--danger"
               onClick={() => {
-                onClose();
-                void db.handleDeleteAccount();
+                if (window.confirm('Are you sure you want to permanently delete your workspace? This action cannot be undone.')) {
+                  onClose();
+                  void db.handleDeleteAccount();
+                }
               }}
             >
               <span className="material-symbols-outlined">delete_forever</span>
