@@ -124,18 +124,22 @@ function IssueCard({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Collapsed Row */}
         <div className="mob-card__row">
-          <TypeBadge type={issue.type} />
           <div className="mob-card__info">
-            <span className="mob-card__repo truncate">{issue.repo}</span>
-            {issue.pr_number && <span className="mob-card__pr">#{issue.pr_number}</span>}
+            <div className="mob-card__topline">
+              <TypeBadge type={issue.type} />
+              {age && <span className="mob-card__age">{age}</span>}
+            </div>
+            <span className="mob-card__title-preview">{issue.title || 'Untitled issue'}</span>
+            <span className="mob-card__repo truncate">
+              {issue.repo}
+              {issue.pr_number ? ` · #${issue.pr_number}` : ''}
+            </span>
           </div>
           <div className="mob-card__meta">
             <span className="mob-card__author">
               <span className="mob-card__avatar">{(issue.author || 'U')[0].toUpperCase()}</span>
             </span>
-            {age && <span className="mob-card__age">{age}</span>}
           </div>
           <span className="material-symbols-outlined mob-card__chevron">
             {expanded ? 'expand_less' : 'expand_more'}
