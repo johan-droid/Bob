@@ -1,0 +1,6 @@
+policy:
+  required_checks:
+    - ci/test
+    - ci/lint
+  required_approvals: 2
+  stale_hours: 24

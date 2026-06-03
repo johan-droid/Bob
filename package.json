@@ -2,27 +2,41 @@
   "name": "bob-web",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
-    "dev": "next dev",
-    "dev:frontend": "next dev -p 3000",
-    "dev:backend": ".\\.venv\\Scripts\\python.exe backend\\api_server.py",
-    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "dev": "tsx server.ts",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "NODE_ENV=production tsx server.ts",
+    "lint": "next lint",
+    "dev:all": "concurrently -n \"next,flask\" -c \"bgBlue,bgGreen\" \"npm run dev\" \"cd backend && python api_server.py\"",
+    "webhook-proxy": "tsx scripts/webhook-proxy.ts"
   },
   "dependencies": {
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "socket.io-client": "4.8.3"
-  },
-  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "25.9.0",
+    "@types/pg": "^8.11.10",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "eslint": "10.4.0",
-    "eslint-config-next": "16.2.6",
+    "better-sqlite3": "^9.4.3",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "next": "16.2.6",
+    "pg": "^8.11.3",
+    "postcss": "^8.5.15",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "4.8.3",
+    "tailwindcss": "^4.3.0",
+    "tsx": "^4.22.3",
     "typescript": "6.0.3"
+  },
+  "devDependencies": {
+    "eslint": "10.4.0",
+    "eslint-config-next": "16.2.6"
   }
 }

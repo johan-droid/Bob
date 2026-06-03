@@ -1,0 +1,138 @@
+@import url('../tokens.css');
+@import url('../components.css');
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, var(--accent-muted), transparent 28%),
+    radial-gradient(circle at bottom right, var(--success-muted), transparent 24%),
+    var(--bg);
+}
+
+.settings-shell {
+  min-height: 100vh;
+}
+
+.settings-page {
+  max-width: 1000px;
+}
+
+.settings-copy h1 {
+  font-size: clamp(30px, 4vw, 38px);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.settings-copy p,
+.section-copy p,
+.sync-text span,
+.rule-copy p,
+.repo-card p,
+.repo-meta,
+.danger-copy p {
+  color: var(--text-secondary);
+}
+
+.settings-stack,
+.settings-form,
+.rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sync-panel,
+.rule-item,
+.repo-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.sync-panel,
+.rule-item,
+.repo-card {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.sync-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-icon,
+.repo-status-icon {
+  color: var(--danger);
+}
+
+.sync-icon.synced {
+  color: var(--success);
+}
+
+.repo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.repo-card {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.repo-head,
+.repo-meta,
+.repo-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.repo-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.repo-meta {
+  font-size: 12px;
+}
+
+.repo-permission {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.danger-card {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.danger-copy h2 {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .sync-panel,
+  .rule-item,
+  .repo-head,
+  .repo-meta,
+  .repo-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -3,7 +3,7 @@ REM Bob - Local Development Setup Script (Windows)
 REM This script sets up your local development environment
 
 echo ========================================
-echo Bob - Local Development Setup
+echo Bob - Local Development Setup (Node.js Unified Stack)
 echo ========================================
 echo.
 
@@ -28,28 +28,18 @@ if not exist .env (
 echo Found .env file
 echo.
 
-REM Copy .env to backend directory
-echo Copying .env to backend directory...
-copy .env backend\.env >nul
-echo Created backend\.env
-echo.
-
-REM Install Python dependencies
-echo Installing Python dependencies...
-cd backend
-pip install -r requirements.txt
+REM Install Node.js dependencies
+echo Installing Node.js dependencies...
+call npm install
 echo Dependencies installed
 echo.
-
-cd ..
 
 echo ========================================
 echo Setup complete!
 echo.
-echo To start the server:
-echo   cd backend
-echo   python api_server.py
+echo To start the development server:
+echo   npm run dev
 echo.
-echo Then open: http://localhost:5000
+echo Then open: http://localhost:3000
 echo ========================================
 pause

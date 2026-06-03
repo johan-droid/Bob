@@ -4,6 +4,8 @@ type ApiInit = RequestInit & {
 
 export type IssueStatus = 'pending' | 'in_progress' | 'failed' | 'resolved';
 
+export type IssueType = 'merge_conflict' | 'ci_failure' | 'review_issue' | 'stale_pr' | 'oversized_pr';
+
 export type IssueItem = {
   id?: number;
   repo?: string;
@@ -13,8 +15,9 @@ export type IssueItem = {
   branch?: string;
   pr_number?: number;
   run_id?: string;
-  type?: 'merge_conflict' | 'ci_failure' | string;
+  type?: IssueType | string;
   status?: IssueStatus;
+  author?: string;
   last_commented_at?: string | null;
   comment_count?: number;
   created_at?: string | null;
@@ -36,19 +39,46 @@ export type RepoItem = {
   last_synced?: string | null;
 };
 
+export type DashboardStats = {
+  total?: number;
+  pending?: number;
+  in_progress?: number;
+  failed?: number;
+  resolved?: number;
+  conflicts?: number;
+  failing?: number;
+  review_issues?: number;
+  stale?: number;
+  oversized?: number;
+  ready?: number;
+};
+
 export type DashboardPayload = {
-  stats?: { total?: number; pending?: number; in_progress?: number; failed?: number; resolved?: number };
+  stats?: DashboardStats;
   pending?: IssueItem[];
   in_progress?: IssueItem[];
   failed?: IssueItem[];
   resolved?: IssueItem[];
   repos?: RepoItem[];
+  my_prs?: IssueItem[];
+  action_items?: Array<{
+    id?: number;
+    kind?: string;
+    title?: string;
+    description?: string;
+    url?: string;
+    repo?: string;
+  }>;
 };
 
 export type AppSettings = {
   scan_interval?: number;
   excluded_repos?: string[];
   notify_in_app?: boolean;
+  slack_webhook?: string;
+  discord_webhook?: string;
+  auto_label_conflict?: boolean;
+  tag_author_on_fail?: boolean;
   updated_at?: string | null;
 };
 
@@ -75,9 +105,36 @@ export type AppState = {
 
 let csrfToken: string | null = null;
 
+export function apiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/$/, '');
+  }
+
+  return '';
+}
+
+export function realtimeBaseUrl() {
+  const configuredBaseUrl = apiBaseUrl();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  // Socket.IO is served by server.js on the same origin as the Next.js app.
+  // Always use window.location.origin so both dev (:3000) and prod work correctly.
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  return '';
+}
+
+function apiUrl(path: string) {
+  return `${apiBaseUrl()}${path}`;
+}
+
 async function getCsrfToken() {
   if (csrfToken) return csrfToken;
-  const response = await fetch('/api/csrf-token', { credentials: 'include' });
+  const response = await fetch(apiUrl('/api/csrf-token'), { credentials: 'include' });
   if (!response.ok) return null;
   const payload = await response.json() as { csrf_token?: string };
   csrfToken = payload.csrf_token || null;
@@ -106,7 +163,7 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
     if (token) headers.set('X-CSRFToken', token);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     method,
     credentials: 'include',
@@ -138,5 +195,15 @@ export const api = {
     `/api/issues/${issueId}/status`,
     { method: 'POST', body: JSON.stringify({ status }) }
   ),
-  deleteAccount: () => apiFetch<{ success: boolean }>('/api/account/delete', { method: 'POST' })
+  deleteAccount: () => apiFetch<{ success: boolean }>('/api/account/delete', { method: 'POST' }),
+
+  // ── Real GitHub Actions (replaces fake "Route to Agent") ──────────────────
+  rerunCi: (issueId: number) => apiFetch<{ success: boolean; message?: string }>(
+    `/api/issues/${issueId}/rerun-ci`,
+    { method: 'POST' }
+  ),
+  requestReview: (issueId: number, reviewers: string[]) => apiFetch<{ success: boolean; message?: string }>(
+    `/api/issues/${issueId}/request-review`,
+    { method: 'POST', body: JSON.stringify({ reviewers }) }
+  ),
 };

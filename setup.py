@@ -15,6 +15,7 @@ setup(
         'python-socketio==5.11.0',
         'gunicorn==21.2.0',
         'eventlet==0.41.0',
+        'simple-websocket==1.1.0',
         'Flask-Session==0.8.0',
         'Flask-WTF==1.2.1',
         'WTForms==3.1.2',

@@ -13,7 +13,7 @@ export default function UserLoginPage() {
           </div>
           <h1 className="auth-title">Sign in with GitHub</h1>
           <p>Track your pull requests, view assigned work, and keep your personal workspace in sync.</p>
-          <div className="auth__actions" style={{ justifyContent: 'center' }}>
+          <div className="auth__actions flex-wrap px-4 py-3" style={{ justifyContent: 'center' }}>
             <a href="/auth/github?portal=user" className="button">Continue with GitHub</a>
             <Link href="/" className="button-secondary">Back to home</Link>
           </div>
