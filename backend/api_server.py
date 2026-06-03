@@ -1223,7 +1223,7 @@ def github_webhook():
         abort(403)
 
     expected = 'sha256=' + hmac.new(
-        WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
+        WEBHOOK_SECRET.encode(), request.get_data(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
         logger.warning('Webhook signature mismatch')
         abort(403)

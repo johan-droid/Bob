@@ -13,3 +13,7 @@
 **Vulnerability:** The `escHtml()` function used `textContent` and `innerHTML` for escaping.
 **Learning:** This DOM-based method fails to escape single and double quotes, leaving attributes (e.g., `href="${escHtml(...)}"`) vulnerable to XSS attacks.
 **Prevention:** Always use explicit regex-based string replacements for `<`, `>`, `&`, `'`, and `"` when implementing HTML escaping functions.
+## 2024-06-02 - [Flask Webhook Signature Validation]
+**Vulnerability:** Using `request.data` in Flask for webhook validation. If the payload is accessed via `request.get_json()` earlier in the request lifecycle, `request.data` may be empty, causing signature validation to fail.
+**Learning:** `request.data` is a property that calls `request.get_data(parse_form_data=True)`. However, if form data has been parsed, or if JSON has been accessed, `request.data` will often return an empty string. `request.get_data()` accesses the raw stream and returns the exact bytes that were sent, which is crucial for verifying HMAC signatures.
+**Prevention:** Always use `request.get_data()` when validating cryptographic signatures in Flask.
