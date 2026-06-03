@@ -1,7 +1,10 @@
 """tests/test_scanner.py — PRHealthScanner unit tests with mocked GitHub API."""
 import pytest
 from unittest.mock import patch, MagicMock
-from pr_health_scanner import PRHealthScanner
+try:
+    from backend.pr_health_scanner import PRHealthScanner
+except ImportError:
+    from pr_health_scanner import PRHealthScanner
 
 
 def make_resp(json_data, status=200, headers=None):
@@ -45,12 +48,19 @@ def test_check_merge_conflict_unknown(scanner):
         assert scanner.check_merge_conflict('org/repo', 1) is False
 
 
-def test_issue_dedup_skips_existing(scanner):
-    existing = [{'title': '🚨 Merge conflict in PR #1 already exists', 'state': 'open'}]
+def test_upsert_status_comment_updates_existing(scanner):
+    existing = [{'id': 123, 'body': '<!-- bob-pr-health -->\nold status'}]
     with patch('requests.Session.get', return_value=make_resp(existing)):
-        # Title prefix matches, should be skipped
-        result = scanner.create_issue('org/repo', '🚨 Merge conflict in PR #1', 'body', ['needs-fix'])
-    assert result.get('skipped') is True
+        with patch('requests.Session.patch', return_value=make_resp({'id': 123, 'url': 'http://x'})):
+            result = scanner.upsert_status_comment('org/repo', 1, 'new status')
+    assert result.get('id') == 123
+
+
+def test_upsert_status_comment_creates_when_missing(scanner):
+    with patch('requests.Session.get', return_value=make_resp([])):
+        with patch('requests.Session.post', return_value=make_resp({'id': 456, 'url': 'http://x'})):
+            result = scanner.upsert_status_comment('org/repo', 1, 'status body')
+    assert result.get('id') == 456
 
 
 def test_scan_workflow_failures_parses_runs(scanner):
@@ -62,6 +72,32 @@ def test_scan_workflow_failures_parses_runs(scanner):
         failures = scanner.scan_workflow_failures('org/repo')
     assert len(failures) == 1
     assert failures[0]['name'] == 'CI'
+
+
+def test_scan_repository_maps_failure_branch_to_pr(scanner):
+    pulls = [{'number': 7, 'title': 'Fix', 'html_url': 'http://pr', 'head': {'ref': 'feature/a'}}]
+    failures = [{'id': 99, 'name': 'CI', 'conclusion': 'failure', 'head_branch': 'feature/a',
+                 'html_url': 'http://run', 'created_at': '2024-01-01'}]
+    graphql_data = {
+        "pullRequests": {
+            "nodes": [{
+                "number": 7,
+                "title": "Fix",
+                "url": "http://pr",
+                "mergeable": "MERGEABLE",
+                "author": {"login": "dev"},
+                "headRef": {"name": "feature/a", "target": {"oid": "abc123"}},
+                "reviews": {"nodes": []}
+            }]
+        }
+    }
+    with patch.object(scanner, 'batch_scan_graphql', return_value=graphql_data):
+        with patch.object(scanner, 'scan_workflow_failures', return_value=[{
+            'id': 99, 'name': 'CI', 'conclusion': 'failure', 'branch': 'feature/a',
+            'html_url': 'http://run', 'created_at': '2024-01-01'
+        }]):
+            result = scanner.scan_repository('org/repo')
+    assert result['workflow_failures'][0]['pr'] == 7
 
 
 def test_rate_limit_sleep_triggered(scanner):

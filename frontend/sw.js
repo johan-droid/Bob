@@ -1,5 +1,5 @@
 /* sw.js — Bob Service Worker */
-const CACHE = 'bob-v3';
+const CACHE = 'bob-v4';
 const OFFLINE_URLS = ['/', '/offline.html'];
 
 self.addEventListener('install', e => {
@@ -27,6 +27,11 @@ self.addEventListener('fetch', e => {
     
     // Only intercept GET requests for our own origin
     if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+    // Let HTML navigations reach the network so deploys are visible immediately.
+    if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+        return;
+    }
     
     // Skip API, Socket.IO, and OAuth routes
     if (url.pathname.startsWith('/api/') || 

@@ -3,7 +3,7 @@
 # Bob - Local Development Setup Script
 # This script sets up your local development environment
 
-echo "🤖 Bob - Local Development Setup"
+echo "🤖 Bob - Local Development Setup (Node.js Unified Stack)"
 echo "=================================="
 echo ""
 
@@ -27,27 +27,17 @@ fi
 echo "✅ Found .env file"
 echo ""
 
-# Copy .env to backend directory
-echo "📋 Copying .env to backend directory..."
-cp .env backend/.env
-echo "✅ Created backend/.env"
-echo ""
-
-# Install Python dependencies
-echo "📦 Installing Python dependencies..."
-cd backend
-pip install -r requirements.txt
+# Install Node dependencies
+echo "📦 Installing Node.js dependencies..."
+npm install
 echo "✅ Dependencies installed"
 echo ""
-
-cd ..
 
 echo "=================================="
 echo "✅ Setup complete!"
 echo ""
-echo "To start the server:"
-echo "  cd backend"
-echo "  python api_server.py"
+echo "To start the development server:"
+echo "  npm run dev"
 echo ""
-echo "Then open: http://localhost:5000"
+echo "Then open: http://localhost:3000"
 echo "=================================="

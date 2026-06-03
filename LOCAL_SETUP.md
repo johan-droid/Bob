@@ -32,7 +32,7 @@ Edit `.env` with your credentials:
 
 ```bash
 # Required: GitHub Personal Access Token
-GITHUB_TOKEN=ghp_your_actual_token_here
+GITHUB_TOKEN=replace_with_github_pat
 
 # Required: Repositories to monitor
 TARGET_REPOS=your-org/repo1,your-org/repo2
@@ -276,7 +276,7 @@ Connected to Bob server
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `GITHUB_TOKEN` | ✅ | GitHub PAT | `ghp_xxxxx` |
+| `GITHUB_TOKEN` | ✅ | GitHub PAT | `replace_with_github_pat` |
 | `TARGET_REPOS` | ✅ | Repos to monitor | `org/repo1,org/repo2` |
 | `GITHUB_CLIENT_ID` | ✅ | OAuth Client ID | `Iv1.xxxxx` |
 | `GITHUB_CLIENT_SECRET` | ✅ | OAuth Secret | `xxxxx` |

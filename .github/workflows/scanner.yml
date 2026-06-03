@@ -1,0 +1,45 @@
+name: "Bob PR Health Scanner"
+
+on:
+  schedule:
+    - cron: "0 * * * *" # Run hourly
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Scan a specific repository (e.g. owner/repo). If blank, scans all repositories."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  run-scanner:
+    name: Execute PR Health Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run PR Health Scanner
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_PAT || github.token }}
+          TARGET_REPOS: ${{ inputs.repo || secrets.TARGET_REPOS }}
+          ASSIGNEE_USERNAME: ${{ secrets.ASSIGNEE_USERNAME || 'jules' }}
+        run: |
+          python -m backend.pr_health_scanner

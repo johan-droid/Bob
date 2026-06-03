@@ -50,7 +50,7 @@ python api_server.py
 
 ```bash
 # GitHub API Access
-GITHUB_TOKEN=ghp_your_token_here
+GITHUB_TOKEN=replace_with_github_pat
 
 # Repositories to Monitor
 TARGET_REPOS=org/repo1,org/repo2,org/repo3
@@ -80,6 +80,7 @@ python -c "import os; print(os.urandom(24).hex())"
 ### Heroku Production
 
 - **Don't use `.env` files**
+- App uses both Node and Python buildpacks on Heroku (`heroku/nodejs`, then `heroku/python`)
 - Set via Heroku CLI:
   ```bash
   heroku config:set GITHUB_TOKEN=your_token
@@ -87,8 +88,14 @@ python -c "import os; print(os.urandom(24).hex())"
   heroku config:set GITHUB_CLIENT_ID=your_client_id
   heroku config:set GITHUB_CLIENT_SECRET=your_secret
   heroku config:set SECRET_KEY=$(python -c "import os; print(os.urandom(24).hex())")
+  heroku config:set WEBHOOK_SECRET=your_webhook_secret
+  heroku config:set TOKEN_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+  heroku config:set INTERNAL_CRON_TOKEN=$(python -c "import secrets; print(secrets.token_hex(32))")
+  heroku config:set PUBLIC_BASE_URL=https://your-app-name.herokuapp.com
+  heroku config:set ALLOWED_ORIGINS=https://your-app-name.herokuapp.com
   ```
 - OAuth callback: `https://your-app.herokuapp.com/callback/github`
+- Ensure web process binds to Heroku dynamic `$PORT` (already handled via Gunicorn command in `Procfile`)
 
 ## 🔒 Security Notes
 
