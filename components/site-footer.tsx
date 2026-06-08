@@ -15,7 +15,7 @@ export function SiteFooter() {
         <div className="footer-links">
           <Link href="/docs">Docs</Link>
           <Link href="/privacy">Privacy</Link>
-          <a href="https://github.com/johan-droid/Bob" target="_blank" rel="noreferrer">Source</a>
+          <a href="https://github.com/johan-droid/Bob" target="_blank" rel="noopener noreferrer">Source</a>
         </div>
       </div>
     </footer>

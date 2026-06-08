@@ -187,7 +187,7 @@ function IssueCard({
                 <a
                   href={issue.url}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="mob-action mob-action--gh"
                   onClick={(e) => e.stopPropagation()}
                 >

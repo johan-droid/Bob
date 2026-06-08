@@ -21,3 +21,7 @@
 **Vulnerability:** Using `request.data` in Flask for webhook validation. If the payload is accessed via `request.get_json()` earlier in the request lifecycle, `request.data` may be empty, causing signature validation to fail.
 **Learning:** `request.data` is a property that calls `request.get_data(parse_form_data=True)`. However, if form data has been parsed, or if JSON has been accessed, `request.data` will often return an empty string. `request.get_data()` accesses the raw stream and returns the exact bytes that were sent, which is crucial for verifying HMAC signatures.
 **Prevention:** Always use `request.get_data()` when validating cryptographic signatures in Flask.
+## 2026-06-08 - Reverse Tabnabbing Vulnerability
+**Vulnerability:** Found multiple anchor tags using `target="_blank"` without `rel="noopener noreferrer"`. This exposes the application to reverse tabnabbing, where the newly opened tab can manipulate the window.opener object of the original page.
+**Learning:** Modern browsers have started to implicitly set `noopener` on `target="_blank"` links, but it's not universally guaranteed across all browsers and versions, especially older ones. Explicitly adding `rel="noopener noreferrer"` remains a critical defense-in-depth practice.
+**Prevention:** Always add `rel="noopener noreferrer"` when using `target="_blank"` for external links to ensure the new page runs in a separate process and cannot access `window.opener`.

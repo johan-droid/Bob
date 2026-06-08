@@ -383,7 +383,7 @@ export default function LandingPage() {
           <div className="footer-links">
             <Link href="/docs">Docs</Link>
             <Link href="/privacy">Privacy</Link>
-            <a href="https://github.com/johan-droid/bob" target="_blank" rel="noreferrer">Source</a>
+            <a href="https://github.com/johan-droid/bob" target="_blank" rel="noopener noreferrer">Source</a>
             <a href="/auth/github?portal=org" className="footer-cta">Connect GitHub →</a>
           </div>
         </div>
