@@ -179,7 +179,7 @@ function renderList(containerId, items) {
                 <select class="input-field" style="background: var(--bg-overlay); border: 1px solid var(--border); color: var(--text-primary); height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${pr.id}, this.value)">
                     ${['pending','in_progress','failed','resolved'].map(s => `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`).join('')}
                 </select>
-                <a href="${escHtml(pr.url || '#')}" target="_blank" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 22px;">open_in_new</a>
+                <a href="${escHtml(pr.url || '#')}" target="_blank" rel="noopener noreferrer" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 22px;">open_in_new</a>
             </div>
         </div>`;
     }).join('');
@@ -224,7 +224,7 @@ function renderRepos(repos) {
                     </div>
                     <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escHtml(r.permissions_level)}</div>
                 </div>
-                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
+                <a href="https://github.com/${escHtml(r.full_name)}" target="_blank" rel="noopener noreferrer" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 24px; transition: transform 0.3s ease;">arrow_right_alt</a>
             </div>
         </div>
         `;

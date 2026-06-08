@@ -511,7 +511,7 @@ function DesktopDashboard({ mode }: Props) {
                             <a
                               href={issue.url}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="text-xs font-bold text-brand hover:underline flex items-center gap-1"
                             >
                               <span className="material-symbols-outlined text-[14px]">open_in_new</span>

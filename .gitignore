@@ -57,3 +57,5 @@ flask_sessions/
 node_modules/
 backend/bob.db-shm
 backend/bob.db-wal
+backend/bob.db
+backend/flask_sessions/
