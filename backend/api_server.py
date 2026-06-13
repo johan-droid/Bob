@@ -1819,11 +1819,10 @@ def react_fallback(route_path):
 
     static_exts = ('.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico', '.json', '.txt')
     if route_path.endswith(static_exts):
-        asset_path = os.path.normpath(os.path.join(FRONTEND_DIR, route_path))
-        frontend_root = os.path.normpath(FRONTEND_DIR)
-        if asset_path.startswith(frontend_root) and os.path.isfile(asset_path):
-            return send_from_directory(os.path.dirname(asset_path), os.path.basename(asset_path))
-        abort(404)
+        try:
+            return send_from_directory(FRONTEND_DIR, route_path)
+        except Exception:
+            abort(404)
 
     protected_routes = ('org/dashboard', 'user/dashboard', 'org/settings', 'permissions')
     if route_path in protected_routes and 'user' not in session:
