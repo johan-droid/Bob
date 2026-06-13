@@ -25,3 +25,8 @@
 **Vulnerability:** Found multiple anchor tags using `target="_blank"` without `rel="noopener noreferrer"`. This exposes the application to reverse tabnabbing, where the newly opened tab can manipulate the window.opener object of the original page.
 **Learning:** Modern browsers have started to implicitly set `noopener` on `target="_blank"` links, but it's not universally guaranteed across all browsers and versions, especially older ones. Explicitly adding `rel="noopener noreferrer"` remains a critical defense-in-depth practice.
 **Prevention:** Always add `rel="noopener noreferrer"` when using `target="_blank"` for external links to ensure the new page runs in a separate process and cannot access `window.opener`.
+
+## 2024-05-20 - [Path Traversal in Flask Fallback Route]
+**Vulnerability:** A path traversal vulnerability existed in the fallback route of `backend/api_server.py`. The application attempted to prevent directory traversal manually by checking `if asset_path.startswith(frontend_root)`, which is flawed because it allowed access to sibling directories with the same prefix (e.g., `/app/frontend.secret` passes `.startswith('/app/frontend')`).
+**Learning:** Manual path prefix validation using `.startswith()` is dangerous because it doesn't account for path separators, making sibling directory traversal possible.
+**Prevention:** Always use Flask's native `send_from_directory()` function, which incorporates robust internal checks against directory traversal. Do not attempt to implement custom path traversal protections manually.
