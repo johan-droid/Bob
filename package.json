@@ -25,6 +25,7 @@
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
     "next": "16.2.6",
+    "nodemailer": "^8.0.11",
     "pg": "^8.11.3",
     "postcss": "^8.5.15",
     "react": "19.2.6",
@@ -36,6 +37,7 @@
     "typescript": "6.0.3"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
     "eslint": "10.4.0",
     "eslint-config-next": "16.2.6"
   }

@@ -166,6 +166,7 @@ class PRHealthScanner:
                     f"retry {attempt + 1}/{max_retries} after {retry_delay}s"
                 )
                 time.sleep(retry_delay)
+                retry_delay *= 2
         
         # After all retries, if still None, treat as no conflict (conservative default)
         logger.warning(

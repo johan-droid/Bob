@@ -35,7 +35,44 @@ async function webhookResolvePr(repoFullName: string, prNumber: number) {
   await emitToRepoOwners(repoFullName);
 }
 
-async function queueRepoScanForOwners(repoFullName: string, reason: string) {
+
+async function checkDebounceAndFreshness(repoFullName: string, headSha?: string): Promise<boolean> {
+  const debounceMs = Number(process.env.WEBHOOK_DEBOUNCE_MS || 45000);
+  const freshnessMs = Number(process.env.PR_SCAN_FRESHNESS_MS || 300000);
+  const now = Date.now();
+
+  try {
+    const rows = await query(
+      'SELECT head_sha, last_scanned_at FROM pr_scan_state WHERE repo = $1 ORDER BY last_scanned_at DESC LIMIT 1',
+      [repoFullName]
+    );
+
+    if (rows && rows.length > 0) {
+      const lastScanned = new Date(rows[0].last_scanned_at).getTime();
+
+      // Phase 3: Debounce limit
+      if (now - lastScanned < debounceMs) {
+        console.log(`Webhook debounce limit hit for ${repoFullName}. Dropping event.`);
+        return true;
+      }
+
+      // Phase 3: Freshness limit
+      if (headSha && headSha === rows[0].head_sha && (now - lastScanned < freshnessMs)) {
+        console.log(`Webhook freshness limit hit for ${repoFullName} (head_sha unchanged). Dropping event.`);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check debounce and freshness:', err);
+  }
+
+  return false;
+}
+
+async function queueRepoScanForOwners(repoFullName: string, reason: string, headSha?: string) {
+  const shouldDrop = await checkDebounceAndFreshness(repoFullName, headSha);
+  if (shouldDrop) return;
+
   const owners = await query(
     'SELECT DISTINCT user_id FROM user_repos WHERE full_name = $1 AND agent_permission IN ($2, $3)',
     [repoFullName, 'write', 'admin']
@@ -97,12 +134,12 @@ export async function POST(request: Request) {
       if (action === 'closed' && pr.merged) {
         await webhookResolvePr(repoName, pr.number);
       } else if (['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(action)) {
-        await queueRepoScanForOwners(repoName, `pull_request:${pr.number || 'unknown'}:${action}`);
+        await queueRepoScanForOwners(repoName, `pull_request:${pr.number || 'unknown'}:${action}`, pr.head?.sha);
       }
     } else if (event === 'check_suite') {
       const cs = payload.check_suite || {};
       if (cs.status === 'completed') {
-        await queueRepoScanForOwners(repoName, `check_suite:${cs.id || 'unknown'}:${cs.conclusion || 'none'}`);
+        await queueRepoScanForOwners(repoName, `check_suite:${cs.id || 'unknown'}:${cs.conclusion || 'none'}`, cs.head_sha);
       } else if (cs.conclusion === 'failure') {
         await emitToRepoOwners(repoName);
       }
