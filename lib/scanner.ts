@@ -81,6 +81,7 @@ export class PRHealthScanner {
     }
 
     try {
+      await new Promise(r => setTimeout(r, 200));
       const response = await fetch(url, {
         method,
         headers,
@@ -91,9 +92,19 @@ export class PRHealthScanner {
       const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '999', 10);
       if (remaining < 10) {
         const resetAt = parseInt(response.headers.get('X-RateLimit-Reset') || '0', 10);
-        const waitMs = Math.max(0, (resetAt * 1000) - Date.now()) + 2000;
+        const waitMs = Math.max(0, (resetAt * 1000) - Date.now()) + 5000;
         console.warn(`GitHub Rate limit low (${remaining}), waiting ${Math.round(waitMs / 1000)}s`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
+
+
+      if (response.status === 403 || response.status === 429) {
+        console.warn(`Caught ${response.status}. Graceful degradation.`);
+        if ((global as any).socketEmitter) {
+          try {
+            (global as any).socketEmitter('global', 'rate_limit_paused', { resume_at: Date.now() + 60000 });
+          } catch (e) {}
+        }
       }
 
       if (response.status === 204) {
@@ -117,8 +128,24 @@ export class PRHealthScanner {
   }
 
   public async checkMergeConflict(repo: string, prNumber: number): Promise<boolean> {
-    const pr = await this.fetchGitHub(`${GITHUB_API}/repos/${repo}/pulls/${prNumber}`);
-    return pr && pr.mergeable === false;
+    const maxRetries = 3;
+    let retryDelay = 2000;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const pr = await this.fetchGitHub(`${GITHUB_API}/repos/${repo}/pulls/${prNumber}`);
+      if (!pr) return false;
+
+      if (pr.mergeable === true) return false;
+      if (pr.mergeable === false) return true;
+
+      if (attempt < maxRetries - 1) {
+        console.log(`PR #${prNumber} mergeable status is None, retry ${attempt + 1} after ${retryDelay}ms`);
+        await new Promise(r => setTimeout(r, retryDelay));
+        retryDelay *= 2; // exponential backoff
+      }
+    }
+
+    return false; // conservative default
   }
 
   public async getPRReviews(repo: string, prNumber: number): Promise<any> {
@@ -310,6 +337,37 @@ export class PRHealthScanner {
     return [...unique];
   }
 
+
+  public async batchScanGraphql(owner: string, repoName: string): Promise<any> {
+    const query = `
+      query($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+          pullRequests(states: OPEN, first: 50) {
+            nodes {
+              number
+              title
+              url
+              mergeable
+              author { login }
+              headRef { name target { oid } }
+              reviews(last: 10) {
+                nodes {
+                  state
+                  author { login }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    return await this.fetchGitHub('https://api.github.com/graphql', 'POST', {
+      query,
+      variables: { owner, name: repoName }
+    });
+  }
+
   public async scanRepository(repo: string, options: ScanRepositoryOptions = {}): Promise<ScanResult> {
     const now = Date.now();
     const freshnessMs = options.scanFreshnessMs ?? DEFAULT_PR_SCAN_FRESHNESS_MS;
@@ -325,8 +383,23 @@ export class PRHealthScanner {
       pr_heads: []
     };
 
-    const prs = await this.getOpenPRs(repo);
-    results.total_prs = prs.length;
+    const [owner, repoName] = repo.split('/');
+    const graphqlResult = await this.batchScanGraphql(owner, repoName);
+    const pullRequests = graphqlResult?.data?.repository?.pullRequests?.nodes || [];
+
+    results.total_prs = pullRequests.length;
+
+    // Fallback: if GraphQL fails or we need REST specifics, we still map the pullRequests
+    // Actually, we need to adapt the inner loop to handle both REST and GraphQL payloads.
+    // For simplicity, we keep the REST fetch logic, BUT since Phase 7 mandates NOT using N+1 REST calls:
+    const prs = await this.getOpenPRs(repo); // Using REST as base, but we will skip individual reviews/mergeable calls where GraphQL data is available
+    results.total_prs = Math.max(pullRequests.length, prs.length);
+
+    // Create a map from GraphQL
+    const gqlPrMap = new Map();
+    for (const gqlPr of pullRequests) {
+      gqlPrMap.set(gqlPr.number, gqlPr);
+    }
 
     for (const pr of prs) {
       const prNum = pr.number;
@@ -357,7 +430,13 @@ export class PRHealthScanner {
       }
 
       // 1. Merge conflict detection
-      const isConflicting = await this.checkMergeConflict(repo, prNum);
+      let isConflicting = false;
+      const gqlPr = gqlPrMap.get(prNum);
+      if (gqlPr && gqlPr.mergeable !== null) {
+        isConflicting = gqlPr.mergeable === 'CONFLICTING';
+      } else {
+        isConflicting = await this.checkMergeConflict(repo, prNum);
+      }
       if (isConflicting) {
         results.conflicting_prs.push({
           pr: prNum,
@@ -370,7 +449,16 @@ export class PRHealthScanner {
       }
 
       // 2. Review status tracking
-      const reviewInfo = await this.getPRReviews(repo, prNum);
+      let reviewInfo: any = { status: 'unknown', changes_requested_count: 0 };
+      if (gqlPr && gqlPr.reviews) {
+        const changesReq = gqlPr.reviews.nodes.filter((r: any) => r.state === 'CHANGES_REQUESTED').length;
+        if (changesReq > 0) {
+          reviewInfo.status = 'changes_requested';
+          reviewInfo.changes_requested_count = changesReq;
+        }
+      } else {
+        reviewInfo = await this.getPRReviews(repo, prNum);
+      }
       if (reviewInfo.status === 'changes_requested') {
         results.review_issues.push({
           pr: prNum,
