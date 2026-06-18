@@ -1074,6 +1074,13 @@ def action_rebase_contract():
     if not user:
         return jsonify({'ok': False, 'error': 'User not authenticated'}), 401
     
+    # 🛡️ Sentinel: Enforce authorization check (IDOR prevention)
+    # Verify the user actually has write access to the target repository
+    user_repo = UserRepo.query.filter_by(user_id=user.id, full_name=repo).first()
+    if not user_repo or user_repo.permissions_level not in ('push', 'admin', 'owner'):
+        logger.warning(f"Authorization bypass attempt: User {user.username} tried to rebase on {repo}")
+        return jsonify({'ok': False, 'error': 'You do not have write access to this repository'}), 403
+
     token = get_user_token(user.id) or GITHUB_TOKEN
     if not token:
         return jsonify({'ok': False, 'error': 'No GitHub token available'}), 401
@@ -1190,6 +1197,16 @@ def action_approve_merge_contract():
     if err:
         return err
 
+    # 🛡️ Sentinel: Enforce authorization check (IDOR prevention)
+    user = current_user()
+    if not user:
+        return jsonify({'ok': False, 'error': 'User not authenticated'}), 401
+
+    user_repo = UserRepo.query.filter_by(user_id=user.id, full_name=repo).first()
+    if not user_repo or user_repo.permissions_level not in ('admin', 'owner'):
+        logger.warning(f"Authorization bypass attempt: User {user.username} tried to approve+merge on {repo}")
+        return jsonify({'ok': False, 'error': 'You do not have maintain access to this repository'}), 403
+
     dry_run = bool(data.get('dry_run', True))
     merge_method = (data.get('merge_method') or 'squash').strip()
     contract = {
@@ -1206,6 +1223,7 @@ def action_approve_merge_contract():
 
     if dry_run:
         return jsonify({'ok': True, 'contract': contract}), 200
+
     return jsonify({'ok': False, 'error': 'Execution disabled. Use dry_run=true for contract preview.', 'contract': contract}), 501
 
 
