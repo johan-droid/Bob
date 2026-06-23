@@ -176,7 +176,7 @@ function renderList(containerId, items) {
                 </div>
             </div>
             <div style="display: flex; gap: 12px; align-items: center;">
-                <select class="input-field" style="background: var(--bg-overlay); border: 1px solid var(--border); color: var(--text-primary); height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${pr.id}, this.value)">
+                <select class="input-field" style="background: var(--bg-overlay); border: 1px solid var(--border); color: var(--text-primary); height: 32px; padding: 0 8px; font-size: 11px; border-radius: 10px; outline: none;" onchange="setStatus(${escHtml(pr.id)}, this.value)">
                     ${['pending','in_progress','failed','resolved'].map(s => `<option value="${s}" ${pr.status===s?'selected':''}>${capitalize(s)}</option>`).join('')}
                 </select>
                 <a href="${escHtml(pr.url || '#')}" target="_blank" rel="noopener noreferrer" class="material-symbols-outlined" style="color: var(--accent); text-decoration: none; font-size: 22px;">open_in_new</a>
@@ -208,7 +208,7 @@ function renderRepos(repos) {
             <span class="material-symbols-outlined bento-bg-icon">${icon}</span>
             <div style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 1;">
                 <div>
-                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent); font-weight: 700; letter-spacing: 1px;">${r.language || 'UNKNOWN'}</div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent); font-weight: 700; letter-spacing: 1px;">${escHtml(r.language) || 'UNKNOWN'}</div>
                     <div class="text-title" style="margin-top: 6px; font-size: 20px; color: var(--text-primary);">${escHtml(r.full_name.split('/')[1])}</div>
                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 500;">${escHtml(r.full_name.split('/')[0])}</div>
                 </div>
@@ -220,7 +220,7 @@ function renderRepos(repos) {
                 <div style="display: flex; gap: 16px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span class="material-symbols-outlined" style="font-size: 16px; color: var(--danger);">report</span>
-                        <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${r.issue_count}</span>
+                        <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${escHtml(r.issue_count)}</span>
                     </div>
                     <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${escHtml(r.permissions_level)}</div>
                 </div>
