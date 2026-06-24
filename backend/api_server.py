@@ -316,19 +316,22 @@ def _react_export_exists():
 
 def _react_page_response(route_path=''):
     """Serve the exported Next.js page when available; fall back to legacy templates locally."""
+    from werkzeug.exceptions import NotFound
     normalized = route_path.strip('/')
     candidates = []
     if not normalized:
-        candidates.append(os.path.join(REACT_DIST_DIR, 'index.html'))
+        candidates.append('index.html')
     else:
         candidates.extend([
-            os.path.join(REACT_DIST_DIR, normalized, 'index.html'),
-            os.path.join(REACT_DIST_DIR, f'{normalized}.html'),
+            f"{normalized}/index.html",
+            f"{normalized}.html",
         ])
 
     for candidate in candidates:
-        if os.path.exists(candidate):
-            return send_from_directory(os.path.dirname(candidate), os.path.basename(candidate))
+        try:
+            return send_from_directory(REACT_DIST_DIR, candidate)
+        except NotFound:
+            continue
 
     if _react_export_exists():
         return send_from_directory(REACT_DIST_DIR, 'index.html')
