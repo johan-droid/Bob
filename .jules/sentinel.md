@@ -34,6 +34,11 @@
 **Vulnerability:** The `action_rebase_contract` and `action_approve_merge_contract` endpoints in `backend/api_server.py` did not verify if the authenticated user possessed the necessary permissions for the requested repository before executing actions or returning payloads.
 **Learning:** Relying solely on authentication (e.g., `@login_required`) is insufficient for endpoints interacting with resources (like repositories). Users must also be explicitly authorized (e.g., verifying their `permissions_level` against the target resource).
 **Prevention:** Always implement an authorization gate querying the association table (e.g., `UserRepo`) to ensure the user has appropriate roles (like 'push', 'admin', 'owner') before processing sensitive requests.
+
+## 2025-02-23 - [Frontend XSS Prevention]
+**Vulnerability:** Unescaped variables injected directly into DOM via `.innerHTML` in `frontend/app.js` and `frontend/org/dashboard-data.js` using string literals. Variables like `r.language`, `r.issue_count`, `pr.id` and `emptyMessage` could lead to XSS.
+**Learning:** Even internal variables like `emptyMessage` or numbers like `pr.id` should be escaped or properly cast when injected as HTML attributes using string interpolation. This prevents potential future regressions where these variables might become user-controlled.
+**Prevention:** Always use `escHtml` or `escapeHtml` consistently when constructing HTML using template literals assigned to `.innerHTML`.
 ## 2026-06-23 - [Missing CSRF Token in Frontend Fetch Requests]
 **Vulnerability:** The `fetch` call for deleting a user account (`POST /api/account/delete`) in `frontend/user/dashboard.html` omitted the `X-CSRFToken` header. Because Flask-WTF enforces CSRF protection globally on the backend, the missing token caused the action to fail (and inherently exposed a lack of CSRF protection if the backend check were bypassed).
 **Learning:** Frontend fetch requests making state-changing (e.g., POST) calls to CSRF-protected endpoints must explicitly include the CSRF token. If a meta tag is not available, the token must be fetched dynamically from the backend (e.g., via `/api/csrf-token`) and passed in the `X-CSRFToken` header.

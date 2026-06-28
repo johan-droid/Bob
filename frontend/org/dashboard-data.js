@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const authorInitial = authorName.charAt(0).toUpperCase();
 
         return `
-            <div class="pr-card" id="pr-${pr.id}">
+            <div class="pr-card" id="pr-${escapeHtml(pr.id)}">
                 <div class="pr-card-header">
                     <div class="pr-title">${escapeHtml(pr.title || 'Untitled PR')}</div>
                     <div class="pr-badges">${badgesHtml}</div>
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="pr-card-footer">
                     <a href="${escapeHtml(pr.url || '#')}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">View PR</a>
-                    <button class="btn btn-sm btn-outline dismiss-btn" data-id="${pr.id}">Dismiss</button>
+                    <button class="btn btn-sm btn-outline dismiss-btn" data-id="${escapeHtml(pr.id)}">Dismiss</button>
                 </div>
             </div>
         `;
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = `
                 <div class="empty-state">
                     <span class="material-symbols-outlined">check_circle</span>
-                    <p>${emptyMessage}</p>
+                    <p>${escapeHtml(emptyMessage)}</p>
                 </div>
             `;
             return;
