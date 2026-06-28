@@ -161,9 +161,16 @@
 
                 confirmBtn.addEventListener('click', async () => {
                     try {
+                        const csrfRes = await fetch('/api/csrf-token');
+                        const csrfData = await csrfRes.json();
+                        const csrfToken = csrfData.csrf_token;
+
                         const response = await fetch('/api/account/delete', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' }
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            }
                         });
 
                         if (response.ok || response.status === 200 || response.status === 204) {
