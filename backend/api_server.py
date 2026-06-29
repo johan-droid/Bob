@@ -162,12 +162,18 @@ init_db(app)
 
 
 @app.after_request
-def add_no_cache_headers(response):
-    """Prevent HTML documents from being cached across deploys."""
+def add_security_headers(response):
+    """Prevent HTML caching and apply defense-in-depth security headers."""
     if response.mimetype == 'text/html':
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+
+    # Security headers applied to all responses
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
     return response
 
 def ensure_schema():
