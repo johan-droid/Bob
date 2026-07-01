@@ -162,8 +162,13 @@ init_db(app)
 
 
 @app.after_request
-def add_no_cache_headers(response):
-    """Prevent HTML documents from being cached across deploys."""
+def add_security_headers(response):
+    """Add global security headers and prevent HTML documents from being cached."""
+    # 🛡️ Sentinel: Enforce global security headers
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+
     if response.mimetype == 'text/html':
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
